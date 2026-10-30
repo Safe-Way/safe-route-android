@@ -8,9 +8,16 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import com.deungbul.anshimgil.data.Facility
 import com.deungbul.anshimgil.data.FacilityKind
+import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.MapLayers
+import com.deungbul.anshimgil.data.RouteResult
+import com.deungbul.anshimgil.data.RouteType
 import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.LatLng
+import com.kakao.vectormap.camera.CameraUpdateFactory
+import com.kakao.vectormap.route.RouteLineOptions
+import com.kakao.vectormap.route.RouteLineSegment
+import com.kakao.vectormap.route.RouteLineStyle
 import com.kakao.vectormap.label.LabelOptions
 import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
@@ -48,8 +55,67 @@ fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
 
 private val Facility.latLng: LatLng get() = LatLng.from(lat, lon)
 
+fun LatLon.toLatLng(): LatLng = LatLng.from(lat, lon)
+
+/**
+ * Draws both routes (the [selected] one on top and stronger), facility tags along them,
+ * and start/end markers, then fits the camera to the routes.
+ */
+fun KakaoMap.showRoutes(context: Context, result: RouteResult, selected: RouteType, destinationName: String) {
+    showLayers(context, MapLayers(result.facilities, zones = emptyList()))
+    val density = context.resources.displayMetrics.density
+    val lineLayer = routeLineManager?.layer ?: return
+    lineLayer.removeAll()
+
+    // Draw the unselected route first so the selected one sits on top.
+    result.routes.sortedBy { it.type == selected }.forEach { route ->
+        val isSelected = route.type == selected
+        val color = when (route.type) {
+            RouteType.SAFE -> if (isSelected) 0xFF1F6B42 else 0xFF86A893
+            RouteType.SHORTEST -> if (isSelected) 0xFF17211B else 0xFF8A968E
+        }.toInt()
+        val width = (if (isSelected) 8f else 5f) * density
+        val style = RouteLineStyle.from(width, color, 1.5f * density, 0xFFFFFFFF.toInt())
+        lineLayer.addRouteLine(
+            RouteLineOptions.from(RouteLineSegment.from(route.path.map { it.toLatLng() }, style)),
+        )
+    }
+
+    val path = result.route(selected)?.path ?: result.routes.firstOrNull()?.path ?: return
+    labelManager?.layer?.let { labels ->
+        labels.addLabel(
+            LabelOptions.from(path.first().toLatLng())
+                .setStyles(LabelStyles.from(LabelStyle.from(dotBitmap(0xFF2F6FDB.toInt(), density)).setApplyDpScale(false))),
+        )
+        labels.addLabel(
+            LabelOptions.from(path.last().toLatLng())
+                .setStyles(
+                    LabelStyles.from(
+                        LabelStyle.from(pillBitmap(destinationName.take(12), 0xFFB42318.toInt(), density))
+                            .setAnchorPoint(0.5f, 1f)
+                            .setApplyDpScale(false),
+                    ),
+                ),
+        )
+    }
+
+    val points = result.routes.flatMap { it.path }.map { it.toLatLng() }.toTypedArray()
+    if (points.isNotEmpty()) moveCamera(CameraUpdateFactory.fitMapPoints(points, (48 * density).toInt()))
+}
+
+/** A filled circle with a white ring, used for the user's position. */
+fun dotBitmap(color: Int, density: Float, sizeDp: Float = 18f): Bitmap {
+    val size = (sizeDp * density).toInt()
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val r = size / 2f
+    canvas.drawCircle(r, r, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = 0xFFFFFFFF.toInt() })
+    canvas.drawCircle(r, r, r - 3f * density, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+    return bitmap
+}
+
 /** A white rounded tag with a colored border and bold text, like the design mockup. */
-private fun pillBitmap(text: String, color: Int, density: Float): Bitmap {
+internal fun pillBitmap(text: String, color: Int, density: Float): Bitmap {
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         this.color = color
         textSize = 13f * density
