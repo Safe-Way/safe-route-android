@@ -3,11 +3,8 @@ package com.deungbul.anshimgil.data
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-
-private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 
 /**
  * Keeps the chosen mode on this phone only. It is never sent to the server for storage (NFR-07).
