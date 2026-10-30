@@ -20,8 +20,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.ModeRepository
+import com.deungbul.anshimgil.data.Place
 import com.deungbul.anshimgil.data.PlaceRepository
+import com.deungbul.anshimgil.data.RouteRepository
+import com.deungbul.anshimgil.map.CHOSUN_UNIV
+import com.deungbul.anshimgil.ui.route.RouteScreen
 import com.deungbul.anshimgil.data.SavedPlacesRepository
 import com.deungbul.anshimgil.data.UserMode
 import com.deungbul.anshimgil.ui.search.SearchScreen
@@ -39,10 +44,11 @@ class MainActivity : ComponentActivity() {
         val modeRepository = ModeRepository(applicationContext)
         val savedPlaces = SavedPlacesRepository(applicationContext)
         val placeRepository = PlaceRepository.create()
+        val routeRepository = RouteRepository.create()
         setContent {
             SeipjidoTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    AppRoot(modeRepository, savedPlaces, placeRepository, Modifier.padding(innerPadding))
+                    AppRoot(modeRepository, savedPlaces, placeRepository, routeRepository, Modifier.padding(innerPadding))
                 }
             }
         }
@@ -59,7 +65,11 @@ private sealed interface SavedMode {
 private sealed interface Screen {
     data object Home : Screen
     data object Search : Screen
+    data class Route(val destination: Place) : Screen
 }
+
+/** Where routes start until GPS is wired in (#7): the Chosun University demo area. */
+private val DEMO_ORIGIN = LatLon(CHOSUN_UNIV.latitude, CHOSUN_UNIV.longitude)
 
 /** First launch shows the mode picker; after that the map opens directly. */
 @Composable
@@ -67,6 +77,7 @@ fun AppRoot(
     modeRepository: ModeRepository,
     savedPlaces: SavedPlacesRepository,
     placeRepository: PlaceRepository,
+    routeRepository: RouteRepository,
     modifier: Modifier = Modifier,
 ) {
     val savedFlow = remember(modeRepository) { modeRepository.mode.map { SavedMode.Ready(it) } }
@@ -102,8 +113,21 @@ fun AppRoot(
                         placeRepository = placeRepository,
                         savedPlaces = savedPlaces,
                         onBack = { screen = Screen.Home },
-                        onPlaceSelected = { place ->
-                            Toast.makeText(context, "경로 화면 준비 중: ${place.name}", Toast.LENGTH_SHORT).show()
+                        onPlaceSelected = { place -> screen = Screen.Route(place) },
+                        modifier = modifier,
+                    )
+                }
+                screen is Screen.Route -> {
+                    val destination = (screen as Screen.Route).destination
+                    BackHandler { screen = Screen.Search }
+                    RouteScreen(
+                        mode = mode,
+                        origin = DEMO_ORIGIN,
+                        destination = destination,
+                        routeRepository = routeRepository,
+                        onBack = { screen = Screen.Search },
+                        onStart = { _, _ ->
+                            Toast.makeText(context, "길안내 화면 준비 중", Toast.LENGTH_SHORT).show()
                         },
                         modifier = modifier,
                     )
