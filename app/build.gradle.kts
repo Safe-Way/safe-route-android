@@ -11,6 +11,8 @@ val localProperties = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 val kakaoNativeAppKey: String = localProperties.getProperty("KAKAO_NATIVE_APP_KEY", "")
+// e.g. http://10.0.2.2:8080 for a server on this computer seen from the emulator. Blank = example data.
+val serverBaseUrl: String = localProperties.getProperty("SERVER_BASE_URL", "")
 
 android {
     namespace = "com.deungbul.anshimgil"
@@ -28,6 +30,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "KAKAO_NATIVE_APP_KEY", "\"$kakaoNativeAppKey\"")
+        buildConfigField("String", "SERVER_BASE_URL", "\"$serverBaseUrl\"")
     }
 
     buildTypes {

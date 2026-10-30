@@ -21,7 +21,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.deungbul.anshimgil.data.ModeRepository
+import com.deungbul.anshimgil.data.PlaceRepository
+import com.deungbul.anshimgil.data.SavedPlacesRepository
 import com.deungbul.anshimgil.data.UserMode
+import com.deungbul.anshimgil.ui.search.SearchScreen
 import com.deungbul.anshimgil.ui.common.MapMessage
 import com.deungbul.anshimgil.ui.home.HomeScreen
 import com.deungbul.anshimgil.ui.mode.ModeSelectScreen
@@ -34,10 +37,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val modeRepository = ModeRepository(applicationContext)
+        val savedPlaces = SavedPlacesRepository(applicationContext)
+        val placeRepository = PlaceRepository.create()
         setContent {
             SeipjidoTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    AppRoot(modeRepository, Modifier.padding(innerPadding))
+                    AppRoot(modeRepository, savedPlaces, placeRepository, Modifier.padding(innerPadding))
                 }
             }
         }
@@ -50,12 +55,24 @@ private sealed interface SavedMode {
     data class Ready(val mode: UserMode?) : SavedMode
 }
 
+/** Screens reachable from the home map. */
+private sealed interface Screen {
+    data object Home : Screen
+    data object Search : Screen
+}
+
 /** First launch shows the mode picker; after that the map opens directly. */
 @Composable
-fun AppRoot(modeRepository: ModeRepository, modifier: Modifier = Modifier) {
+fun AppRoot(
+    modeRepository: ModeRepository,
+    savedPlaces: SavedPlacesRepository,
+    placeRepository: PlaceRepository,
+    modifier: Modifier = Modifier,
+) {
     val savedFlow = remember(modeRepository) { modeRepository.mode.map { SavedMode.Ready(it) } }
     val saved by savedFlow.collectAsStateWithLifecycle(initialValue = SavedMode.Loading)
     var changingMode by rememberSaveable { mutableStateOf(false) }
+    var screen by remember { mutableStateOf<Screen>(Screen.Home) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -79,11 +96,21 @@ fun AppRoot(modeRepository: ModeRepository, modifier: Modifier = Modifier) {
                 }
                 BuildConfig.KAKAO_NATIVE_APP_KEY.isBlank() ->
                     MapMessage("local.properties에 KAKAO_NATIVE_APP_KEY를 넣고 다시 빌드해 주세요.", modifier)
+                screen == Screen.Search -> {
+                    BackHandler { screen = Screen.Home }
+                    SearchScreen(
+                        placeRepository = placeRepository,
+                        savedPlaces = savedPlaces,
+                        onBack = { screen = Screen.Home },
+                        onPlaceSelected = { place ->
+                            Toast.makeText(context, "경로 화면 준비 중: ${place.name}", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = modifier,
+                    )
+                }
                 else -> HomeScreen(
                     mode = mode,
-                    onOpenSearch = {
-                        Toast.makeText(context, "검색 화면은 준비 중이에요", Toast.LENGTH_SHORT).show()
-                    },
+                    onOpenSearch = { screen = Screen.Search },
                     // Opens the mode picker until the settings screen (#8) exists.
                     onOpenSettings = { changingMode = true },
                     modifier = modifier,
