@@ -25,6 +25,9 @@ import com.deungbul.anshimgil.data.ModeRepository
 import com.deungbul.anshimgil.data.Place
 import com.deungbul.anshimgil.data.PlaceRepository
 import com.deungbul.anshimgil.data.RouteRepository
+import com.deungbul.anshimgil.data.RouteResult
+import com.deungbul.anshimgil.data.RouteType
+import com.deungbul.anshimgil.ui.guide.GuideScreen
 import com.deungbul.anshimgil.map.CHOSUN_UNIV
 import com.deungbul.anshimgil.ui.route.RouteScreen
 import com.deungbul.anshimgil.data.SavedPlacesRepository
@@ -66,6 +69,7 @@ private sealed interface Screen {
     data object Home : Screen
     data object Search : Screen
     data class Route(val destination: Place) : Screen
+    data class Guide(val destination: Place, val result: RouteResult, val type: RouteType) : Screen
 }
 
 /** Where routes start until GPS is wired in (#7): the Chosun University demo area. */
@@ -126,9 +130,19 @@ fun AppRoot(
                         destination = destination,
                         routeRepository = routeRepository,
                         onBack = { screen = Screen.Search },
-                        onStart = { _, _ ->
-                            Toast.makeText(context, "길안내 화면 준비 중", Toast.LENGTH_SHORT).show()
-                        },
+                        onStart = { result, type -> screen = Screen.Guide(destination, result, type) },
+                        modifier = modifier,
+                    )
+                }
+                screen is Screen.Guide -> {
+                    val guide = screen as Screen.Guide
+                    BackHandler { screen = Screen.Route(guide.destination) }
+                    GuideScreen(
+                        mode = mode,
+                        result = guide.result,
+                        type = guide.type,
+                        destinationName = guide.destination.name,
+                        onFinish = { screen = Screen.Home },
                         modifier = modifier,
                     )
                 }
