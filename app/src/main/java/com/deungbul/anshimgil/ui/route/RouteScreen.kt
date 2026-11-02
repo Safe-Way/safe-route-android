@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -47,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.deungbul.anshimgil.data.ALL_CONDITION_KEYS
 import com.deungbul.anshimgil.data.ApiException
 import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.Place
@@ -81,12 +83,13 @@ fun RouteScreen(
     origin: LatLon,
     destination: Place,
     routeRepository: RouteRepository,
+    autoConditions: Boolean,
     onBack: () -> Unit,
     onStart: (RouteResult, RouteType) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var conditionsOff by rememberSaveable { mutableStateOf(setOf<String>()) }
+    var conditionsOff by rememberSaveable { mutableStateOf(if (autoConditions) emptySet() else ALL_CONDITION_KEYS) }
     var selected by rememberSaveable { mutableStateOf(RouteType.SAFE) }
     var state by remember { mutableStateOf<RouteState>(RouteState.Loading) }
     var retry by remember { mutableIntStateOf(0) }
@@ -152,6 +155,8 @@ fun RouteScreen(
                                     conditionsOff = if (condition.on) conditionsOff + condition.key else conditionsOff - condition.key
                                 },
                                 label = { Text(condition.label + if (condition.on) "" else " 끔", fontSize = 14.sp) },
+                                // Solid background so the text stays readable over the map.
+                                colors = FilterChipDefaults.filterChipColors(containerColor = Color.White),
                                 modifier = Modifier.heightIn(min = 40.dp),
                             )
                         }

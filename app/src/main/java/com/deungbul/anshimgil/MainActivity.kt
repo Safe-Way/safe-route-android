@@ -1,7 +1,6 @@
 package com.deungbul.anshimgil
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -11,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,8 +18,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.deungbul.anshimgil.data.AppSettings
 import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.ModeRepository
 import com.deungbul.anshimgil.data.Place
@@ -31,7 +33,10 @@ import com.deungbul.anshimgil.ui.guide.GuideScreen
 import com.deungbul.anshimgil.map.CHOSUN_UNIV
 import com.deungbul.anshimgil.ui.route.RouteScreen
 import com.deungbul.anshimgil.data.SavedPlacesRepository
+import com.deungbul.anshimgil.data.SettingsRepository
+import com.deungbul.anshimgil.data.TextSize
 import com.deungbul.anshimgil.data.UserMode
+import com.deungbul.anshimgil.ui.settings.SettingsScreen
 import com.deungbul.anshimgil.ui.search.SearchScreen
 import com.deungbul.anshimgil.ui.common.MapMessage
 import com.deungbul.anshimgil.ui.home.HomeScreen
@@ -48,14 +53,31 @@ class MainActivity : ComponentActivity() {
         val savedPlaces = SavedPlacesRepository(applicationContext)
         val placeRepository = PlaceRepository.create()
         val routeRepository = RouteRepository.create()
+        val settingsRepository = SettingsRepository(applicationContext)
         setContent {
+            val settings by settingsRepository.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
             SeipjidoTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    AppRoot(modeRepository, savedPlaces, placeRepository, routeRepository, Modifier.padding(innerPadding))
+                ScaledText(settings.textSize) {
+                    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                        AppRoot(
+                            modeRepository, savedPlaces, placeRepository, routeRepository,
+                            settingsRepository, settings, Modifier.padding(innerPadding),
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+/** Applies the text size chosen in settings on top of the phone's own font size. */
+@Composable
+private fun ScaledText(size: TextSize, content: @Composable () -> Unit) {
+    val density = LocalDensity.current
+    CompositionLocalProvider(
+        LocalDensity provides Density(density.density, density.fontScale * size.scale),
+        content = content,
+    )
 }
 
 /** Saved mode as read from the phone; [Loading] until the first read finishes. */
@@ -68,6 +90,7 @@ private sealed interface SavedMode {
 private sealed interface Screen {
     data object Home : Screen
     data object Search : Screen
+    data object Settings : Screen
     data class Route(val destination: Place) : Screen
     data class Guide(val destination: Place, val result: RouteResult, val type: RouteType) : Screen
 }
@@ -82,6 +105,8 @@ fun AppRoot(
     savedPlaces: SavedPlacesRepository,
     placeRepository: PlaceRepository,
     routeRepository: RouteRepository,
+    settingsRepository: SettingsRepository,
+    settings: AppSettings,
     modifier: Modifier = Modifier,
 ) {
     val savedFlow = remember(modeRepository) { modeRepository.mode.map { SavedMode.Ready(it) } }
@@ -89,7 +114,6 @@ fun AppRoot(
     var changingMode by rememberSaveable { mutableStateOf(false) }
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
 
     when (val state = saved) {
         SavedMode.Loading -> Box(modifier.fillMaxSize())
@@ -111,6 +135,20 @@ fun AppRoot(
                 }
                 BuildConfig.KAKAO_NATIVE_APP_KEY.isBlank() ->
                     MapMessage("local.properties에 KAKAO_NATIVE_APP_KEY를 넣고 다시 빌드해 주세요.", modifier)
+                screen == Screen.Settings -> {
+                    BackHandler { screen = Screen.Home }
+                    SettingsScreen(
+                        mode = mode,
+                        settings = settings,
+                        onBack = { screen = Screen.Home },
+                        onChangeMode = { changingMode = true },
+                        onManagePlaces = { screen = Screen.Search },
+                        onVoiceChange = { scope.launch { settingsRepository.setVoiceGuide(it) } },
+                        onAutoConditionsChange = { scope.launch { settingsRepository.setAutoConditions(it) } },
+                        onTextSizeChange = { scope.launch { settingsRepository.setTextSize(it) } },
+                        modifier = modifier,
+                    )
+                }
                 screen == Screen.Search -> {
                     BackHandler { screen = Screen.Home }
                     SearchScreen(
@@ -129,6 +167,7 @@ fun AppRoot(
                         origin = DEMO_ORIGIN,
                         destination = destination,
                         routeRepository = routeRepository,
+                        autoConditions = settings.autoConditions,
                         onBack = { screen = Screen.Search },
                         onStart = { result, type -> screen = Screen.Guide(destination, result, type) },
                         modifier = modifier,
@@ -142,6 +181,7 @@ fun AppRoot(
                         result = guide.result,
                         type = guide.type,
                         destinationName = guide.destination.name,
+                        voiceByDefault = settings.voiceGuide,
                         onFinish = { screen = Screen.Home },
                         modifier = modifier,
                     )
@@ -149,8 +189,7 @@ fun AppRoot(
                 else -> HomeScreen(
                     mode = mode,
                     onOpenSearch = { screen = Screen.Search },
-                    // Opens the mode picker until the settings screen (#8) exists.
-                    onOpenSettings = { changingMode = true },
+                    onOpenSettings = { screen = Screen.Settings },
                     modifier = modifier,
                 )
             }
