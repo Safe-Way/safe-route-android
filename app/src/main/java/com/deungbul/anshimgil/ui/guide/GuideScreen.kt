@@ -99,6 +99,7 @@ fun GuideScreen(
     result: RouteResult,
     type: RouteType,
     destinationName: String,
+    voiceByDefault: Boolean,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -107,7 +108,7 @@ fun GuideScreen(
     val guidance = remember(route) { Guidance(route.path, result.facilities) }
     var fix by remember { mutableStateOf<LatLon?>(null) }
     var demoProgress by remember { mutableDoubleStateOf(0.0) }
-    var voiceOn by rememberSaveable { mutableStateOf(true) }
+    var voiceOn by rememberSaveable { mutableStateOf(voiceByDefault) }
     var map by remember { mutableStateOf<KakaoMap?>(null) }
     var me by remember { mutableStateOf<Label?>(null) }
     val scope = rememberCoroutineScope()
