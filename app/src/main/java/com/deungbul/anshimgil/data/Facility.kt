@@ -23,13 +23,11 @@ data class Zone(val label: String, val fillColor: Long, val strokeColor: Long, v
 /** What one mode shows on the map. */
 data class MapLayers(val facilities: List<Facility>, val zones: List<Zone>)
 
-/** Which facility types each mode shows (issue #3). */
+/** Which facility types each mode shows (issue #3). Every mode shows CCTV, as the team agreed. */
 val UserMode.facilityKinds: Set<FacilityKind>
     get() = when (this) {
-        UserMode.CHILD -> setOf(FacilityKind.GUARD_HOUSE, FacilityKind.CCTV)
+        UserMode.CHILD -> setOf(FacilityKind.GUARD_HOUSE)
         UserMode.SENIOR -> setOf(FacilityKind.HEAT_SHELTER, FacilityKind.COLD_SHELTER, FacilityKind.TOILET)
         UserMode.DISABLED -> setOf(FacilityKind.ACCESSIBLE_TOILET, FacilityKind.ELEVATOR, FacilityKind.STAIRS)
-        UserMode.GENERAL -> setOf(
-            FacilityKind.CCTV, FacilityKind.EMERGENCY_BELL, FacilityKind.POLICE, FacilityKind.CONVENIENCE_STORE,
-        )
-    }
+        UserMode.GENERAL -> setOf(FacilityKind.EMERGENCY_BELL, FacilityKind.POLICE, FacilityKind.CONVENIENCE_STORE)
+    } + FacilityKind.CCTV

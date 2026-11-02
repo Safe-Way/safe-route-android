@@ -69,11 +69,11 @@ fun UserMode.style(): ModeStyle = when (this) {
         Icons.Filled.Backpack, Color(0xFFFFF1C9), Color(0xFF8A5A00),
     )
     UserMode.SENIOR -> ModeStyle(
-        "어르신", "계단 없이 쉬엄쉬엄", "무더위쉼터, 한파쉼터, 공중화장실",
+        "어르신", "계단 없이 쉬엄쉬엄", "무더위쉼터, 한파쉼터, 공중화장실, CCTV",
         Icons.Filled.Chair, Color(0xFFE3F2E6), Color(0xFF1F6B42),
     )
     UserMode.DISABLED -> ModeStyle(
-        "장애인", "휠체어로 편한 길", "장애인 화장실, 엘리베이터, 계단 구간",
+        "장애인", "휠체어로 편한 길", "장애인 화장실, 엘리베이터, 계단 구간, CCTV",
         Icons.Filled.Elevator, Color(0xFFE1EBFB), Color(0xFF1D4ED8),
     )
     UserMode.GENERAL -> ModeStyle(
