@@ -4,21 +4,21 @@ package com.deungbul.anshimgil.data
  * Facility types shown on the map. [color] is the label's border and text color (ARGB).
  * [avoid] marks places the route steers away from rather than toward, so they are never offered as help.
  */
-enum class FacilityKind(val label: String, val color: Long, val avoid: Boolean = false) {
+enum class FacilityKind(val label: String, val color: Long, val avoid: Boolean = false, val title: String = label) {
     CCTV("CCTV", 0xFF1F6B42),
-    POLICE("파출소", 0xFF1D4ED8),
-    GUARD_HOUSE("지킴이집", 0xFFC2410C),
+    POLICE("파출소", 0xFF1D4ED8, title = "경찰서·파출소"),
+    GUARD_HOUSE("지킴이집", 0xFFC2410C, title = "아동안전지킴이집"),
     EMERGENCY_BELL("비상벨", 0xFFB42318),
     CONVENIENCE_STORE("편의점", 0xFF0F766E),
     HEAT_SHELTER("무더위쉼터", 0xFFC2410C),
     COLD_SHELTER("한파쉼터", 0xFF1D4ED8),
-    TOILET("화장실", 0xFF0F766E),
+    TOILET("화장실", 0xFF0F766E, title = "공중화장실"),
     ACCESSIBLE_TOILET("장애인 화장실", 0xFF7C2D12),
-    CURB_RAMP("턱 낮춘 횡단보도", 0xFF1D4ED8),
+    CURB_RAMP("턱 낮춘 횡단보도", 0xFF1D4ED8, title = "보도턱 낮춘 횡단보도"),
     /** Overpass with an elevator. */
-    ELEVATOR("엘리베이터 육교", 0xFF6D28D9),
-    OVERPASS("육교", 0xFFB42318, avoid = true),
-    STAIRS("계단", 0xFFB42318, avoid = true),
+    ELEVATOR("엘리베이터 육교", 0xFF6D28D9, title = "엘리베이터 있는 육교"),
+    OVERPASS("육교", 0xFFB42318, avoid = true, title = "육교 (피할 곳)"),
+    STAIRS("계단", 0xFFB42318, avoid = true, title = "계단 (피할 곳)"),
 }
 
 data class Facility(val kind: FacilityKind, val lat: Double, val lon: Double)
@@ -44,3 +44,22 @@ val UserMode.facilityKinds: Set<FacilityKind>
         )
         UserMode.GENERAL -> emptySet()
     } + COMMON_FACILITY_KINDS
+
+/** Settings key for child protection zones, which are areas rather than a [FacilityKind]. */
+const val CHILD_ZONE_KEY = "CHILD_ZONE"
+
+/** Something a user can add to the map in settings: a [FacilityKind] name or [CHILD_ZONE_KEY]. */
+data class MapItem(val key: String, val title: String)
+
+/** Items this mode does not show by default, in the order settings lists them. */
+val UserMode.optionalMapItems: List<MapItem>
+    get() = buildList {
+        if (this@optionalMapItems != UserMode.CHILD) add(MapItem(CHILD_ZONE_KEY, "어린이 보호구역"))
+        FacilityKind.entries.filter { it !in facilityKinds }.forEach { add(MapItem(it.name, it.title)) }
+    }
+
+/** Facility kinds shown for this mode plus the ones the user added in settings. */
+fun UserMode.shownKinds(extras: Set<String>): Set<FacilityKind> =
+    facilityKinds + FacilityKind.entries.filter { it.name in extras }
+
+fun UserMode.showsChildZones(extras: Set<String>): Boolean = this == UserMode.CHILD || CHILD_ZONE_KEY in extras

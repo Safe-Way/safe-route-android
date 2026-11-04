@@ -141,6 +141,7 @@ fun AppRoot(
                         onVoiceChange = { scope.launch { settingsRepository.setVoiceGuide(it) } },
                         onAutoConditionsChange = { scope.launch { settingsRepository.setAutoConditions(it) } },
                         onTextSizeChange = { scope.launch { settingsRepository.setTextSize(it) } },
+                        onExtraMapItemChange = { key, on -> scope.launch { settingsRepository.setExtraMapItem(key, on) } },
                         modifier = modifier,
                     )
                 }
@@ -182,6 +183,7 @@ fun AppRoot(
                 }
                 else -> HomeScreen(
                     mode = mode,
+                    extraMapItems = settings.extraMapItems,
                     onOpenSearch = { screen = Screen.Search },
                     onOpenSettings = { screen = Screen.Settings },
                     modifier = modifier,

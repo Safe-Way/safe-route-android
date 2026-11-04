@@ -35,11 +35,12 @@ object FakeFacilities {
         ),
     )
 
-    fun layersFor(mode: UserMode): MapLayers {
-        val kinds = mode.facilityKinds
+    /** [extras] are the items the user added in settings (see [optionalMapItems]). */
+    fun layersFor(mode: UserMode, extras: Set<String> = emptySet()): MapLayers {
+        val kinds = mode.shownKinds(extras)
         return MapLayers(
             facilities = all.filter { it.kind in kinds },
-            zones = if (mode == UserMode.CHILD) listOf(childZone) else emptyList(),
+            zones = if (mode.showsChildZones(extras)) listOf(childZone) else emptyList(),
         )
     }
 }
