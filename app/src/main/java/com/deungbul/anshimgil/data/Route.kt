@@ -10,6 +10,8 @@ data class RouteOption(
     val distanceM: Int,
     val durationMin: Int,
     val path: List<LatLon>,
+    /** Facilities along the route by group: light, cctv, bell, help. */
+    val counts: Map<String, Int> = emptyMap(),
 )
 
 /** A detected situation such as night or rain; [on] is whether routing used it. */
@@ -23,9 +25,8 @@ data class Explanation(val summary: String, val items: List<CompareItem>)
 data class DataQuality(val ok: Boolean, val message: String?)
 
 /**
- * `/api/route` result. Top-level names follow requirements 8.3
- * (conditions, routes, explanation, facilities, dataQuality); inner fields are provisional
- * until the server shares the final shape.
+ * `/api/route` result (requirements 8.3). When the shortest route is also the safe one,
+ * or the mode has no daytime rule, [routes] holds only the safe route.
  */
 data class RouteResult(
     val conditions: List<Condition>,
@@ -44,6 +45,9 @@ data class RouteRequest(
     /** Condition keys the user switched off (FR-03). */
     val conditionsOff: Set<String> = emptySet(),
 )
+
+/** The server's `night` value: off when the user switched night off, otherwise judged from sunset. */
+val RouteRequest.night: String get() = if ("night" in conditionsOff) "off" else "auto"
 
 /** Walking speed per mode in meters per minute (requirements 0.2; disabled is a placeholder). */
 val UserMode.walkingSpeedMPerMin: Int

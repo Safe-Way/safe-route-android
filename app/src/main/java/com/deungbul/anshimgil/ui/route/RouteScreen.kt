@@ -195,7 +195,10 @@ private fun RouteDetails(
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.selectableGroup()) {
         listOf(RouteType.SAFE, RouteType.SHORTEST).forEach { type ->
             result.route(type)?.let { route ->
-                RouteCard(route, selected = type == selected, onClick = { onSelect(type) }, modifier = Modifier.weight(1f))
+                RouteCard(
+                    route, selected = type == selected, only = result.routes.size == 1,
+                    onClick = { onSelect(type) }, modifier = Modifier.weight(1f),
+                )
             }
         }
     }
@@ -217,7 +220,9 @@ private fun RouteDetails(
                 )
             }
         }
-        Text("가장 빠른 길 → 안전한 길로 바꾸면", fontSize = 12.sp, color = Muted)
+        if (result.explanation.items.isNotEmpty()) {
+            Text("가장 빠른 길 → 안전한 길로 바꾸면", fontSize = 12.sp, color = Muted)
+        }
     }
 
     if (!result.dataQuality.ok) {
@@ -241,14 +246,18 @@ private fun RouteDetails(
         Icon(Icons.Filled.Navigation, contentDescription = null, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(8.dp))
         Text(
-            if (selected == RouteType.SAFE) "안전한 길로 안내 시작" else "빠른 길로 안내 시작",
+            when {
+                result.routes.size == 1 -> "길 안내 시작"
+                selected == RouteType.SAFE -> "안전한 길로 안내 시작"
+                else -> "빠른 길로 안내 시작"
+            },
             fontSize = 19.sp, fontWeight = FontWeight.Black,
         )
     }
 }
 
 @Composable
-private fun RouteCard(route: RouteOption, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun RouteCard(route: RouteOption, selected: Boolean, only: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val safe = route.type == RouteType.SAFE
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -265,7 +274,11 @@ private fun RouteCard(route: RouteOption, selected: Boolean, onClick: () -> Unit
                         .background(if (safe) Green else Color(0xFF6B776F), RoundedCornerShape(3.dp)),
                 )
                 Text(
-                    if (safe) "안전한 길 · 추천" else "가장 빠른 길",
+                    when {
+                        only -> "안내할 길"
+                        safe -> "안전한 길 · 추천"
+                        else -> "가장 빠른 길"
+                    },
                     fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (safe) Green else Muted,
                 )
             }
