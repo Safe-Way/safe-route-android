@@ -22,6 +22,8 @@ object FakeFacilities {
         Facility(FacilityKind.ACCESSIBLE_TOILET, 35.1378, 126.9300),
         Facility(FacilityKind.ELEVATOR, 35.1425, 126.9328),
         Facility(FacilityKind.STAIRS, 35.1414, 126.9320),
+        Facility(FacilityKind.CURB_RAMP, 35.1390, 126.9335),
+        Facility(FacilityKind.OVERPASS, 35.1432, 126.9318),
     )
 
     private val childZone = Zone(
