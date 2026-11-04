@@ -1,5 +1,7 @@
 package com.deungbul.anshimgil.ui.route
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -51,7 +53,12 @@ import androidx.compose.ui.unit.sp
 import com.deungbul.anshimgil.data.ALL_CONDITION_KEYS
 import com.deungbul.anshimgil.data.ApiException
 import com.deungbul.anshimgil.data.LatLon
+import com.deungbul.anshimgil.data.Origin
 import com.deungbul.anshimgil.data.Place
+import com.deungbul.anshimgil.data.chooseOrigin
+import com.deungbul.anshimgil.location.LOCATION_PERMISSIONS
+import com.deungbul.anshimgil.location.currentLocation
+import com.deungbul.anshimgil.location.hasLocationPermission
 import com.deungbul.anshimgil.data.RouteOption
 import com.deungbul.anshimgil.data.RouteRepository
 import com.deungbul.anshimgil.data.RouteRequest
@@ -80,7 +87,6 @@ private sealed interface RouteState {
 @Composable
 fun RouteScreen(
     mode: UserMode,
-    origin: LatLon,
     destination: Place,
     routeRepository: RouteRepository,
     autoConditions: Boolean,
@@ -94,13 +100,21 @@ fun RouteScreen(
     var state by remember { mutableStateOf<RouteState>(RouteState.Loading) }
     var retry by remember { mutableIntStateOf(0) }
     var map by remember { mutableStateOf<KakaoMap?>(null) }
+    var origin by remember { mutableStateOf<Origin?>(null) }
 
-    LaunchedEffect(conditionsOff, retry) {
+    // Ask for location once; without it the route starts at the demo point.
+    var asked by remember { mutableStateOf(hasLocationPermission(context)) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { asked = true }
+    LaunchedEffect(Unit) { if (!asked) permissionLauncher.launch(LOCATION_PERMISSIONS) }
+
+    LaunchedEffect(asked, conditionsOff, retry) {
+        if (!asked) return@LaunchedEffect
         state = RouteState.Loading
+        val from = chooseOrigin(currentLocation(context)).also { origin = it }
         state = try {
             RouteState.Ready(
                 routeRepository.findRoutes(
-                    RouteRequest(origin, LatLon(destination.lat, destination.lon), mode, conditionsOff),
+                    RouteRequest(from.point, LatLon(destination.lat, destination.lon), mode, conditionsOff),
                 ),
             )
         } catch (e: ApiException) {
@@ -128,7 +142,7 @@ fun RouteScreen(
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "검색으로 돌아가기", tint = Ink)
                         }
-                        Text("현재 위치", fontSize = 15.sp, color = Muted)
+                        Text(origin?.label ?: "현재 위치", fontSize = 15.sp, color = Muted)
                         Text("  →  ", fontSize = 15.sp, color = Muted)
                         Text(
                             destination.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink,
@@ -173,7 +187,7 @@ fun RouteScreen(
                     .padding(16.dp),
             ) {
                 when (val s = state) {
-                    RouteState.Loading -> Text("길을 찾는 중…", fontSize = 16.sp, color = Muted, modifier = Modifier.padding(vertical = 24.dp))
+                    RouteState.Loading -> Text(if (origin == null) "현재 위치를 찾는 중…" else "길을 찾는 중…", fontSize = 16.sp, color = Muted, modifier = Modifier.padding(vertical = 24.dp))
                     is RouteState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(s.message, fontSize = 16.sp, color = Color(0xFFB42318))
                         TextButton(onClick = { retry++ }) { Text("다시 시도") }

@@ -1,12 +1,5 @@
 package com.deungbul.anshimgil.ui.guide
 
-import android.Manifest
-import android.annotation.SuppressLint
-import android.content.Context
-import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
 import android.speech.tts.TextToSpeech
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -54,7 +47,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
+import android.content.Context
+import com.deungbul.anshimgil.location.LOCATION_PERMISSIONS
+import com.deungbul.anshimgil.location.LocationUpdates
+import com.deungbul.anshimgil.location.hasLocationPermission
 import com.deungbul.anshimgil.data.Guidance
 import com.deungbul.anshimgil.data.GuidanceState
 import com.deungbul.anshimgil.data.LatLon
@@ -119,7 +115,7 @@ fun GuideScreen(
     }
     LaunchedEffect(Unit) {
         if (!hasPermission) {
-            permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+            permissionLauncher.launch(LOCATION_PERMISSIONS)
         }
     }
     if (hasPermission) LocationUpdates(context) { fix = it }
@@ -329,24 +325,6 @@ private fun rememberTts(context: Context): TextToSpeech {
     DisposableEffect(tts) { onDispose { tts.stop(); tts.shutdown() } }
     return tts
 }
-
-/** GPS fixes while this screen is shown; stops when it leaves. */
-@SuppressLint("MissingPermission")
-@Composable
-private fun LocationUpdates(context: Context, onFix: (LatLon) -> Unit) {
-    DisposableEffect(Unit) {
-        val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        val listener = LocationListener { location: Location -> onFix(LatLon(location.latitude, location.longitude)) }
-        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-            .filter { runCatching { manager.isProviderEnabled(it) }.getOrDefault(false) }
-        providers.forEach { manager.requestLocationUpdates(it, 1000L, 0f, listener) }
-        onDispose { manager.removeUpdates(listener) }
-    }
-}
-
-private fun hasLocationPermission(context: Context) =
-    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
 private val ARRIVAL_FORMAT = DateTimeFormatter.ofPattern("a h:mm", Locale.KOREAN)
 

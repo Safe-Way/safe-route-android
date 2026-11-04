@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,12 +34,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.deungbul.anshimgil.data.FakeFacilities
 import com.deungbul.anshimgil.data.UserMode
-import com.deungbul.anshimgil.map.CHOSUN_UNIV
+import com.deungbul.anshimgil.data.chooseOrigin
+import com.deungbul.anshimgil.location.currentLocation
 import com.deungbul.anshimgil.map.KakaoMapView
 import com.deungbul.anshimgil.map.showLayers
 import com.deungbul.anshimgil.ui.common.MapMessage
 import com.deungbul.anshimgil.ui.mode.style
 import com.kakao.vectormap.KakaoMap
+import com.kakao.vectormap.LatLng
+import kotlinx.coroutines.launch
 import com.kakao.vectormap.camera.CameraUpdateFactory
 
 private val Ink = Color(0xFF17211B)
@@ -54,6 +58,7 @@ fun HomeScreen(
     val context = LocalContext.current
     var map by remember { mutableStateOf<KakaoMap?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(map, mode) {
         map?.showLayers(context, FakeFacilities.layersFor(mode))
@@ -114,9 +119,14 @@ fun HomeScreen(
             }
         }
 
-        // Real GPS comes with walking guidance (#7); for now this returns to the demo area.
+        // The phone's position when it is known and in Gwangju, otherwise the demo area.
         Surface(
-            onClick = { map?.moveCamera(CameraUpdateFactory.newCenterPosition(CHOSUN_UNIV, 16)) },
+            onClick = {
+                scope.launch {
+                    val p = chooseOrigin(currentLocation(context)).point
+                    map?.moveCamera(CameraUpdateFactory.newCenterPosition(LatLng.from(p.lat, p.lon), 16))
+                }
+            },
             shape = CircleShape,
             color = Color.White,
             shadowElevation = 4.dp,
