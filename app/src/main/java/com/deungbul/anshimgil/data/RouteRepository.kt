@@ -15,10 +15,7 @@ interface RouteRepository {
     }
 }
 
-/**
- * Talks to `POST /api/route`. Field names inside each section are a first guess;
- * adjust [toJson] and the parsers once the server shape is final.
- */
+/** Talks to `POST /api/route` (requirements 8.3, server Safe-Way/safe-route#33). */
 class ServerRouteRepository : RouteRepository {
     override suspend fun findRoutes(request: RouteRequest): RouteResult =
         parseRouteResult(ServerApi.post("/api/route", request.toJson()))
@@ -28,37 +25,60 @@ internal fun RouteRequest.toJson(): JSONObject = JSONObject()
     .put("origin", JSONObject().put("lat", origin.lat).put("lon", origin.lon))
     .put("destination", JSONObject().put("lat", destination.lat).put("lon", destination.lon))
     .put("mode", mode.key)
-    .put("conditionsOff", JSONArray(conditionsOff.toList()))
+    .put("night", night)
+
+/** Comparison rows built from each route's `counts`, in the server's group order. */
+private val COUNT_GROUPS = listOf(
+    Triple("light", "가로등", "개"),
+    Triple("cctv", "CCTV", "대"),
+    Triple("bell", "비상벨", "개"),
+    Triple("help", "도움 지점", "곳"),
+)
+
+/** Server facility types the map shows. Street and security lights are too many to tag, so they are left out. */
+private val FACILITY_TYPES = mapOf(
+    "CCTV" to FacilityKind.CCTV,
+    "EMERGENCY_BELL" to FacilityKind.EMERGENCY_BELL,
+    "POLICE" to FacilityKind.POLICE,
+    "CONVENIENCE_STORE" to FacilityKind.CONVENIENCE_STORE,
+    "CHILD_SAFETY_HOUSE" to FacilityKind.GUARD_HOUSE,
+)
 
 internal fun parseRouteResult(json: JSONObject): RouteResult {
     fun JSONArray?.objects(): List<JSONObject> = if (this == null) emptyList() else (0 until length()).map { getJSONObject(it) }
+    fun JSONObject?.ints(): Map<String, Int> = this?.keys()?.asSequence()?.associateWith { optInt(it) }.orEmpty()
 
-    val conditions = json.optJSONArray("conditions").objects().map {
-        Condition(it.getString("key"), it.optString("label", it.getString("key")), it.optBoolean("on", true))
-    }
+    // Only night is judged for now. Show the chip while it is night, or after the user switched it off.
+    val conditionsJson = json.optJSONObject("conditions")
+    val night = conditionsJson?.optBoolean("night") ?: false
+    val manual = conditionsJson?.optString("nightSource") == "manual"
+    val conditions = if (night || manual) listOf(Condition("night", "밤", night)) else emptyList()
+
     val routes = json.optJSONArray("routes").objects().mapNotNull { route ->
-        val type = runCatching { RouteType.valueOf(route.getString("type").uppercase()) }.getOrNull() ?: return@mapNotNull null
-        val path = route.optJSONArray("path")
+        val type = runCatching { RouteType.valueOf(route.getString("kind").uppercase()) }.getOrNull() ?: return@mapNotNull null
+        val geometry = route.optJSONArray("geometry")
         RouteOption(
             type = type,
             distanceM = route.optInt("distanceM"),
             durationMin = route.optInt("durationMin"),
-            path = if (path == null) emptyList() else (0 until path.length()).map { i ->
-                val point = path.get(i)
-                if (point is JSONArray) LatLon(point.getDouble(0), point.getDouble(1))
-                else (point as JSONObject).let { LatLon(it.getDouble("lat"), it.getDouble("lon")) }
+            // GeoJSON order: [lon, lat]
+            path = if (geometry == null) emptyList() else (0 until geometry.length()).map { i ->
+                geometry.getJSONArray(i).let { LatLon(it.getDouble(1), it.getDouble(0)) }
             },
+            counts = route.optJSONObject("counts").ints(),
         )
     }
-    val explanationJson = json.optJSONObject("explanation") ?: JSONObject()
-    val explanation = Explanation(
-        summary = explanationJson.optString("summary"),
-        items = explanationJson.optJSONArray("items").objects().map {
-            CompareItem(it.getString("label"), it.optInt("shortest"), it.optInt("safe"), it.optString("unit"))
-        },
-    )
+    val shortest = routes.firstOrNull { it.type == RouteType.SHORTEST }
+    val safe = routes.firstOrNull { it.type == RouteType.SAFE }
+    val items = if (shortest == null || safe == null) emptyList() else COUNT_GROUPS.mapNotNull { (key, label, unit) ->
+        val a = shortest.counts[key] ?: 0
+        val b = safe.counts[key] ?: 0
+        if (a == 0 && b == 0) null else CompareItem(label, a, b, unit)
+    }
+    val explanation = Explanation(summary = json.optJSONObject("explanation")?.optString("text").orEmpty(), items = items)
+
     val facilities = json.optJSONArray("facilities").objects().mapNotNull { f ->
-        val kind = runCatching { FacilityKind.valueOf(f.getString("kind").uppercase()) }.getOrNull() ?: return@mapNotNull null
+        val kind = FACILITY_TYPES[f.optString("type")] ?: return@mapNotNull null
         Facility(kind, f.getDouble("lat"), f.getDouble("lon"))
     }
     val quality = json.optJSONObject("dataQuality")
@@ -68,8 +88,8 @@ internal fun parseRouteResult(json: JSONObject): RouteResult {
         explanation = explanation,
         facilities = facilities,
         dataQuality = DataQuality(
-            ok = quality?.optBoolean("ok", true) ?: true,
-            message = quality?.optString("message")?.ifBlank { null },
+            ok = (quality?.optString("status") ?: "OK") == "OK",
+            message = quality?.optString("message")?.takeUnless { quality.isNull("message") || it.isBlank() },
         ),
     )
 }
@@ -83,8 +103,9 @@ class FakeRouteRepository : RouteRepository {
         delay(400)
         val o = request.origin
         val d = request.destination
-        if (distanceMeters(o.lat, o.lon, d.lat, d.lon) < 30) {
-            throw ApiException("BAD_PARAM", "출발지와 도착지가 너무 가까워요.")
+        // Same rule and wording as the server's SAME_POINT.
+        if (distanceMeters(o.lat, o.lon, d.lat, d.lon) < 50) {
+            throw ApiException("SAME_POINT", "출발과 도착이 너무 가까워요")
         }
         val detour = 0.0012
         val shortestPath = listOf(o, LatLon(d.lat, o.lon), d)
@@ -93,10 +114,7 @@ class FakeRouteRepository : RouteRepository {
         val shortest = option(RouteType.SHORTEST, shortestPath, speed)
         val safe = option(RouteType.SAFE, safePath, speed)
 
-        val conditions = listOf(
-            Condition("night", "밤", "night" !in request.conditionsOff),
-            Condition("rain", "비", "rain" !in request.conditionsOff),
-        )
+        val conditions = listOf(Condition("night", "밤", "night" !in request.conditionsOff))
         val extraM = (safe.distanceM - shortest.distanceM).coerceAtLeast(0)
         val extraMin = (safe.durationMin - shortest.durationMin).coerceAtLeast(0)
         return RouteResult(

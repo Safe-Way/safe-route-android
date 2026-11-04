@@ -3,6 +3,8 @@ package com.deungbul.anshimgil.data
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -28,20 +30,74 @@ class RouteRepositoryTest {
     }
 
     @Test
-    fun parseRouteResult_readsProvisionalShape() {
+    fun parseRouteResult_readsServerShape() {
         val json = JSONObject(
             """
-            {"conditions":[{"key":"night","label":"밤","on":true}],
-             "routes":[{"type":"safe","distanceM":2100,"durationMin":27,"path":[[35.1,126.9],[35.2,126.9]]}],
-             "explanation":{"summary":"120m 더","items":[{"label":"CCTV","shortest":3,"safe":9,"unit":"대"}]},
-             "facilities":[{"kind":"cctv","lat":35.1,"lon":126.9},{"kind":"unknown","lat":0,"lon":0}],
-             "dataQuality":{"ok":false,"message":"데이터 부족"}}
+            {"conditions":{"night":true,"nightSource":"auto","sunset":"17:41"},
+             "routes":[
+               {"kind":"shortest","distanceM":1028,"durationMin":13,"geometry":[[126.91,35.14],[126.92,35.15]],
+                "counts":{"light":10,"cctv":3,"bell":0,"help":1}},
+               {"kind":"safe","distanceM":1244,"durationMin":16,"geometry":[[126.91,35.14],[126.90,35.15],[126.92,35.15]],
+                "counts":{"light":43,"cctv":25,"bell":0,"help":2}}],
+             "explanation":{"text":"216m(3분) 더 돌지만 가로등 +33개, CCTV +22대","extraM":216,"extraMin":3,
+                "diff":{"light":33,"cctv":22,"bell":0,"help":1}},
+             "facilities":[{"type":"CCTV","lat":35.14,"lon":126.91,"on":"both"},
+               {"type":"CHILD_SAFETY_HOUSE","lat":35.15,"lon":126.90,"on":"safe"},
+               {"type":"STREETLIGHT","lat":35.15,"lon":126.92,"on":"safe"}],
+             "dataQuality":{"status":"PARTIAL","message":"이 지역은 안전 데이터가 부족합니다","dataDate":"2026-11-03"}}
             """.trimIndent(),
         )
         val result = parseRouteResult(json)
+        assertEquals(listOf(Condition("night", "밤", true)), result.conditions)
+        val shortest = result.route(RouteType.SHORTEST)!!
+        // geometry is [lon, lat]
+        assertEquals(LatLon(35.14, 126.91), shortest.path.first())
+        assertEquals(3, result.route(RouteType.SAFE)!!.path.size)
+        assertEquals("216m(3분) 더 돌지만 가로등 +33개, CCTV +22대", result.explanation.summary)
+        // bell is 0 on both routes, so no row for it
+        assertEquals(
+            listOf(CompareItem("가로등", 10, 43, "개"), CompareItem("CCTV", 3, 25, "대"), CompareItem("도움 지점", 1, 2, "곳")),
+            result.explanation.items,
+        )
+        assertEquals(listOf(FacilityKind.CCTV, FacilityKind.GUARD_HOUSE), result.facilities.map { it.kind })
+        assertFalse(result.dataQuality.ok)
+        assertEquals("이 지역은 안전 데이터가 부족합니다", result.dataQuality.message)
+    }
+
+    @Test
+    fun parseRouteResult_singleRouteInDaytime() {
+        val json = JSONObject(
+            """
+            {"conditions":{"night":false,"nightSource":"auto","sunset":"17:41"},
+             "routes":[{"kind":"safe","distanceM":1435,"durationMin":18,"geometry":[[126.91,35.14],[126.92,35.15]],
+                "counts":{"light":20,"cctv":5,"bell":1,"help":2}}],
+             "explanation":{"text":"지금은 밤이 아니라 가장 짧은 길을 안내합니다","extraM":0,"extraMin":0,"diff":{}},
+             "facilities":[],
+             "dataQuality":{"status":"OK","message":null,"dataDate":"2026-11-03"}}
+            """.trimIndent(),
+        )
+        val result = parseRouteResult(json)
+        assertTrue(result.conditions.isEmpty())
         assertEquals(RouteType.SAFE, result.routes.single().type)
-        assertEquals(2, result.routes.single().path.size)
-        assertEquals(1, result.facilities.size)
-        assertEquals("데이터 부족", result.dataQuality.message)
+        assertTrue(result.explanation.items.isEmpty())
+        assertTrue(result.dataQuality.ok)
+        assertNull(result.dataQuality.message)
+    }
+
+    @Test
+    fun parseRouteResult_nightSwitchedOffKeepsChip() {
+        val json = JSONObject("""{"conditions":{"night":false,"nightSource":"manual"},"routes":[]}""")
+        assertEquals(listOf(Condition("night", "밤", false)), parseRouteResult(json).conditions)
+    }
+
+    @Test
+    fun toJson_sendsNightInsteadOfConditionsOff() {
+        val origin = LatLon(35.14, 126.91)
+        val destination = LatLon(35.15, 126.92)
+        val auto = RouteRequest(origin, destination, UserMode.DISABLED).toJson()
+        assertEquals("auto", auto.getString("night"))
+        assertEquals("wheelchair", auto.getString("mode"))
+        assertFalse(auto.has("conditionsOff"))
+        assertEquals("off", RouteRequest(origin, destination, UserMode.GENERAL, setOf("night")).toJson().getString("night"))
     }
 }
