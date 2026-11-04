@@ -22,7 +22,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.deungbul.anshimgil.data.AppSettings
-import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.ModeRepository
 import com.deungbul.anshimgil.data.Place
 import com.deungbul.anshimgil.data.PlaceRepository
@@ -30,7 +29,6 @@ import com.deungbul.anshimgil.data.RouteRepository
 import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.RouteType
 import com.deungbul.anshimgil.ui.guide.GuideScreen
-import com.deungbul.anshimgil.map.CHOSUN_UNIV
 import com.deungbul.anshimgil.ui.route.RouteScreen
 import com.deungbul.anshimgil.data.SavedPlacesRepository
 import com.deungbul.anshimgil.data.SettingsRepository
@@ -94,9 +92,6 @@ private sealed interface Screen {
     data class Route(val destination: Place) : Screen
     data class Guide(val destination: Place, val result: RouteResult, val type: RouteType) : Screen
 }
-
-/** Where routes start until GPS is wired in (#7): the Chosun University demo area. */
-private val DEMO_ORIGIN = LatLon(CHOSUN_UNIV.latitude, CHOSUN_UNIV.longitude)
 
 /** First launch shows the mode picker; after that the map opens directly. */
 @Composable
@@ -164,7 +159,6 @@ fun AppRoot(
                     BackHandler { screen = Screen.Search }
                     RouteScreen(
                         mode = mode,
-                        origin = DEMO_ORIGIN,
                         destination = destination,
                         routeRepository = routeRepository,
                         autoConditions = settings.autoConditions,
