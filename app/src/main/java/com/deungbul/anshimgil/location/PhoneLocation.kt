@@ -12,7 +12,11 @@ import android.os.Looper
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.core.content.ContextCompat
+import androidx.core.location.LocationManagerCompat
 import com.deungbul.anshimgil.data.LatLon
+import com.deungbul.anshimgil.data.Origin
+import com.deungbul.anshimgil.data.OriginIssue
+import com.deungbul.anshimgil.data.chooseOrigin
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
@@ -25,6 +29,20 @@ val LOCATION_PERMISSIONS = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Man
 
 fun hasLocationPermission(context: Context) = LOCATION_PERMISSIONS.any {
     ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+}
+
+/** Whether the phone's location setting is on. */
+fun isLocationOn(context: Context): Boolean =
+    LocationManagerCompat.isLocationEnabled(context.getSystemService(Context.LOCATION_SERVICE) as LocationManager)
+
+/** Where a route starts from the phone, with the reason when the demo point is used instead. */
+suspend fun phoneOrigin(context: Context, timeoutMs: Long = 8_000): Origin {
+    val why = when {
+        !hasLocationPermission(context) -> OriginIssue.NO_PERMISSION
+        !isLocationOn(context) -> OriginIssue.LOCATION_OFF
+        else -> OriginIssue.NO_FIX
+    }
+    return chooseOrigin(currentLocation(context, timeoutMs), why)
 }
 
 private const val RECENT_MS = 2 * 60_000L

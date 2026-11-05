@@ -27,6 +27,15 @@ class OriginTest {
         // Emulator default (California) and Seoul
         assertEquals(DEMO_ORIGIN_POINT, chooseOrigin(LatLon(37.4220, -122.0841)).point)
         assertEquals(DEMO_ORIGIN_POINT, chooseOrigin(LatLon(37.5665, 126.9780)).point)
+        assertEquals(OriginIssue.OUTSIDE_GWANGJU, chooseOrigin(LatLon(37.5665, 126.9780)).issue)
         assertTrue(isInGwangju(LatLon(35.2200, 126.8500))) // 첨단
+    }
+
+    @Test
+    fun noFix_saysWhy() {
+        val off = chooseOrigin(null, OriginIssue.LOCATION_OFF)
+        assertEquals(OriginIssue.LOCATION_OFF, off.issue)
+        assertEquals("조선대 (위치 꺼짐)", off.label)
+        assertEquals(OriginIssue.NO_FIX, chooseOrigin(null).issue)
     }
 }

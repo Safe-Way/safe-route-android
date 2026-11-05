@@ -36,6 +36,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -47,6 +48,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,9 +65,9 @@ import com.deungbul.anshimgil.data.ApiException
 import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.Origin
 import com.deungbul.anshimgil.data.Place
-import com.deungbul.anshimgil.data.chooseOrigin
+import com.deungbul.anshimgil.data.OriginIssue
 import com.deungbul.anshimgil.location.LOCATION_PERMISSIONS
-import com.deungbul.anshimgil.location.currentLocation
+import com.deungbul.anshimgil.location.phoneOrigin
 import com.deungbul.anshimgil.location.hasLocationPermission
 import com.deungbul.anshimgil.data.RouteOption
 import com.deungbul.anshimgil.data.RouteRepository
@@ -121,8 +128,8 @@ fun RouteScreen(
     LaunchedEffect(asked, conditionsOff, conditionsOn, retry) {
         if (!asked) return@LaunchedEffect
         state = RouteState.Loading
-        val from = (startPlace?.let { Origin(LatLon(it.lat, it.lon), it.name, fromGps = false) }
-            ?: chooseOrigin(currentLocation(context))).also { origin = it }
+        val from = (startPlace?.let { Origin(LatLon(it.lat, it.lon), it.name) }
+            ?: phoneOrigin(context)).also { origin = it }
         state = try {
             RouteState.Ready(
                 routeRepository.findRoutes(
@@ -133,6 +140,37 @@ fun RouteScreen(
             RouteState.Failed(e.message)
         }
     }
+    // After the user turns location on (or allows it) in the phone's settings, find the start again.
+    var sentToSettings by remember { mutableStateOf(false) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && sentToSettings) {
+                sentToSettings = false
+                asked = true
+                retry++
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+    fun fixLocation(issue: OriginIssue) {
+        when (issue) {
+            OriginIssue.LOCATION_OFF -> {
+                sentToSettings = true
+                context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+            }
+            OriginIssue.NO_PERMISSION -> {
+                sentToSettings = true
+                context.startActivity(
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
+                )
+            }
+            OriginIssue.NO_FIX -> retry++
+            OriginIssue.OUTSIDE_GWANGJU -> Unit
+        }
+    }
+
     val result = (state as? RouteState.Ready)?.result
     LaunchedEffect(map, result, selected) {
         val m = map ?: return@LaunchedEffect
@@ -178,6 +216,10 @@ fun RouteScreen(
                             )
                         }
                     }
+                }
+                // Why the route starts at Chosun University instead of here, with a way to fix it.
+                origin?.issue?.takeIf { startPlace == null }?.let { issue ->
+                    LocationNotice(issue, onFix = { fixLocation(issue) })
                 }
                 // Night is always shown so it can also be switched on in daytime.
                 result?.let { r -> r.conditions.ifEmpty { listOf(Condition("night", "밤", false)) } }?.let { conditions ->
@@ -225,6 +267,27 @@ fun RouteScreen(
                     is RouteState.Ready -> RouteDetails(s.result, selected, onSelect = { selected = it }, onStart = { onStart(s.result, selected) })
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun LocationNotice(issue: OriginIssue, onFix: () -> Unit) {
+    val action = when (issue) {
+        OriginIssue.LOCATION_OFF -> "위치 켜기"
+        OriginIssue.NO_PERMISSION -> "권한 허용"
+        OriginIssue.NO_FIX -> "다시 찾기"
+        OriginIssue.OUTSIDE_GWANGJU -> null
+    }
+    Surface(shape = RoundedCornerShape(14.dp), color = Color(0xFFFFF4E5), shadowElevation = 3.dp) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp).heightIn(min = 44.dp),
+        ) {
+            Icon(Icons.Filled.WarningAmber, contentDescription = null, tint = Color(0xFFB45309))
+            Text(issue.message, fontSize = 14.sp, color = Color(0xFF7A5310), lineHeight = 19.sp, modifier = Modifier.weight(1f))
+            action?.let { TextButton(onClick = onFix) { Text(it, fontSize = 15.sp, fontWeight = FontWeight.Bold) } }
         }
     }
 }

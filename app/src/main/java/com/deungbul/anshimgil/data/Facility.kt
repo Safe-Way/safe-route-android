@@ -19,12 +19,29 @@ enum class FacilityKind(val label: String, val color: Long, val avoid: Boolean =
     ELEVATOR("엘리베이터 육교", 0xFF6D28D9, title = "엘리베이터 있는 육교"),
     OVERPASS("육교", 0xFFB42318, avoid = true, title = "육교 (피할 곳)"),
     STAIRS("계단", 0xFFB42318, avoid = true, title = "계단 (피할 곳)"),
+    SUBWAY("지하철역", 0xFF1D4ED8),
+    SUBWAY_ENTRANCE("역 입구", 0xFF1D4ED8),
     /** A child protection zone from the server, which gives a point rather than an area. Shown with [CHILD_ZONE_KEY]. */
     SCHOOL_ZONE("보호구역", 0xFFA16207, title = "어린이 보호구역"),
 }
 
-/** [route] is the route it lies along; null means both routes or not route-specific. */
-data class Facility(val kind: FacilityKind, val lat: Double, val lon: Double, val route: RouteType? = null)
+/** How a facility tag is drawn: normal, grayed out (e.g. a station without elevators), or a small gray dot (e.g. curb unknown). */
+enum class FacilityLook { NORMAL, GRAY, DOT }
+
+/**
+ * [route] is the route it lies along; null means both routes or not route-specific.
+ * [text] replaces the kind's label, e.g. "지하철역 · 엘리베이터 3대".
+ */
+data class Facility(
+    val kind: FacilityKind,
+    val lat: Double,
+    val lon: Double,
+    val route: RouteType? = null,
+    val text: String? = null,
+    val look: FacilityLook = FacilityLook.NORMAL,
+) {
+    val label: String get() = text ?: kind.label
+}
 
 /** An area drawn on the map, such as a child protection zone. Points go around the edge in order. */
 data class Zone(val label: String, val fillColor: Long, val strokeColor: Long, val points: List<Pair<Double, Double>>)
@@ -32,9 +49,11 @@ data class Zone(val label: String, val fillColor: Long, val strokeColor: Long, v
 /** What one mode shows on the map. */
 data class MapLayers(val facilities: List<Facility>, val zones: List<Zone>)
 
-/** Shown in every mode: CCTV, police, emergency bells and convenience stores (team list, 11/4). */
-val COMMON_FACILITY_KINDS: Set<FacilityKind> =
-    setOf(FacilityKind.CCTV, FacilityKind.POLICE, FacilityKind.EMERGENCY_BELL, FacilityKind.CONVENIENCE_STORE)
+/** Shown in every mode: CCTV, police, emergency bells, convenience stores (team list, 11/4) and subway stations and entrances (11/5). */
+val COMMON_FACILITY_KINDS: Set<FacilityKind> = setOf(
+    FacilityKind.CCTV, FacilityKind.POLICE, FacilityKind.EMERGENCY_BELL, FacilityKind.CONVENIENCE_STORE,
+    FacilityKind.SUBWAY, FacilityKind.SUBWAY_ENTRANCE,
+)
 
 /** Which facility types each mode shows first on the map (issue #3, team list 11/4). Child protection zones are drawn as areas. */
 val UserMode.facilityKinds: Set<FacilityKind>
