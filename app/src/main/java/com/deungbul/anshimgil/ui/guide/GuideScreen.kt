@@ -62,15 +62,16 @@ import com.deungbul.anshimgil.data.Turn
 import com.deungbul.anshimgil.data.UserMode
 import com.deungbul.anshimgil.data.walkingSpeedMPerMin
 import com.deungbul.anshimgil.map.KakaoMapView
-import com.deungbul.anshimgil.map.dotBitmap
+import com.deungbul.anshimgil.map.addMyLocation
+import com.deungbul.anshimgil.map.pointTo
+import com.deungbul.anshimgil.map.tiltForWalking
+import com.deungbul.anshimgil.location.bearingDegrees
+import com.deungbul.anshimgil.location.rememberCompassHeading
 import com.deungbul.anshimgil.map.showRoutes
 import com.deungbul.anshimgil.map.toLatLng
 import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.camera.CameraUpdateFactory
 import com.kakao.vectormap.label.Label
-import com.kakao.vectormap.label.LabelOptions
-import com.kakao.vectormap.label.LabelStyle
-import com.kakao.vectormap.label.LabelStyles
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -83,6 +84,8 @@ private val Green = Color(0xFF1F6B42)
 private const val FAR_FROM_ROUTE_M = 300
 private const val OFF_ROUTE_WARN_M = 40
 private const val DEMO_STEP_M = 8.0
+/** Close enough to see the next turn, with the map tilted so the street ahead shows. */
+private const val GUIDE_ZOOM = 18
 
 /**
  * Walking guidance along the chosen route (issue #7): next turn, nearest help, remaining distance,
@@ -142,17 +145,24 @@ fun GuideScreen(
     LaunchedEffect(map) {
         val m = map ?: return@LaunchedEffect
         m.showRoutes(context, result.copy(routes = listOf(route)), route.type, destinationName)
-        val density = context.resources.displayMetrics.density
-        me = m.labelManager?.layer?.addLabel(
-            LabelOptions.from(state.snapped.toLatLng())
-                .setStyles(LabelStyles.from(LabelStyle.from(dotBitmap(0xFF2F6FDB.toInt(), density, 24f)).setApplyDpScale(false)))
-                .setRank(10),
-        )
+        me = m.addMyLocation(context, state.snapped, sizeDp = 24f)
+        m.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
+        m.tiltForWalking()
     }
     LaunchedEffect(map, state.snapped) {
         me?.moveTo(state.snapped.toLatLng())
-        map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), 17))
+        map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
     }
+
+    // The arrow shows which way the walker faces (compass). In the demo walk, or without a compass,
+    // it points along the route instead.
+    val compass = rememberCompassHeading()
+    val heading = if (demo || compass == null) {
+        bearingDegrees(state.snapped, guidance.atProgress(state.progressM + 5).snapped)
+    } else {
+        compass
+    }
+    LaunchedEffect(me, heading) { me?.pointTo(heading) }
 
     Column(modifier = modifier.fillMaxSize().background(Color.White)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -169,7 +179,7 @@ fun GuideScreen(
             }
             // The camera follows only when the position moves, so after dragging the map this brings it back.
             Surface(
-                onClick = { map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), 17)) },
+                onClick = { map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM)) },
                 shape = CircleShape,
                 color = Color.White,
                 shadowElevation = 4.dp,
@@ -230,7 +240,7 @@ fun GuideScreen(
                         onClick = {
                             scope.launch {
                                 tts.speak(instruction.spoken, TextToSpeech.QUEUE_FLUSH, null, "again")
-                                map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), 17))
+                                map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
                             }
                         },
                         modifier = Modifier.weight(1f).heightIn(min = 56.dp),

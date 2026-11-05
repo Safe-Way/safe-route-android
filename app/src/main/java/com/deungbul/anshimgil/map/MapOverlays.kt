@@ -148,14 +148,52 @@ fun KakaoMap.showPoints(context: Context, start: LatLon, places: List<Pair<LatLo
     }
 }
 
-/** The phone's position as a blue dot above everything else; move it later with `Label.moveTo`. */
-fun KakaoMap.addMyLocation(context: Context, point: LatLon): Label? {
+/**
+ * The phone's position as a blue dot with an arrow for the way the walker faces, above everything else.
+ * Move it with `Label.moveTo` and turn it with [pointTo].
+ */
+fun KakaoMap.addMyLocation(context: Context, point: LatLon, sizeDp: Float = 22f): Label? {
     val density = context.resources.displayMetrics.density
     return labelManager?.layer?.addLabel(
         LabelOptions.from(point.toLatLng())
-            .setStyles(LabelStyles.from(LabelStyle.from(dotBitmap(0xFF2F6FDB.toInt(), density, 22f)).setApplyDpScale(false)))
+            .setStyles(
+                LabelStyles.from(
+                    // Centered so the arrow turns around the dot.
+                    LabelStyle.from(headingBitmap(0xFF2F6FDB.toInt(), density, sizeDp)).setAnchorPoint(0.5f, 0.5f).setApplyDpScale(false),
+                ),
+            )
             .setRank(10),
     )
+}
+
+/** Turns the position marker so its arrow points [degrees] clockwise from north. */
+fun Label.pointTo(degrees: Float) = rotateTo(Math.toRadians(degrees.toDouble()).toFloat())
+
+/** Map tilt for walking screens: buildings stand up in 3D and more of the street ahead is visible. */
+const val WALK_TILT_DEGREES = 50.0
+
+fun KakaoMap.tiltForWalking() = moveCamera(CameraUpdateFactory.tiltTo(Math.toRadians(WALK_TILT_DEGREES)))
+
+/**
+ * A dot of [dotDp] with a pointed arrow above it (pointing north until turned).
+ * The bitmap is square with the dot in the middle, so turning it keeps the dot in place.
+ */
+private fun headingBitmap(color: Int, density: Float, dotDp: Float): Bitmap {
+    val dot = dotDp * density
+    val size = (dot * 2.2f).toInt()
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val c = size / 2f
+    val arrow = android.graphics.Path().apply {
+        moveTo(c, 0f)
+        lineTo(c + dot * 0.42f, c - dot * 0.38f)
+        lineTo(c - dot * 0.42f, c - dot * 0.38f)
+        close()
+    }
+    canvas.drawPath(arrow, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+    canvas.drawCircle(c, c, dot / 2, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = 0xFFFFFFFF.toInt() })
+    canvas.drawCircle(c, c, dot / 2 - 3f * density, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+    return bitmap
 }
 
 /** A filled circle with a white ring, used for the user's position. */
