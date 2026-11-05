@@ -1,5 +1,10 @@
 package com.deungbul.anshimgil.ui.guide
 
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.boundsInParent
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.foundation.layout.PaddingValues
 import android.speech.tts.TextToSpeech
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -164,10 +169,24 @@ fun GuideScreen(
     }
     LaunchedEffect(me, heading) { me?.pointTo(heading) }
 
+    // Keep the walker in the middle of the part of the map not covered by the instruction card:
+    // the map's top padding moves its center down by the card's height.
+    var overlayBottomPx by remember { mutableIntStateOf(0) }
+    LaunchedEffect(map, overlayBottomPx) {
+        val m = map ?: return@LaunchedEffect
+        m.setPadding(0, overlayBottomPx, 0, 0)
+        m.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
+    }
+
     Column(modifier = modifier.fillMaxSize().background(Color.White)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             KakaoMapView(modifier = Modifier.fillMaxSize(), onMapReady = { map = it })
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(12.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .padding(12.dp)
+                    .onGloballyPositioned { overlayBottomPx = it.boundsInParent().bottom.toInt() },
+            ) {
                 InstructionCard(state, instruction)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     StatusPill(if (type == RouteType.SAFE) "안전한 길로 가는 중" else "빠른 길로 가는 중", Green)
@@ -194,28 +213,27 @@ fun GuideScreen(
             }
         }
 
+        // Kept short so most of the screen is map: one line for help, one for the numbers, one row of buttons.
         Surface(shadowElevation = 8.dp, color = Color.White) {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
                 state.nearestHelp?.let { help ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color(0xFFFFF4E5), RoundedCornerShape(14.dp))
-                            .padding(12.dp),
+                            .background(Color(0xFFFFF4E5), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
                     ) {
                         Box(
                             contentAlignment = Alignment.Center,
-                            modifier = Modifier.size(40.dp).background(Color(help.kind.color), CircleShape),
-                        ) { Text("!", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp) }
-                        Column {
-                            Text("가까운 도움 장소", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7C2D12))
-                            Text(
-                                "${help.kind.label} · ${sideText(help.side)} ${help.meters}m",
-                                fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink,
-                            )
-                        }
+                            modifier = Modifier.size(26.dp).background(Color(help.kind.color), CircleShape),
+                        ) { Text("!", color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp) }
+                        Text(
+                            "가까운 도움  ${help.kind.label} · ${sideText(help.side)} ${help.meters}m",
+                            fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
 
@@ -230,11 +248,12 @@ fun GuideScreen(
                     OutlinedButton(
                         onClick = { voiceOn = !voiceOn },
                         border = BorderStroke(2.dp, if (voiceOn) Green else Color(0xFFCBD3CC)),
-                        modifier = Modifier.weight(1f).heightIn(min = 56.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     ) {
-                        Icon(if (voiceOn) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff, contentDescription = null, tint = Ink)
-                        Spacer(Modifier.width(6.dp))
-                        Text(if (voiceOn) "음성 켜짐" else "음성 꺼짐", fontSize = 15.sp, color = Ink)
+                        Icon(if (voiceOn) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff, contentDescription = null, tint = Ink, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(if (voiceOn) "음성 켬" else "음성 끔", fontSize = 15.sp, color = Ink, maxLines = 1)
                     }
                     OutlinedButton(
                         onClick = {
@@ -243,19 +262,21 @@ fun GuideScreen(
                                 map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
                             }
                         },
-                        modifier = Modifier.weight(1f).heightIn(min = 56.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     ) {
-                        Icon(Icons.Filled.Replay, contentDescription = null, tint = Ink)
-                        Spacer(Modifier.width(6.dp))
-                        Text("다시 안내", fontSize = 15.sp, color = Ink)
+                        Icon(Icons.Filled.Replay, contentDescription = null, tint = Ink, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("다시 안내", fontSize = 15.sp, color = Ink, maxLines = 1)
                     }
-                }
-                OutlinedButton(
-                    onClick = onFinish,
-                    border = BorderStroke(2.dp, if (state.arrived) Ink else Color(0xFFCBD3CC)),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-                ) {
-                    Text(if (state.arrived) "도착! 안내 끝내기" else "안내 끝내기", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink)
+                    OutlinedButton(
+                        onClick = onFinish,
+                        border = BorderStroke(2.dp, if (state.arrived) Ink else Color(0xFFCBD3CC)),
+                        contentPadding = PaddingValues(horizontal = 6.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    ) {
+                        Text(if (state.arrived) "도착! 끝내기" else "안내 끝내기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink, maxLines = 1)
+                    }
                 }
             }
         }
@@ -295,7 +316,8 @@ private fun sideText(side: Turn) = when (side) {
 
 @Composable
 private fun InstructionCard(state: GuidanceState, instruction: Instruction) {
-    Surface(shape = RoundedCornerShape(20.dp), color = Ink, contentColor = Color.White, shadowElevation = 6.dp) {
+    // Slightly see-through so the map under it still shows.
+    Surface(shape = RoundedCornerShape(20.dp), color = Ink.copy(alpha = 0.82f), contentColor = Color.White) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -339,7 +361,7 @@ private fun StatusPill(text: String, color: Color) {
 private fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
         Text(label, fontSize = 13.sp, color = Muted)
-        Text(value, fontSize = 22.sp, fontWeight = FontWeight.Black, color = Ink)
+        Text(value, fontSize = 20.sp, fontWeight = FontWeight.Black, color = Ink)
     }
 }
 
