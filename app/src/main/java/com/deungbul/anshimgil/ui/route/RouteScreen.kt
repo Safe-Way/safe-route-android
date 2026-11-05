@@ -192,7 +192,7 @@ fun RouteScreen(
                         modifier = Modifier.padding(end = 10.dp).heightIn(min = 56.dp),
                     ) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "검색으로 돌아가기", tint = Ink)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로 가기", tint = Ink)
                         }
                         // Tap the start to search for another one.
                         Text(
