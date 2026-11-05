@@ -11,6 +11,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.deungbul.anshimgil.data.Guardian
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.deungbul.anshimgil.ui.safety.canSendSms
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -75,6 +79,8 @@ fun SettingsScreen(
     onExtraMapItemChange: (key: String, on: Boolean) -> Unit,
     onAddGuardian: (Guardian) -> Unit,
     onRemoveGuardian: (Guardian) -> Unit,
+    onTurnSignsChange: (Boolean) -> Unit,
+    onSosButtonChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -101,7 +107,7 @@ fun SettingsScreen(
 
         SectionTitle("귀가 지킴이")
         Text(
-            "SOS를 누르거나 길안내 중 정한 길에서 벗어나면, 여기 등록한 보호자에게 지금 위치를 문자로 보낼 수 있어요.",
+            "SOS가 울리거나 길안내 중 정한 길에서 벗어났을 때, 여기 등록한 보호자에게 지금 위치를 문자로 보내요.",
             fontSize = 14.sp, color = Muted,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
@@ -119,6 +125,16 @@ fun SettingsScreen(
                 }
             }
         }
+        // Turning SOS on asks to send texts, so the guardians get the text without another tap.
+        // Without the permission SOS still works and opens the message app instead.
+        val smsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onSosButtonChange(true) }
+        SwitchRow(
+            "SOS 버튼",
+            "지도 화면에 SOS 버튼을 보여 줘요. 누르고 5초가 지나면 보호자에게 지금 위치를 문자로 보내요",
+            settings.sosButton,
+        ) { on ->
+            if (on && !canSendSms(context)) smsPermission.launch(Manifest.permission.SEND_SMS) else onSosButtonChange(on)
+        }
         if (settings.guardians.size < Guardian.MAX) {
             LinkRow("보호자 추가", "이름과 전화번호 (최대 ${Guardian.MAX}명)") { addingGuardian = true }
         }
@@ -126,6 +142,7 @@ fun SettingsScreen(
         SectionTitle("길찾기")
         SwitchRow("음성 안내", "걷는 동안 다음 방향을 읽어 줘요", settings.voiceGuide, onVoiceChange)
         SwitchRow("상황 자동 판단", "밤, 비, 폭염 등을 알아서 경로에 반영해요", settings.autoConditions, onAutoConditionsChange)
+        SwitchRow("꺾는 곳 표시", "길안내 지도에서 크게 꺾는 곳에 ↰ ↱ 표시를 보여 줘요", settings.turnSigns, onTurnSignsChange)
 
         SectionTitle("지도에 더 보기")
         Text(
@@ -172,7 +189,7 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(16.dp),
         ) {
-            InfoText("개인정보", "고른 모드, 자주 가는 곳, 보호자 연락처는 이 휴대폰에만 저장해요. 걷는 동안의 위치는 길안내에만 쓰고 저장하지 않아요. 보호자 문자는 직접 보내기를 눌러야 나가요.")
+            InfoText("개인정보", "고른 모드, 자주 가는 곳, 보호자 연락처는 이 휴대폰에만 저장해요. 걷는 동안의 위치는 길안내에만 쓰고 저장하지 않아요. 보호자 문자는 SOS나 ‘보호자에게 알리기’를 눌렀을 때만 나가요.")
             InfoText("데이터 출처", "공공데이터포털, 생활안전지도, 재난안전데이터 공유플랫폼, 기상청, 에어코리아, 카카오")
         }
     }

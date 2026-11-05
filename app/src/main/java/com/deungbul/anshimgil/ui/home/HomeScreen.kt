@@ -105,6 +105,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onPlaceSelected: (Place) -> Unit,
     guardians: List<Guardian>,
+    showSos: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var sos by remember { mutableStateOf(false) }
@@ -333,7 +334,7 @@ fun HomeScreen(
                 color = Color.White.copy(alpha = 0.85f),
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = 88.dp, bottom = 12.dp),
+                    .padding(start = if (showSos) 88.dp else 12.dp, bottom = 12.dp),
             ) {
                 Text(
                     note,
@@ -355,7 +356,7 @@ fun HomeScreen(
 
         error?.let { MapMessage(it, Modifier.align(Alignment.BottomCenter)) }
 
-        SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 44.dp))
+        if (showSos) SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 44.dp))
         if (sos) SosOverlay(guardians, here = { here }, onClose = { sos = false }, onAddGuardian = onOpenSettings)
     }
 }

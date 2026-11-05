@@ -22,6 +22,10 @@ data class AppSettings(
     val extraMapItems: Set<String> = emptySet(),
     /** People texted on SOS or when leaving the route, in the order they were added. */
     val guardians: List<Guardian> = emptyList(),
+    /** ↰/↱ signs at sharp turns on the guidance map; off unless the user turns them on. */
+    val turnSigns: Boolean = false,
+    /** The SOS button on the map screens; off unless the user turns it on. */
+    val sosButton: Boolean = false,
 )
 
 /** Situations routing can react to; all are switched off when auto-detection is off. */
@@ -35,6 +39,8 @@ class SettingsRepository(private val context: Context) {
     private val extraMapItemsKey = stringSetPreferencesKey("extra_map_items")
     // One line per guardian, kept in order (a string set would lose it).
     private val guardiansKey = stringPreferencesKey("guardians")
+    private val turnSignsKey = booleanPreferencesKey("turn_signs")
+    private val sosButtonKey = booleanPreferencesKey("sos_button")
 
     val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
         AppSettings(
@@ -43,6 +49,8 @@ class SettingsRepository(private val context: Context) {
             textSize = TextSize.entries.firstOrNull { it.name == prefs[textSizeKey] } ?: TextSize.NORMAL,
             extraMapItems = prefs[extraMapItemsKey].orEmpty(),
             guardians = prefs[guardiansKey].orEmpty().lines().mapNotNull { Guardian.decode(it) },
+            turnSigns = prefs[turnSignsKey] ?: false,
+            sosButton = prefs[sosButtonKey] ?: false,
         )
     }
 
@@ -79,5 +87,13 @@ class SettingsRepository(private val context: Context) {
             val now = it[guardiansKey].orEmpty().lines().mapNotNull { line -> Guardian.decode(line) }
             it[guardiansKey] = (now - guardian).joinToString("\n") { g -> g.encode() }
         }
+    }
+
+    suspend fun setTurnSigns(on: Boolean) {
+        context.settingsDataStore.edit { it[turnSignsKey] = on }
+    }
+
+    suspend fun setSosButton(on: Boolean) {
+        context.settingsDataStore.edit { it[sosButtonKey] = on }
     }
 }

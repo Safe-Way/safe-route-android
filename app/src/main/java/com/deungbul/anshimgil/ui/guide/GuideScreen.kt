@@ -1,7 +1,7 @@
 package com.deungbul.anshimgil.ui.guide
 
 import androidx.compose.material3.TextButton
-import com.deungbul.anshimgil.ui.safety.openGuardianText
+import com.deungbul.anshimgil.ui.safety.sendGuardianText
 import com.deungbul.anshimgil.ui.safety.SosOverlay
 import com.deungbul.anshimgil.ui.safety.SosButton
 import com.deungbul.anshimgil.data.guardianMessage
@@ -131,6 +131,8 @@ fun GuideScreen(
     voiceByDefault: Boolean,
     facilityRepository: FacilityRepository,
     guardians: List<Guardian>,
+    showTurnSigns: Boolean,
+    showSos: Boolean,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -178,7 +180,7 @@ fun GuideScreen(
     LaunchedEffect(map) {
         val m = map ?: return@LaunchedEffect
         m.showRoutes(context, result.copy(routes = listOf(route)), route.type, destinationName)
-        m.addTurnArrows(context, guidance.turnMarks)
+        if (showTurnSigns) m.addTurnArrows(context, guidance.turnMarks)
         me = m.addMyLocation(context, state.snapped, sizeDp = 24f)
         m.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
         m.tiltForWalking()
@@ -257,14 +259,14 @@ fun GuideScreen(
                 if (offRouteLong && guardians.isNotEmpty() && !offRouteTold) {
                     OffRouteCard(
                         onTell = {
-                            openGuardianText(context, guardians, guardianMessage(GuardianAlert.OFF_ROUTE, fix ?: state.snapped))
+                            sendGuardianText(context, guardians, guardianMessage(GuardianAlert.OFF_ROUTE, fix ?: state.snapped))
                             offRouteTold = true
                         },
                         onDismiss = { offRouteTold = true },
                     )
                 }
             }
-            SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp))
+            if (showSos) SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp))
             // The camera follows only when the position moves, so after dragging the map this brings it back.
             Surface(
                 onClick = { map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM)) },

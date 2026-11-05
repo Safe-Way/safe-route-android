@@ -149,6 +149,8 @@ fun AppRoot(
                         onExtraMapItemChange = { key, on -> scope.launch { settingsRepository.setExtraMapItem(key, on) } },
                         onAddGuardian = { scope.launch { settingsRepository.addGuardian(it) } },
                         onRemoveGuardian = { scope.launch { settingsRepository.removeGuardian(it) } },
+                        onTurnSignsChange = { scope.launch { settingsRepository.setTurnSigns(it) } },
+                        onSosButtonChange = { scope.launch { settingsRepository.setSosButton(it) } },
                         modifier = modifier,
                     )
                 }
@@ -208,6 +210,8 @@ fun AppRoot(
                         voiceByDefault = settings.voiceGuide,
                         facilityRepository = facilityRepository,
                         guardians = settings.guardians,
+                        showTurnSigns = settings.turnSigns,
+                        showSos = settings.sosButton,
                         onFinish = { screen = Screen.Home },
                         modifier = modifier,
                     )
@@ -221,6 +225,7 @@ fun AppRoot(
                     onOpenSettings = { screen = Screen.Settings },
                     onPlaceSelected = { place -> screen = Screen.Route(place, fromHome = true) },
                     guardians = settings.guardians,
+                    showSos = settings.sosButton,
                     modifier = modifier,
                 )
             }
