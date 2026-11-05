@@ -51,4 +51,24 @@ class GuidanceTest {
         assertEquals(FacilityKind.GUARD_HOUSE, Guidance(path, listOf(cctv, guard)).update(start).nearestHelp?.kind)
         assertEquals(null, Guidance(path, listOf(cctv)).update(start).nearestHelp)
     }
+
+    @Test
+    fun helpListShowsPlacesAheadNearestFirst() {
+        // A straight route north, about 220 m long.
+        val path = listOf(LatLon(35.1400, 126.9300), LatLon(35.1420, 126.9300))
+        val store = Facility(FacilityKind.CONVENIENCE_STORE, 35.1415, 126.93015) // ~165 m along, a little east
+        val police = Facility(FacilityKind.POLICE, 35.1405, 126.92985) // ~55 m along, a little west
+        val cctv = Facility(FacilityKind.CCTV, 35.1410, 126.9300) // not a help place
+        val far = Facility(FacilityKind.EMERGENCY_BELL, 35.1410, 126.9320) // ~180 m off the route
+        val guidance = Guidance(path, listOf(store, police, cctv, far))
+
+        val list = guidance.helpAhead(0.0)
+        assertEquals(listOf(FacilityKind.POLICE, FacilityKind.CONVENIENCE_STORE), list.map { it.kind })
+        assertEquals(Turn.LEFT, list[0].side)
+        assertEquals(Turn.RIGHT, list[1].side)
+        // Walked past the police box: only the store is left, about 55 m ahead.
+        val later = guidance.helpAhead(110.0)
+        assertEquals(listOf(FacilityKind.CONVENIENCE_STORE), later.map { it.kind })
+        assertTrue(later[0].aheadM in 45..65)
+    }
 }

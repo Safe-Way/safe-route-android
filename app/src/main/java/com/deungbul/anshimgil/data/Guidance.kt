@@ -33,6 +33,15 @@ data class HelpPoint(val kind: FacilityKind, val meters: Int, val side: Turn)
 /** A sharp turn on the route at [point]; [left] says which way it goes. */
 data class TurnMark(val point: LatLon, val left: Boolean)
 
+/** A place to get help further along the route: [aheadM] along the route from here, [offM] off it. */
+data class HelpAhead(val kind: FacilityKind, val aheadM: Int, val side: Turn, val offM: Int)
+
+/** Help places this far from the route still count as along it. */
+private const val HELP_LIST_OFF_M = 60.0
+
+/** A help place a few meters behind still shows, since GPS can put the walker slightly past it. */
+private const val PASSED_M = 5.0
+
 /** A change of heading at least this large counts as a turn. */
 private const val TURN_DEGREES = 30.0
 
@@ -83,6 +92,29 @@ class Guidance(private val path: List<LatLon>, private val facilities: List<Faci
         }
         marks
     }
+
+    /**
+     * Places to get help along the rest of the route (도움 지점 목록): those within [maxOffM] of the route
+     * and not already passed, nearest first, each with how far ahead it is and on which side.
+     */
+    fun helpAhead(progressM: Double, maxOffM: Double = HELP_LIST_OFF_M): List<HelpAhead> =
+        facilities.filter { it.kind in HELP_KINDS }.mapNotNull { f ->
+            val p = toXY(LatLon(f.lat, f.lon))
+            var off = Double.MAX_VALUE
+            var leg = 0
+            var t = 0.0
+            for (i in legLengths.indices) {
+                val (tt, d) = projectOnLeg(p, i)
+                if (d < off) { off = d; leg = i; t = tt }
+            }
+            val along = cumulative[leg] + legLengths[leg] * t
+            if (off > maxOffM || along < progressM - PASSED_M) return@mapNotNull null
+            val (ax, ay) = points[leg]
+            val (bx, by) = points[leg + 1]
+            val cross = (bx - ax) * (p.second - ay) - (by - ay) * (p.first - ax)
+            val side = if (off < 3) Turn.STRAIGHT else if (cross > 0) Turn.LEFT else Turn.RIGHT
+            HelpAhead(f.kind, (along - progressM).coerceAtLeast(0.0).roundToInt(), side, off.roundToInt())
+        }.sortedBy { it.aheadM }
 
     /** Direction of travel at [progressM], looking a few meters ahead, in degrees clockwise from north. */
     fun travelBearing(progressM: Double): Float {

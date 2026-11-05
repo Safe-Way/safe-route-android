@@ -151,6 +151,7 @@ fun AppRoot(
                         onRemoveGuardian = { scope.launch { settingsRepository.removeGuardian(it) } },
                         onTurnSignsChange = { scope.launch { settingsRepository.setTurnSigns(it) } },
                         onSosButtonChange = { scope.launch { settingsRepository.setSosButton(it) } },
+                        onResetToDefaults = { scope.launch { settingsRepository.resetToDefaults() } },
                         modifier = modifier,
                     )
                 }
