@@ -65,8 +65,7 @@ import com.deungbul.anshimgil.data.Place
 import com.deungbul.anshimgil.data.PlaceRepository
 import com.deungbul.anshimgil.data.SavedPlacesRepository
 import com.deungbul.anshimgil.data.LatLon
-import com.deungbul.anshimgil.data.chooseOrigin
-import com.deungbul.anshimgil.location.currentLocation
+import com.deungbul.anshimgil.location.phoneOrigin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -110,7 +109,7 @@ fun SearchScreen(
     var here by remember { mutableStateOf<LatLon?>(null) }
 
     LaunchedEffect(Unit) { focus.requestFocus() }
-    LaunchedEffect(Unit) { here = chooseOrigin(currentLocation(context, timeoutMs = 3_000)).point }
+    LaunchedEffect(Unit) { here = phoneOrigin(context, timeoutMs = 3_000).point }
     LaunchedEffect(query, here) {
         val text = query.trim()
         if (text.length < 2) {

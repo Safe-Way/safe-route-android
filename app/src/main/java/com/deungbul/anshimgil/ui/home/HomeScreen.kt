@@ -42,8 +42,7 @@ import com.deungbul.anshimgil.data.FacilityRepository
 import com.deungbul.anshimgil.data.Place
 import com.deungbul.anshimgil.data.PlaceRepository
 import com.deungbul.anshimgil.data.UserMode
-import com.deungbul.anshimgil.data.chooseOrigin
-import com.deungbul.anshimgil.location.currentLocation
+import com.deungbul.anshimgil.location.phoneOrigin
 import com.deungbul.anshimgil.map.KakaoMapView
 import com.deungbul.anshimgil.map.showLayers
 import com.deungbul.anshimgil.ui.common.MapMessage
@@ -93,7 +92,7 @@ fun HomeScreen(
         finding = kind
         nearbyMessage = null
         scope.launch {
-            val here = chooseOrigin(currentLocation(context)).point
+            val here = phoneOrigin(context).point
             try {
                 val result = placeRepository.nearby(kind, mode, here.lat, here.lon)
                 val nearest = result.places.firstOrNull()
@@ -203,7 +202,10 @@ fun HomeScreen(
         Surface(
             onClick = {
                 scope.launch {
-                    val p = chooseOrigin(currentLocation(context)).point
+                    val origin = phoneOrigin(context)
+                    // Say why the map went to Chosun University instead of the phone's position.
+                    nearbyMessage = origin.issue?.message?.replace("에서 출발해요", "을 보여 줘요")
+                    val p = origin.point
                     map?.moveCamera(CameraUpdateFactory.newCenterPosition(LatLng.from(p.lat, p.lon), 16))
                 }
             },
