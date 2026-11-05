@@ -186,7 +186,13 @@ fun KakaoMap.showPoints(context: Context, start: LatLon, places: List<Pair<LatLo
  */
 fun KakaoMap.addMyLocation(context: Context, point: LatLon, sizeDp: Float = 22f): Label? {
     val density = context.resources.displayMetrics.density
-    return labelManager?.layer?.addLabel(
+    // A layer of its own drawn above every tag, so a nearby store or CCTV tag never covers the walker.
+    // One walker per map, so whatever was there before is replaced.
+    val layer = labelManager?.let {
+        it.getLayer(ME_LAYER) ?: it.addLayer(LabelLayerOptions.from(ME_LAYER).setCompetitionType(CompetitionType.None).setZOrder(20_000))
+    }
+    layer?.removeAll()
+    return layer?.addLabel(
         LabelOptions.from(point.toLatLng())
             .setStyles(
                 LabelStyles.from(
@@ -220,6 +226,7 @@ fun KakaoMap.addTurnArrows(context: Context, marks: List<TurnMark>) {
 }
 
 private const val TURN_SIGN_LAYER = "turnSigns"
+private const val ME_LAYER = "me"
 
 /** A white disc with a dark green ring and a turn arrow (↰ for left, ↱ for right). */
 private fun turnSignBitmap(density: Float, left: Boolean): Bitmap {
