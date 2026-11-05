@@ -34,7 +34,9 @@ fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
 
     val density = context.resources.displayMetrics.density
     layers.zones.forEach { zone ->
-        val points = MapPoints.fromLatLng(zone.points.map { (lat, lon) -> LatLng.from(lat, lon) })
+        // The SDK does not draw the edge from the last point back to the first, so close the ring.
+        val ring = if (zone.points.first() == zone.points.last()) zone.points else zone.points + zone.points.first()
+        val points = MapPoints.fromLatLng(ring.map { (lat, lon) -> LatLng.from(lat, lon) })
         shapeLayer?.addPolygon(
             PolygonOptions.from(points, PolygonStyles.from(zone.fillColor.toInt(), 2f * density, zone.strokeColor.toInt())),
         )
