@@ -42,4 +42,13 @@ class GuidanceTest {
         assertEquals(FacilityKind.GUARD_HOUSE, g.nearestHelp?.kind)
         assertEquals(Turn.LEFT, g.nearestHelp?.side)
     }
+
+    @Test
+    fun cctvIsNotAHelpPlace() {
+        // A CCTV right beside the walker and a guard house farther away: only the guard house is help.
+        val cctv = Facility(FacilityKind.CCTV, 35.14041, 126.9318)
+        val guard = Facility(FacilityKind.GUARD_HOUSE, 35.1403, 126.9314)
+        assertEquals(FacilityKind.GUARD_HOUSE, Guidance(path, listOf(cctv, guard)).update(start).nearestHelp?.kind)
+        assertEquals(null, Guidance(path, listOf(cctv)).update(start).nearestHelp)
+    }
 }

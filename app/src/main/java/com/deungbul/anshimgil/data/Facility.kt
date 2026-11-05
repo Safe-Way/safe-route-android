@@ -67,6 +67,10 @@ val UserMode.facilityKinds: Set<FacilityKind>
         UserMode.GENERAL -> emptySet()
     } + COMMON_FACILITY_KINDS
 
+/** Places a walker can go to or use to get help (the server's "help" group plus emergency bells); CCTV only watches. */
+val HELP_KINDS: Set<FacilityKind> =
+    setOf(FacilityKind.POLICE, FacilityKind.GUARD_HOUSE, FacilityKind.CONVENIENCE_STORE, FacilityKind.EMERGENCY_BELL)
+
 /** Settings key for child protection zones, which are areas rather than a [FacilityKind]. */
 const val CHILD_ZONE_KEY = "CHILD_ZONE"
 

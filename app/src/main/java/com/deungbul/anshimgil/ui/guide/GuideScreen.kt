@@ -254,10 +254,15 @@ fun GuideScreen(
 
 private data class Instruction(val big: String, val action: String, val spoken: String)
 
+/** Closer than this to the turn, say "지금" instead of "0m 앞". */
+private const val TURN_NOW_M = 5
+
 private fun instructionText(state: GuidanceState): Instruction {
     val m = state.metersToNextTurn
     return when {
         state.arrived -> Instruction("도착", "목적지에 도착했어요", "목적지에 도착했어요. 안내를 마칩니다.")
+        m < TURN_NOW_M && state.nextTurn == Turn.LEFT -> Instruction("지금", "왼쪽으로 가세요", "지금 왼쪽으로 가세요")
+        m < TURN_NOW_M && state.nextTurn == Turn.RIGHT -> Instruction("지금", "오른쪽으로 가세요", "지금 오른쪽으로 가세요")
         state.nextTurn == Turn.LEFT -> Instruction("${m}m 앞", "왼쪽으로 가세요", "${m}미터 앞에서 왼쪽으로 가세요")
         state.nextTurn == Turn.RIGHT -> Instruction("${m}m 앞", "오른쪽으로 가세요", "${m}미터 앞에서 오른쪽으로 가세요")
         state.nextTurn == Turn.STRAIGHT -> Instruction("${m}m", "쭉 가세요", "${m}미터 쭉 가세요")
