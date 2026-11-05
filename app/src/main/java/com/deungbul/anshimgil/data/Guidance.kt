@@ -94,7 +94,7 @@ class Guidance(private val path: List<LatLon>, private val facilities: List<Faci
     private fun nearestHelp(here: Pair<Double, Double>, leg: Int): HelpPoint? {
         val heading = points[leg + 1].let { (bx, by) -> (bx - points[leg].first) to (by - points[leg].second) }
         return facilities
-            .filter { !it.kind.avoid }
+            .filter { it.kind in HELP_KINDS }
             .map { f -> f to toXY(LatLon(f.lat, f.lon)) }
             .map { (f, xy) -> Triple(f, xy, dist(here, xy)) }
             .filter { it.third <= 200 }
