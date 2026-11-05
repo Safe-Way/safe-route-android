@@ -36,6 +36,10 @@ data class RouteResult(
     val dataQuality: DataQuality,
     /** Weather and air shown for information, e.g. "비", "12°C", "미세먼지 나쁨"; empty when the server could not get them. */
     val weather: List<String> = emptyList(),
+    /** Today's sunset at the start ("17:34"), when the server gives it. */
+    val sunset: java.time.LocalTime? = null,
+    /** Whether it is raining now (only when the server could get the weather). */
+    val raining: Boolean = false,
 ) {
     fun route(type: RouteType): RouteOption? = routes.firstOrNull { it.type == type }
 
@@ -69,3 +73,20 @@ val UserMode.walkingSpeedMPerMin: Int
         UserMode.DISABLED -> 50
         UserMode.GENERAL -> 80
     }
+
+/** How long before sunset the evening counts as night for routing. */
+const val EVENING_BEFORE_SUNSET_MIN = 60L
+
+/**
+ * Whether the app should switch night routing on by itself although the server did not: in the evening
+ * (from an hour before sunset, for every mode) or when it rains, since both make streets darker.
+ * Null when night routing is already on or nothing calls for it; otherwise the reason to show.
+ */
+fun autoNightReason(result: RouteResult, now: java.time.LocalTime): String? {
+    if (result.conditions.any { it.key == "night" && it.on }) return null
+    return when {
+        result.raining -> "비가 와서"
+        result.sunset != null && !now.isBefore(result.sunset.minusMinutes(EVENING_BEFORE_SUNSET_MIN)) -> "저녁이라"
+        else -> null
+    }
+}

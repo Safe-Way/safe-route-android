@@ -54,6 +54,9 @@ internal fun parseRouteResult(json: JSONObject): RouteResult {
     val manual = conditionsJson?.optString("nightSource") == "manual"
     val conditions = if (night || manual) listOf(Condition("night", "밤", night)) else emptyList()
     val weather = weatherNotes(conditionsJson)
+    val sunset = conditionsJson?.optString("sunset")?.takeIf { it.isNotBlank() }
+        ?.let { runCatching { java.time.LocalTime.parse(it) }.getOrNull() }
+    val raining = conditionsJson?.optBoolean("weatherAvailable") == true && conditionsJson.optBoolean("rain")
 
     val routes = json.optJSONArray("routes").objects().mapNotNull { route ->
         val type = runCatching { RouteType.valueOf(route.getString("kind").uppercase()) }.getOrNull() ?: return@mapNotNull null
@@ -91,6 +94,8 @@ internal fun parseRouteResult(json: JSONObject): RouteResult {
     val quality = json.optJSONObject("dataQuality")
     return RouteResult(
         conditions = conditions,
+        sunset = sunset,
+        raining = raining,
         routes = routes,
         explanation = explanation,
         facilities = facilities,
