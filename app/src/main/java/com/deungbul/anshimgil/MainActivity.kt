@@ -35,6 +35,8 @@ import com.deungbul.anshimgil.data.SavedPlacesRepository
 import com.deungbul.anshimgil.data.SettingsRepository
 import com.deungbul.anshimgil.data.TextSize
 import com.deungbul.anshimgil.data.UserMode
+import com.deungbul.anshimgil.data.WalkSpeedRepository
+import com.deungbul.anshimgil.data.personalSpeed
 import com.deungbul.anshimgil.ui.settings.SettingsScreen
 import com.deungbul.anshimgil.ui.search.SearchScreen
 import com.deungbul.anshimgil.ui.common.MapMessage
@@ -54,6 +56,7 @@ class MainActivity : ComponentActivity() {
         val facilityRepository = FacilityRepository.create()
         val routeRepository = RouteRepository.create()
         val settingsRepository = SettingsRepository(applicationContext)
+        val walkSpeedRepository = WalkSpeedRepository(applicationContext)
         setContent {
             val settings by settingsRepository.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
             SeipjidoTheme {
@@ -61,7 +64,7 @@ class MainActivity : ComponentActivity() {
                     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                         AppRoot(
                             modeRepository, savedPlaces, placeRepository, facilityRepository, routeRepository,
-                            settingsRepository, settings, Modifier.padding(innerPadding),
+                            settingsRepository, settings, walkSpeedRepository, Modifier.padding(innerPadding),
                         )
                     }
                 }
@@ -107,6 +110,7 @@ fun AppRoot(
     routeRepository: RouteRepository,
     settingsRepository: SettingsRepository,
     settings: AppSettings,
+    walkSpeedRepository: WalkSpeedRepository,
     modifier: Modifier = Modifier,
 ) {
     val savedFlow = remember(modeRepository) { modeRepository.mode.map { SavedMode.Ready(it) } }
@@ -180,6 +184,7 @@ fun AppRoot(
                     val route = screen as Screen.Route
                     val back = { screen = if (route.fromHome) Screen.Home else Screen.Search() }
                     BackHandler(onBack = back)
+                    val samples by remember(mode) { walkSpeedRepository.samples(mode) }.collectAsStateWithLifecycle(initialValue = emptyList())
                     // key: find the route again whenever the start or destination changes.
                     androidx.compose.runtime.key(route) {
                         RouteScreen(
@@ -197,6 +202,7 @@ fun AppRoot(
                                 screen = Screen.Route(destination = fromPlace, start = route.destination, fromHome = route.fromHome)
                             },
                             onChangeDestination = { place -> screen = route.copy(destination = place) },
+                            walkSpeedMPerMin = personalSpeed(mode, samples),
                             onStart = { result, type -> screen = Screen.Guide(route, result, type) },
                             modifier = modifier,
                         )
@@ -216,6 +222,7 @@ fun AppRoot(
                         showTurnSigns = settings.turnSigns,
                         showSos = settings.sosButton,
                         routeRepository = routeRepository,
+                        walkSpeedRepository = walkSpeedRepository,
                         onFinish = { screen = Screen.Home },
                         modifier = modifier,
                     )

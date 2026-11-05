@@ -1,5 +1,10 @@
 package com.deungbul.anshimgil.ui.guide
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.deungbul.anshimgil.data.walkMinutes
+import com.deungbul.anshimgil.data.personalSpeed
+import com.deungbul.anshimgil.data.WalkMeter
+import com.deungbul.anshimgil.data.WalkSpeedRepository
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
@@ -87,7 +92,6 @@ import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.RouteType
 import com.deungbul.anshimgil.data.Turn
 import com.deungbul.anshimgil.data.UserMode
-import com.deungbul.anshimgil.data.walkingSpeedMPerMin
 import com.deungbul.anshimgil.map.KakaoMapView
 import com.deungbul.anshimgil.map.addMyLocation
 import com.deungbul.anshimgil.map.pointTo
@@ -145,6 +149,7 @@ fun GuideScreen(
     showTurnSigns: Boolean,
     showSos: Boolean,
     routeRepository: RouteRepository,
+    walkSpeedRepository: WalkSpeedRepository,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -172,7 +177,22 @@ fun GuideScreen(
             permissionLauncher.launch(LOCATION_PERMISSIONS)
         }
     }
-    if (hasPermission) LocationUpdates(context) { fix = it }
+    // Personal walking speed: measured on this walk from real positions, saved when the screen closes.
+    val samples by remember(mode) { walkSpeedRepository.samples(mode) }.collectAsStateWithLifecycle(initialValue = emptyList())
+    val speed = personalSpeed(mode, samples)
+    val meter = remember { WalkMeter() }
+    DisposableEffect(Unit) {
+        onDispose {
+            meter.sample(java.time.LocalDate.now().toString())?.let { sample ->
+                // The screen is gone, so this outlives it; the write is quick and local.
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { walkSpeedRepository.add(mode, sample) }
+            }
+        }
+    }
+    if (hasPermission) LocationUpdates(context) {
+        fix = it
+        meter.add(it, android.os.SystemClock.elapsedRealtime())
+    }
 
     // Along the route the walker only goes forward: a fix a few meters behind the last one is GPS noise,
     // so the marker stays put instead of sliding back and forth. A real step back (U-turn) still shows.
@@ -366,7 +386,7 @@ fun GuideScreen(
                 }
 
                 Row(Modifier.fillMaxWidth()) {
-                    val minutes = (state.remainingM.toDouble() / mode.walkingSpeedMPerMin).let { kotlin.math.ceil(it).toInt() }
+                    val minutes = walkMinutes(state.remainingM.toDouble(), speed)
                     Stat("남은 거리", formatDistance(state.remainingM), Modifier.weight(1f))
                     Stat("남은 시간", "${minutes}분", Modifier.weight(1f))
                     Stat("도착", arrivalTime(minutes), Modifier.weight(1f))
