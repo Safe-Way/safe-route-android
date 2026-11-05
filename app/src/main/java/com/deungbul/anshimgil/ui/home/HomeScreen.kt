@@ -2,7 +2,6 @@ package com.deungbul.anshimgil.ui.home
 
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.IconButton
-import androidx.compose.foundation.layout.Spacer
 import com.deungbul.anshimgil.data.Facility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -377,9 +376,11 @@ private fun PlaceDetailCard(place: Facility, onClose: () -> Unit, modifier: Modi
     Surface(shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 6.dp, modifier = modifier.fillMaxWidth()) {
         Column(Modifier.padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(place.name ?: place.label, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink, modifier = Modifier.weight(1f, fill = false))
-                kindText?.let { Text("  $it", fontSize = 14.sp, color = Color(0xFF5E6A62)) }
-                Spacer(Modifier.weight(1f))
+                // The kind ("지하철역") sits small above the name so a long station name keeps one line.
+                Column(Modifier.weight(1f).padding(top = 8.dp)) {
+                    kindText?.let { Text(it, fontSize = 13.sp, color = Color(0xFF5E6A62)) }
+                    Text(place.name ?: place.label, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Ink)
+                }
                 IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Ink) }
             }
             lines.forEach { line -> Text("· $line", fontSize = 16.sp, color = Ink, lineHeight = 22.sp, modifier = Modifier.padding(end = 12.dp)) }
