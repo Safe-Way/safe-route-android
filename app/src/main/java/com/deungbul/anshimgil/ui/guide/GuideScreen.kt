@@ -114,8 +114,8 @@ private const val FOLLOW_MS = 900
 private val FOLLOW = CameraAnimation.from(FOLLOW_MS, false, true)
 /** How long the map and the arrow take to turn. */
 private const val TURN_MS = 300
-/** The map turns only when the walker turns by at least this much. */
-private const val MAP_TURN_DEGREES = 10f
+/** The map turns only when the way ahead on the route turns by at least this much. */
+private const val MAP_TURN_DEGREES = 20f
 
 /**
  * Walking guidance along the chosen route (issue #7): next turn, nearest help, remaining distance,
@@ -202,13 +202,16 @@ fun GuideScreen(
     val travel = guidance.travelBearing(state.progressM)
     val heading = if (demo || compass == null) travel else compass
 
-    // Heading-up, like Naver's walking guidance: the map turns so the way the walker faces points up.
-    // Small wobbles are ignored so the map does not keep swaying.
-    var mapBearing by remember { mutableFloatStateOf(heading) }
-    LaunchedEffect(heading) { if (angleBetween(mapBearing, heading) >= MAP_TURN_DEGREES) mapBearing = heading }
-    // Kakao turns the map the other way round from a compass bearing, hence the minus.
+    // The map turns so the way ahead on the route points up. It follows the route, not the compass:
+    // with the compass the map (and the turn signs on it) kept sliding around whenever the phone moved.
+    // It turns only when the route bends by [MAP_TURN_DEGREES] or more, i.e. at turns.
+    var mapBearing by remember { mutableFloatStateOf(travel) }
+    LaunchedEffect(travel) { if (angleBetween(mapBearing, travel) >= MAP_TURN_DEGREES) mapBearing = travel }
+    // Kakao turns the map the other way round from a compass bearing, hence the minus. No animation,
+    // so it does not fight the animated follow of the walker's position.
     LaunchedEffect(map, mapBearing) {
-        map?.moveCamera(CameraUpdateFactory.rotateTo(Math.toRadians(-mapBearing.toDouble())), CameraAnimation.from(TURN_MS, false, true))
+        map?.moveCamera(CameraUpdateFactory.rotateTo(Math.toRadians(-mapBearing.toDouble())))
+        map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
     }
     // Marker rotation is measured on the screen, not the map, so take off the map's own turn.
     LaunchedEffect(me, heading, mapBearing) { me?.pointTo(heading - mapBearing, TURN_MS) }
