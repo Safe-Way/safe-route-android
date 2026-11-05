@@ -37,7 +37,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.deungbul.anshimgil.data.ApiException
-import com.deungbul.anshimgil.data.FakeFacilities
+import com.deungbul.anshimgil.data.Bbox
+import com.deungbul.anshimgil.data.FacilityRepository
 import com.deungbul.anshimgil.data.Place
 import com.deungbul.anshimgil.data.PlaceRepository
 import com.deungbul.anshimgil.data.UserMode
@@ -49,16 +50,17 @@ import com.deungbul.anshimgil.ui.common.MapMessage
 import com.deungbul.anshimgil.ui.mode.style
 import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.LatLng
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.kakao.vectormap.camera.CameraUpdateFactory
 
 private val Ink = Color(0xFF17211B)
 
-/** One-tap shortcuts: search word, button text and icon. */
+/** One-tap shortcuts: the server's `kind`, button text and icon. */
 private val NEARBY = listOf(
-    Triple("편의점", "편의점", Icons.Filled.Store),
-    Triple("파출소", "파출소", Icons.Filled.LocalPolice),
-    Triple("화장실", "화장실", Icons.Filled.Wc),
+    Triple("store", "편의점", Icons.Filled.Store),
+    Triple("police", "파출소", Icons.Filled.LocalPolice),
+    Triple("toilet", "화장실", Icons.Filled.Wc),
 )
 
 /**
@@ -69,6 +71,7 @@ private val NEARBY = listOf(
 fun HomeScreen(
     mode: UserMode,
     extraMapItems: Set<String>,
+    facilityRepository: FacilityRepository,
     placeRepository: PlaceRepository,
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -80,28 +83,50 @@ fun HomeScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var finding by remember { mutableStateOf<String?>(null) }
     var nearbyMessage by remember { mutableStateOf<String?>(null) }
+    var bbox by remember { mutableStateOf<Bbox?>(null) }
+    var mapNote by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    fun goToNearest(query: String) {
+    // The server picks the place: within 1 km, open ones first, narrowed by the mode.
+    fun goToNearest(kind: String, label: String) {
         if (finding != null) return
-        finding = query
+        finding = kind
         nearbyMessage = null
         scope.launch {
             val here = chooseOrigin(currentLocation(context)).point
-            val nearest = try {
-                placeRepository.search(query, here.lat, here.lon).minByOrNull { it.distanceM ?: Int.MAX_VALUE }
+            try {
+                val result = placeRepository.nearby(kind, mode, here.lat, here.lon)
+                val nearest = result.places.firstOrNull()
+                if (nearest != null) onPlaceSelected(nearest)
+                else nearbyMessage = result.message ?: "가까운 ${label}을(를) 찾지 못했어요"
             } catch (e: ApiException) {
                 nearbyMessage = e.message
-                null
             }
             finding = null
-            if (nearest != null) onPlaceSelected(nearest)
-            else if (nearbyMessage == null) nearbyMessage = "가까운 ${query}을(를) 찾지 못했어요"
         }
     }
 
-    LaunchedEffect(map, mode, extraMapItems) {
-        map?.showLayers(context, FakeFacilities.layersFor(mode, extraMapItems))
+    // Load facilities for the visible area whenever the map stops moving.
+    LaunchedEffect(map) {
+        val m = map ?: return@LaunchedEffect
+        bbox = m.visibleBbox()
+        m.setOnCameraMoveEndListener { moved, _, _ -> moved.visibleBbox()?.let { bbox = it } }
+    }
+    LaunchedEffect(map, mode, extraMapItems, bbox) {
+        val m = map ?: return@LaunchedEffect
+        val area = bbox ?: return@LaunchedEffect
+        delay(300) // wait for the map to settle after a drag
+        mapNote = try {
+            val page = facilityRepository.load(mode, extraMapItems, area)
+            m.showLayers(context, page.layers)
+            when {
+                facilityRepository.isExample -> "시설 정보: 예시 데이터 (서버 연결 전)"
+                page.truncated -> "시설이 많아 일부만 보여요. 확대하면 더 보여요"
+                else -> null
+            }
+        } catch (e: ApiException) {
+            e.message
+        }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -162,7 +187,7 @@ fun HomeScreen(
                     NearbyButton(
                         text = if (finding == query) "찾는 중…" else label,
                         icon = icon,
-                        onClick = { goToNearest(query) },
+                        onClick = { goToNearest(query, label) },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -195,19 +220,21 @@ fun HomeScreen(
             }
         }
 
-        Surface(
-            shape = RoundedCornerShape(4.dp),
-            color = Color.White.copy(alpha = 0.85f),
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 12.dp, bottom = 12.dp),
-        ) {
-            Text(
-                "시설 정보: 예시 데이터 (서버 연결 전)",
-                fontSize = 11.sp,
-                color = Color(0xFF4A564E),
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            )
+        mapNote?.let { note ->
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 12.dp, bottom = 12.dp),
+            ) {
+                Text(
+                    note,
+                    fontSize = 12.sp,
+                    color = Color(0xFF4A564E),
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
         }
 
         error?.let { MapMessage(it, Modifier.align(Alignment.BottomCenter)) }
@@ -235,4 +262,16 @@ private fun NearbyButton(text: String, icon: ImageVector, onClick: () -> Unit, m
             }
         }
     }
+}
+
+/** The map area on screen, or null before the map has a size. */
+private fun KakaoMap.visibleBbox(): Bbox? {
+    val v = viewport
+    if (v.width() <= 0 || v.height() <= 0) return null
+    val a = fromScreenPoint(v.left, v.top) ?: return null
+    val b = fromScreenPoint(v.right, v.bottom) ?: return null
+    return Bbox(
+        west = minOf(a.longitude, b.longitude), south = minOf(a.latitude, b.latitude),
+        east = maxOf(a.longitude, b.longitude), north = maxOf(a.latitude, b.latitude),
+    )
 }

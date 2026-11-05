@@ -19,6 +19,8 @@ enum class FacilityKind(val label: String, val color: Long, val avoid: Boolean =
     ELEVATOR("엘리베이터 육교", 0xFF6D28D9, title = "엘리베이터 있는 육교"),
     OVERPASS("육교", 0xFFB42318, avoid = true, title = "육교 (피할 곳)"),
     STAIRS("계단", 0xFFB42318, avoid = true, title = "계단 (피할 곳)"),
+    /** A child protection zone from the server, which gives a point rather than an area. Shown with [CHILD_ZONE_KEY]. */
+    SCHOOL_ZONE("보호구역", 0xFFA16207, title = "어린이 보호구역"),
 }
 
 data class Facility(val kind: FacilityKind, val lat: Double, val lon: Double)
@@ -55,11 +57,12 @@ data class MapItem(val key: String, val title: String)
 val UserMode.optionalMapItems: List<MapItem>
     get() = buildList {
         if (this@optionalMapItems != UserMode.CHILD) add(MapItem(CHILD_ZONE_KEY, "어린이 보호구역"))
-        FacilityKind.entries.filter { it !in facilityKinds }.forEach { add(MapItem(it.name, it.title)) }
+        FacilityKind.entries.filter { it !in facilityKinds && it != FacilityKind.SCHOOL_ZONE }.forEach { add(MapItem(it.name, it.title)) }
     }
 
 /** Facility kinds shown for this mode plus the ones the user added in settings. */
 fun UserMode.shownKinds(extras: Set<String>): Set<FacilityKind> =
-    facilityKinds + FacilityKind.entries.filter { it.name in extras }
+    facilityKinds + FacilityKind.entries.filter { it.name in extras } +
+        (if (showsChildZones(extras)) setOf(FacilityKind.SCHOOL_ZONE) else emptySet())
 
 fun UserMode.showsChildZones(extras: Set<String>): Boolean = this == UserMode.CHILD || CHILD_ZONE_KEY in extras
