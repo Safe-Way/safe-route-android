@@ -104,6 +104,8 @@ class WalkMeter {
 class WalkSpeedRepository(private val context: Context) {
     private fun key(mode: UserMode) = stringPreferencesKey("walk_samples_${mode.key}")
     private val guestKey = stringPreferencesKey("guest_id")
+    // Walks not yet accepted by the server, one "mode|sample" per line; sent again later.
+    private val pendingKey = stringPreferencesKey("walk_samples_pending")
 
     fun samples(mode: UserMode): Flow<List<WalkSample>> =
         context.settingsDataStore.data.map { prefs -> prefs[key(mode)].orEmpty().lines().mapNotNull { WalkSample.decode(it) } }
@@ -112,6 +114,37 @@ class WalkSpeedRepository(private val context: Context) {
         context.settingsDataStore.edit {
             val now = it[key(mode)].orEmpty().lines().mapNotNull { line -> WalkSample.decode(line) }
             it[key(mode)] = (now + sample).takeLast(WalkSample.KEEP).joinToString("\n") { s -> s.encode() }
+            it[pendingKey] = (it[pendingKey].orEmpty().lines().filter { l -> l.isNotBlank() } + "${mode.key}|${sample.encode()}")
+                .takeLast(WalkSample.KEEP).joinToString("\n")
+        }
+        uploadPending()
+    }
+
+    /**
+     * Sends walks the server has not got yet (`POST /api/walk-speed`): the guest id, mode, distance and
+     * moving time only. Kept for later when the phone is offline or the server is not ready; dropped when
+     * the server says the walk does not count, so it is not sent again forever.
+     */
+    suspend fun uploadPending() {
+        if (!ServerApi.isConfigured) return
+        val lines = context.settingsDataStore.data.first()[pendingKey].orEmpty().lines().filter { it.isNotBlank() }
+        if (lines.isEmpty()) return
+        val guest = guestId()
+        val done = mutableListOf<String>()
+        for (line in lines) {
+            val modeKey = line.substringBefore('|')
+            val sample = WalkSample.decode(line.substringAfter('|')) ?: run { done += line; null } ?: continue
+            try {
+                ServerApi.post("/api/walk-speed", walkSampleJson(guest, modeKey, sample))
+                done += line
+            } catch (e: ApiException) {
+                if (e.code == "BAD_PARAM") done += line else break
+            }
+        }
+        if (done.isNotEmpty()) {
+            context.settingsDataStore.edit { prefs ->
+                prefs[pendingKey] = prefs[pendingKey].orEmpty().lines().filter { it.isNotBlank() && it !in done }.joinToString("\n")
+            }
         }
     }
 
@@ -133,3 +166,11 @@ internal fun metersBetween(a: LatLon, b: LatLon): Double {
         Math.cos(Math.toRadians(a.lat)) * Math.cos(Math.toRadians(b.lat)) * Math.sin(dLon / 2).let { it * it }
     return 2 * r * Math.asin(Math.sqrt(h))
 }
+
+/** The body for `POST /api/walk-speed` (no position, no time of day). */
+internal fun walkSampleJson(guestId: String, modeKey: String, sample: WalkSample): org.json.JSONObject =
+    org.json.JSONObject()
+        .put("guestId", guestId)
+        .put("mode", modeKey)
+        .put("distanceM", sample.distanceM)
+        .put("movingS", sample.movingSec)

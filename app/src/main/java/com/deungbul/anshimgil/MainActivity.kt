@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import com.deungbul.anshimgil.data.AppSettings
 import com.deungbul.anshimgil.data.FacilityRepository
 import com.deungbul.anshimgil.data.ModeRepository
@@ -57,6 +58,8 @@ class MainActivity : ComponentActivity() {
         val routeRepository = RouteRepository.create()
         val settingsRepository = SettingsRepository(applicationContext)
         val walkSpeedRepository = WalkSpeedRepository(applicationContext)
+        // Walks that could not be sent last time (offline, server not ready) go now.
+        lifecycleScope.launch { runCatching { walkSpeedRepository.uploadPending() } }
         setContent {
             val settings by settingsRepository.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
             SeipjidoTheme {

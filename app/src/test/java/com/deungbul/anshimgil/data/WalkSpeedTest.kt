@@ -44,4 +44,12 @@ class WalkSpeedTest {
         short.add(north(0.0), 0); short.add(north(100.0), 100_000)
         assertNull(short.sample("2026-11-05"))
     }
+
+    @Test
+    fun uploadCarriesOnlyGuestModeDistanceAndMovingTime() {
+        val body = walkSampleJson("guest-1", "senior", WalkSample(52.0, 640, 738, "2026-11-05"))
+        assertEquals(setOf("guestId", "mode", "distanceM", "movingS"), body.keys().asSequence().toSet())
+        assertEquals(640, body.getInt("distanceM"))
+        assertEquals(738, body.getInt("movingS"))
+    }
 }
