@@ -1,5 +1,7 @@
 package com.deungbul.anshimgil.ui.home
 
+import com.deungbul.anshimgil.data.MapLayers
+import androidx.compose.runtime.mutableIntStateOf
 import com.deungbul.anshimgil.data.stationExits
 import com.deungbul.anshimgil.data.FacilityKind
 import androidx.compose.material.icons.filled.Close
@@ -73,6 +75,9 @@ import com.kakao.vectormap.camera.CameraUpdateFactory
 
 private val Ink = Color(0xFF17211B)
 
+/** Below this zoom (about a whole district on screen) the map shows no facility tags. */
+private const val MIN_TAG_ZOOM = 15
+
 /** Same scale as the guide screen: nearby streets with buildings in 3D, one step closer than the default 16. */
 private const val WALK_ZOOM = 17
 
@@ -109,6 +114,7 @@ fun HomeScreen(
     var picked by remember { mutableStateOf<Facility?>(null) }
     // What the map shows now, so a station's card can list its exits.
     var shownFacilities by remember { mutableStateOf<List<Facility>>(emptyList()) }
+    var zoom by remember { mutableIntStateOf(WALK_ZOOM) }
     val scope = rememberCoroutineScope()
 
     // The phone's position, kept up to date so the location button moves at once and the dot follows.
@@ -189,16 +195,27 @@ fun HomeScreen(
         val m = map ?: return@LaunchedEffect
         m.tiltForWalking()
         bbox = m.visibleBbox()
-        m.setOnCameraMoveEndListener { moved, _, _ -> moved.visibleBbox()?.let { bbox = it } }
+        m.setOnCameraMoveEndListener { moved, position, _ ->
+            zoom = position.zoomLevel
+            moved.visibleBbox()?.let { bbox = it }
+        }
         m.setOnLabelClickListener { _, _, label ->
             (label.tag as? Facility)?.let { picked = it }
             true
         }
     }
-    LaunchedEffect(map, mode, extraMapItems, bbox) {
+    LaunchedEffect(map, mode, extraMapItems, bbox, zoom) {
         val m = map ?: return@LaunchedEffect
         val area = bbox ?: return@LaunchedEffect
         delay(300) // wait for the map to settle after a drag
+        // Zoomed far out the user is looking for a place, not at what is on each street: no tags then.
+        if (zoom < MIN_TAG_ZOOM) {
+            m.showLayers(context, MapLayers(emptyList(), emptyList()))
+            shownFacilities = emptyList()
+            me = here?.let { m.addMyLocation(context, it) }
+            mapNote = "확대하면 시설이 보여요"
+            return@LaunchedEffect
+        }
         mapNote = try {
             val page = facilityRepository.load(mode, extraMapItems, area)
             m.showLayers(context, page.layers)
