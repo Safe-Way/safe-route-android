@@ -22,6 +22,8 @@ object FakeFacilities {
         Facility(FacilityKind.ACCESSIBLE_TOILET, 35.1378, 126.9300),
         Facility(FacilityKind.ELEVATOR, 35.1425, 126.9328),
         Facility(FacilityKind.STAIRS, 35.1414, 126.9320),
+        Facility(FacilityKind.CURB_RAMP, 35.1390, 126.9335),
+        Facility(FacilityKind.OVERPASS, 35.1432, 126.9318),
     )
 
     private val childZone = Zone(
@@ -33,11 +35,12 @@ object FakeFacilities {
         ),
     )
 
-    fun layersFor(mode: UserMode): MapLayers {
-        val kinds = mode.facilityKinds
+    /** [extras] are the items the user added in settings (see [optionalMapItems]). */
+    fun layersFor(mode: UserMode, extras: Set<String> = emptySet()): MapLayers {
+        val kinds = mode.shownKinds(extras)
         return MapLayers(
             facilities = all.filter { it.kind in kinds },
-            zones = if (mode == UserMode.CHILD) listOf(childZone) else emptyList(),
+            zones = if (mode.showsChildZones(extras)) listOf(childZone) else emptyList(),
         )
     }
 }

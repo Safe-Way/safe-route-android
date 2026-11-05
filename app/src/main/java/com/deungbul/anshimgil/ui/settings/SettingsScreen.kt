@@ -21,6 +21,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import com.deungbul.anshimgil.data.AppSettings
 import com.deungbul.anshimgil.data.TextSize
 import com.deungbul.anshimgil.data.UserMode
+import com.deungbul.anshimgil.data.optionalMapItems
 import com.deungbul.anshimgil.ui.mode.style
 
 private val Ink = Color(0xFF17211B)
@@ -58,6 +61,7 @@ fun SettingsScreen(
     onVoiceChange: (Boolean) -> Unit,
     onAutoConditionsChange: (Boolean) -> Unit,
     onTextSizeChange: (TextSize) -> Unit,
+    onExtraMapItemChange: (key: String, on: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -84,6 +88,16 @@ fun SettingsScreen(
         SectionTitle("길찾기")
         SwitchRow("음성 안내", "걷는 동안 다음 방향을 읽어 줘요", settings.voiceGuide, onVoiceChange)
         SwitchRow("상황 자동 판단", "밤, 비, 폭염 등을 알아서 경로에 반영해요", settings.autoConditions, onAutoConditionsChange)
+
+        SectionTitle("지도에 더 보기")
+        Text(
+            "${mode.style().label} 모드에 기본으로 보이는 것 외에, 더 보고 싶은 정보를 골라요.",
+            fontSize = 14.sp, color = Muted,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        mode.optionalMapItems.forEach { item ->
+            CheckRow(item.title, item.key in settings.extraMapItems) { onExtraMapItemChange(item.key, it) }
+        }
 
         SectionTitle("글자 크기")
         Row(
@@ -179,6 +193,24 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChang
                 onCheckedChange = null,
                 colors = SwitchDefaults.colors(checkedTrackColor = Green),
             )
+        }
+        HorizontalDivider(color = Color(0xFFEDF1EC))
+    }
+}
+
+@Composable
+private fun CheckRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Column {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .toggleable(value = checked, role = Role.Checkbox, onValueChange = onChange)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        ) {
+            Checkbox(checked = checked, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = Green))
+            Text(title, fontSize = 17.sp, color = Ink, modifier = Modifier.padding(start = 12.dp))
         }
         HorizontalDivider(color = Color(0xFFEDF1EC))
     }

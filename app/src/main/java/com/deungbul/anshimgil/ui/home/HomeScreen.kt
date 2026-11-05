@@ -51,6 +51,7 @@ private val Ink = Color(0xFF17211B)
 @Composable
 fun HomeScreen(
     mode: UserMode,
+    extraMapItems: Set<String>,
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -60,8 +61,8 @@ fun HomeScreen(
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(map, mode) {
-        map?.showLayers(context, FakeFacilities.layersFor(mode))
+    LaunchedEffect(map, mode, extraMapItems) {
+        map?.showLayers(context, FakeFacilities.layersFor(mode, extraMapItems))
     }
 
     Box(modifier = modifier.fillMaxSize()) {

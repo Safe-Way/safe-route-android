@@ -158,7 +158,7 @@ class FakeRouteRepository : RouteRepository {
     }
 
     private fun facilitiesAlong(path: List<LatLon>, mode: UserMode): List<Facility> {
-        val kinds = mode.facilityKinds.filter { it != FacilityKind.STAIRS }
+        val kinds = mode.facilityKinds.filter { !it.avoid }
         return listOf(0.25, 0.5, 0.75).mapIndexed { i, fraction ->
             val p = pointAlong(path, fraction)
             // Offset slightly so the tag sits beside the line rather than on it.
