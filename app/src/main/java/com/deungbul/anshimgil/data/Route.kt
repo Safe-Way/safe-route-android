@@ -36,6 +36,9 @@ data class RouteResult(
     val dataQuality: DataQuality,
 ) {
     fun route(type: RouteType): RouteOption? = routes.firstOrNull { it.type == type }
+
+    /** Facilities along the [type] route, leaving out those only on the other one. */
+    fun facilitiesOn(type: RouteType): List<Facility> = facilities.filter { it.route == null || it.route == type }
 }
 
 data class RouteRequest(

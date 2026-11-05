@@ -23,7 +23,8 @@ enum class FacilityKind(val label: String, val color: Long, val avoid: Boolean =
     SCHOOL_ZONE("보호구역", 0xFFA16207, title = "어린이 보호구역"),
 }
 
-data class Facility(val kind: FacilityKind, val lat: Double, val lon: Double)
+/** [route] is the route it lies along; null means both routes or not route-specific. */
+data class Facility(val kind: FacilityKind, val lat: Double, val lon: Double, val route: RouteType? = null)
 
 /** An area drawn on the map, such as a child protection zone. Points go around the edge in order. */
 data class Zone(val label: String, val fillColor: Long, val strokeColor: Long, val points: List<Pair<Double, Double>>)

@@ -79,7 +79,13 @@ internal fun parseRouteResult(json: JSONObject): RouteResult {
 
     val facilities = json.optJSONArray("facilities").objects().mapNotNull { f ->
         val kind = FACILITY_TYPES[f.optString("type")] ?: return@mapNotNull null
-        Facility(kind, f.getDouble("lat"), f.getDouble("lon"))
+        // "on" says which route it lies along: safe, shortest or both.
+        val route = when (f.optString("on")) {
+            "safe" -> RouteType.SAFE
+            "shortest" -> RouteType.SHORTEST
+            else -> null
+        }
+        Facility(kind, f.getDouble("lat"), f.getDouble("lon"), route)
     }
     val quality = json.optJSONObject("dataQuality")
     return RouteResult(
@@ -162,7 +168,7 @@ class FakeRouteRepository : RouteRepository {
         return listOf(0.25, 0.5, 0.75).mapIndexed { i, fraction ->
             val p = pointAlong(path, fraction)
             // Offset slightly so the tag sits beside the line rather than on it.
-            Facility(kinds[i % kinds.size], p.lat + 0.00008, p.lon - 0.00010)
+            Facility(kinds[i % kinds.size], p.lat + 0.00008, p.lon - 0.00010, RouteType.SAFE)
         }
     }
 }
