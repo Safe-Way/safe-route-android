@@ -53,6 +53,9 @@ import com.deungbul.anshimgil.location.lastKnownLocation
 import com.deungbul.anshimgil.location.phoneOrigin
 import com.deungbul.anshimgil.map.KakaoMapView
 import com.deungbul.anshimgil.map.addMyLocation
+import com.deungbul.anshimgil.map.pointTo
+import com.deungbul.anshimgil.map.tiltForWalking
+import com.deungbul.anshimgil.location.rememberCompassHeading
 import com.deungbul.anshimgil.map.showLayers
 import com.kakao.vectormap.label.Label
 import com.deungbul.anshimgil.ui.common.MapMessage
@@ -147,6 +150,9 @@ fun HomeScreen(
         }
         me?.moveTo(LatLng.from(p.lat, p.lon)) ?: run { me = m.addMyLocation(context, p) }
     }
+    // The arrow on the dot turns with the phone (compass).
+    val heading = rememberCompassHeading()
+    LaunchedEffect(me, heading) { heading?.let { me?.pointTo(it) } }
 
     // The server picks the place: within 1 km, open ones first, narrowed by the mode.
     fun goToNearest(kind: String, label: String) {
@@ -171,6 +177,7 @@ fun HomeScreen(
     // Load facilities for the visible area whenever the map stops moving.
     LaunchedEffect(map) {
         val m = map ?: return@LaunchedEffect
+        m.tiltForWalking()
         bbox = m.visibleBbox()
         m.setOnCameraMoveEndListener { moved, _, _ -> moved.visibleBbox()?.let { bbox = it } }
     }
