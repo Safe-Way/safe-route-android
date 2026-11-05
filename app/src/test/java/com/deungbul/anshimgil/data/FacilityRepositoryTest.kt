@@ -84,7 +84,7 @@ class FacilityRepositoryTest {
     @Test
     fun stationsShowElevatorExitsForSeniorAndDisabled() {
         assertEquals(null to FacilityLook.NORMAL, poiLabel(FacilityKind.SUBWAY, true, 2, UserMode.GENERAL))
-        assertEquals("지하철역 · 엘리베이터 출구 2곳" to FacilityLook.NORMAL, poiLabel(FacilityKind.SUBWAY, true, 2, UserMode.SENIOR))
+        assertEquals("지하철역" to FacilityLook.NORMAL, poiLabel(FacilityKind.SUBWAY, true, 2, UserMode.SENIOR))
         // 양동시장역: no street elevator, grayed out only in disabled mode
         assertEquals("지하철역 · 엘리베이터 출구 없음" to FacilityLook.GRAY, poiLabel(FacilityKind.SUBWAY, false, 1, UserMode.DISABLED))
         assertEquals(FacilityLook.NORMAL, poiLabel(FacilityKind.SUBWAY, false, 1, UserMode.SENIOR).second)
@@ -99,11 +99,12 @@ class FacilityRepositoryTest {
 
     @Test
     fun entrancesWithElevatorStandOutForSeniorAndDisabled() {
-        assertEquals("역 입구 · 엘리베이터", poiLabel(FacilityKind.SUBWAY_ENTRANCE, true, null, UserMode.DISABLED).first)
-        assertEquals("3번 출구 · 엘리베이터", poiLabel(FacilityKind.SUBWAY_ENTRANCE, true, null, UserMode.DISABLED, "남광주역 3번 출구").first)
+        assertEquals("역 입구", poiLabel(FacilityKind.SUBWAY_ENTRANCE, true, null, UserMode.DISABLED).first)
+        assertEquals("3번 출구", poiLabel(FacilityKind.SUBWAY_ENTRANCE, true, null, UserMode.DISABLED, "남광주역 3번 출구").first)
         assertEquals("1번 출구" to FacilityLook.GRAY, poiLabel(FacilityKind.SUBWAY_ENTRANCE, false, null, UserMode.DISABLED, "남광주역 1번 출구"))
         assertNull(poiLabel(FacilityKind.SUBWAY_ENTRANCE, null, null, UserMode.DISABLED).first)
         assertNull(poiLabel(FacilityKind.SUBWAY_ENTRANCE, true, null, UserMode.CHILD).first)
+        assertEquals("2번 출구", poiLabel(FacilityKind.SUBWAY_ENTRANCE, false, null, UserMode.CHILD, "남광주역 2번 출구").first)
     }
 
     @Test
@@ -115,6 +116,7 @@ class FacilityRepositoryTest {
         val station = parsePois(json, UserMode.DISABLED.shownKinds(emptySet()), UserMode.DISABLED).layers.facilities.single()
         assertEquals("문화전당역", station.name)
         assertEquals("지하철역 · 엘리베이터 있는 출구 3곳(2·3·4번) · 장애인 화장실 2곳", station.detail)
+        assertEquals(true, station.elevator)
     }
 
     @Test
@@ -126,5 +128,14 @@ class FacilityRepositoryTest {
             Facility(FacilityKind.SUBWAY_ENTRANCE, 0.0, 0.0, name = "학동증심사입구역 1번 출구", detail = "지하철 출입구 · 엘리베이터 있음"),
         )
         assertEquals(listOf("1번 출구 · 엘리베이터 없음", "4번 출구 · 엘리베이터 있음"), stationExits(station, exits))
+    }
+
+    @Test
+    fun schoolZonesComeWithAnAreaAroundTheSchool() {
+        val json = JSONObject("""{"pois":[{"kind":"school_zone","sub":"초등학교","name":"서석초등학교","lat":35.1475,"lon":126.9255}],"truncated":false}""")
+        val page = parsePois(json, UserMode.CHILD.shownKinds(emptySet()), UserMode.CHILD)
+        val zone = page.layers.zones.single()
+        assertEquals(4, zone.points.size)
+        assertTrue(zone.points.all { (lat, lon) -> kotlin.math.abs(lat - 35.1475) < 0.002 && kotlin.math.abs(lon - 126.9255) < 0.002 })
     }
 }

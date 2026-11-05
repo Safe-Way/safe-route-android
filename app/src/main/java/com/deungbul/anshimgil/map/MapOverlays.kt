@@ -9,6 +9,7 @@ import android.graphics.Typeface
 import com.deungbul.anshimgil.data.Facility
 import com.deungbul.anshimgil.data.FacilityKind
 import com.deungbul.anshimgil.data.FacilityLook
+import com.deungbul.anshimgil.data.HELP_KINDS
 import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.MapLayers
 import com.deungbul.anshimgil.data.RouteResult
@@ -32,9 +33,9 @@ import com.kakao.vectormap.shape.PolygonStyles
 /** Replaces everything on the map with [layers]: zones underneath, facility labels on top. */
 fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
     val shapeLayer = shapeManager?.layer
-    val labelLayer = labelManager?.layer
     shapeLayer?.removeAll()
-    labelLayer?.removeAll()
+    labelManager?.layer?.removeAll()
+    val labelLayer = labelManager?.layer
 
     val density = context.resources.displayMetrics.density
     layers.zones.forEach { zone ->
@@ -47,27 +48,51 @@ fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
     }
 
     // One style per distinct tag, since text and look can differ within a kind.
-    val styles = mutableMapOf<Triple<FacilityKind, String, FacilityLook>, LabelStyles>()
-    layers.facilities.forEach { facility ->
-        val style = styles.getOrPut(Triple(facility.kind, facility.label, facility.look)) {
-            val bitmap = when (facility.look) {
-                FacilityLook.NORMAL -> pillBitmap(facility.label, facility.kind.color.toInt(), density)
-                FacilityLook.GRAY -> pillBitmap(facility.label, GRAY, density)
-                FacilityLook.DOT -> dotBitmap(GRAY, density, sizeDp = 10f)
-            }
-            LabelStyles.from(
-                LabelStyle.from(bitmap)
-                    .setAnchorPoint(0.5f, if (facility.look == FacilityLook.DOT) 0.5f else 1f)
-                    .setApplyDpScale(false),
-            )
+    val styles = mutableMapOf<List<Any>, Pair<LabelStyles, Bitmap>>()
+    fun styleOf(facility: Facility) = styles.getOrPut(listOf(facility.kind, facility.label, facility.look, facility.elevator)) {
+        val bitmap = when (facility.look) {
+            FacilityLook.NORMAL -> pillBitmap(facility.label, facility.kind.color.toInt(), density, elevator = facility.elevator)
+            FacilityLook.GRAY -> pillBitmap(facility.label, GRAY, density)
+            FacilityLook.DOT -> dotBitmap(GRAY, density, sizeDp = 10f)
         }
-        // Stations sit on top of the toilets and stores inside them.
-        val rank = if (facility.kind == FacilityKind.SUBWAY) 5L else 0L
+        LabelStyles.from(
+            LabelStyle.from(bitmap)
+                .setAnchorPoint(0.5f, if (facility.look == FacilityLook.DOT) 0.5f else 1f)
+                .setApplyDpScale(false),
+        ) to bitmap
+    }
+
+    // Too many tags in one place are unreadable, so the more important tag wins where tags would overlap
+    // on screen ([tagRank]); zooming in makes room and shows the rest. The map redraws tags after each move.
+    val placed = mutableListOf<android.graphics.Rect>()
+    val gap = (2 * density).toInt()
+    layers.facilities.sortedByDescending { tagRank(it) }.forEach { facility ->
+        val (style, bitmap) = styleOf(facility)
+        val p = runCatching { toScreenPoint(facility.latLng) }.getOrNull()
+        if (p != null) {
+            val top = if (facility.look == FacilityLook.DOT) p.y - bitmap.height / 2 else p.y - bitmap.height
+            val box = android.graphics.Rect(p.x - bitmap.width / 2 - gap, top - gap, p.x + bitmap.width / 2 + gap, top + bitmap.height + gap)
+            if (placed.any { android.graphics.Rect.intersects(it, box) }) return@forEach
+            placed += box
+        }
         // Places with more to say (e.g. a station's elevator exits) can be tapped; the tag carries the place.
-        val options = LabelOptions.from(facility.latLng).setStyles(style).setRank(rank)
+        val options = LabelOptions.from(facility.latLng).setStyles(style).setRank(tagRank(facility))
         if (facility.detail != null) options.setClickable(true).setTag(facility)
         labelLayer?.addLabel(options)
     }
+}
+
+/**
+ * Which tag wins when tags would overlap (higher shows): stations, then elevator exits, then places to
+ * get help, then the rest. CCTV and grayed-out or unconfirmed places give way first.
+ */
+internal fun tagRank(facility: Facility): Long = when {
+    facility.look != FacilityLook.NORMAL -> 0L
+    facility.kind == FacilityKind.SUBWAY -> 50L
+    facility.kind == FacilityKind.SUBWAY_ENTRANCE -> 40L
+    facility.kind in HELP_KINDS -> 30L
+    facility.kind == FacilityKind.CCTV -> 5L
+    else -> 20L
 }
 
 /** Tags for places that are unavailable or unconfirmed. */
@@ -82,7 +107,6 @@ fun LatLon.toLatLng(): LatLng = LatLng.from(lat, lon)
  * and start/end markers, then fits the camera to the routes.
  */
 fun KakaoMap.showRoutes(context: Context, result: RouteResult, selected: RouteType, destinationName: String) {
-    showLayers(context, MapLayers(result.facilitiesOn(selected), zones = emptyList()))
     val density = context.resources.displayMetrics.density
     val lineLayer = routeLineManager?.layer ?: return
     lineLayer.removeAll()
@@ -101,6 +125,11 @@ fun KakaoMap.showRoutes(context: Context, result: RouteResult, selected: RouteTy
         )
     }
 
+    // Fit the camera first: the tags are thinned out by where they fall on screen in the final view.
+    val points = result.routes.flatMap { it.path }.map { it.toLatLng() }.toTypedArray()
+    if (points.isNotEmpty()) moveCamera(CameraUpdateFactory.fitMapPoints(points, (48 * density).toInt()))
+    showLayers(context, MapLayers(result.facilitiesOn(selected), zones = emptyList()))
+
     val path = result.route(selected)?.path ?: result.routes.firstOrNull()?.path ?: return
     labelManager?.layer?.let { labels ->
         labels.addLabel(
@@ -118,9 +147,6 @@ fun KakaoMap.showRoutes(context: Context, result: RouteResult, selected: RouteTy
                 ),
         )
     }
-
-    val points = result.routes.flatMap { it.path }.map { it.toLatLng() }.toTypedArray()
-    if (points.isNotEmpty()) moveCamera(CameraUpdateFactory.fitMapPoints(points, (48 * density).toInt()))
 }
 
 /**
@@ -300,8 +326,11 @@ fun dotBitmap(color: Int, density: Float, sizeDp: Float = 18f): Bitmap {
     return bitmap
 }
 
-/** A white rounded tag with a colored border and bold text, like the design mockup. */
-internal fun pillBitmap(text: String, color: Int, density: Float): Bitmap {
+/**
+ * A white rounded tag with a colored border and bold text, like the design mockup.
+ * With [elevator], a small elevator sign follows the text (a station or exit with an elevator).
+ */
+internal fun pillBitmap(text: String, color: Int, density: Float, elevator: Boolean = false): Bitmap {
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         this.color = color
         textSize = 13f * density
@@ -310,7 +339,9 @@ internal fun pillBitmap(text: String, color: Int, density: Float): Bitmap {
     val stroke = 2f * density
     val padX = 10f * density
     val height = 30f * density
-    val width = textPaint.measureText(text) + padX * 2
+    val iconSize = 18f * density
+    val iconGap = 6f * density
+    val width = textPaint.measureText(text) + padX * 2 + if (elevator) iconSize + iconGap else 0f
 
     val bitmap = Bitmap.createBitmap(width.toInt() + 1, height.toInt() + 1, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
@@ -327,5 +358,21 @@ internal fun pillBitmap(text: String, color: Int, density: Float): Bitmap {
     )
     val baseline = height / 2 - (textPaint.descent() + textPaint.ascent()) / 2
     canvas.drawText(text, padX, baseline, textPaint)
+    if (elevator) {
+        // Elevator sign: a filled rounded square with an up and a down triangle.
+        val left = width - padX - iconSize
+        val top = (height - iconSize) / 2
+        val box = RectF(left, top, left + iconSize, top + iconSize)
+        canvas.drawRoundRect(box, 3f * density, 3f * density, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+        val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = 0xFFFFFFFF.toInt() }
+        val cx = box.centerX()
+        val w = iconSize * 0.26f
+        canvas.drawPath(android.graphics.Path().apply {
+            moveTo(cx, top + iconSize * 0.14f); lineTo(cx + w, top + iconSize * 0.42f); lineTo(cx - w, top + iconSize * 0.42f); close()
+        }, white)
+        canvas.drawPath(android.graphics.Path().apply {
+            moveTo(cx, top + iconSize * 0.86f); lineTo(cx + w, top + iconSize * 0.58f); lineTo(cx - w, top + iconSize * 0.58f); close()
+        }, white)
+    }
     return bitmap
 }

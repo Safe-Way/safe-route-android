@@ -43,6 +43,8 @@ data class Facility(
     val name: String? = null,
     /** The server's one-line summary, e.g. which subway exits have elevators; shown when the tag is tapped. */
     val detail: String? = null,
+    /** A station or exit with an elevator from the street, marked with a small elevator icon on its tag. */
+    val elevator: Boolean = false,
 ) {
     val label: String get() = text ?: kind.label
 }
