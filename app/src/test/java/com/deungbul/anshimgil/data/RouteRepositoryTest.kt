@@ -115,4 +115,20 @@ class RouteRepositoryTest {
         // Older servers send no weather fields
         assertTrue(weatherNotes(JSONObject("""{"night":true}""")).isEmpty())
     }
+
+    @Test
+    fun nightTurnsOnInTheEveningOrInTheRain() {
+        val base = RouteResult(
+            conditions = emptyList(), routes = emptyList(),
+            explanation = Explanation("", emptyList()), facilities = emptyList(), dataQuality = DataQuality(true, null),
+            sunset = java.time.LocalTime.of(17, 34),
+        )
+        val noon = java.time.LocalTime.of(12, 0)
+        val evening = java.time.LocalTime.of(16, 40)
+        assertEquals(null, autoNightReason(base, noon))
+        assertEquals("저녁이라", autoNightReason(base, evening))
+        assertEquals("비가 와서", autoNightReason(base.copy(raining = true), noon))
+        // Already night from the server: nothing to add.
+        assertEquals(null, autoNightReason(base.copy(conditions = listOf(Condition("night", "밤", true))), evening))
+    }
 }

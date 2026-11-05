@@ -147,21 +147,23 @@ private val ELEVATOR_MODES = setOf(UserMode.SENIOR, UserMode.DISABLED)
  * For a station, [wheelchair] says whether an exit has an elevator down from the street,
  * and [count] is how many such exits there are.
  */
-internal fun poiLabel(kind: FacilityKind, wheelchair: Boolean?, count: Int?, mode: UserMode): Pair<String?, FacilityLook> =
+internal fun poiLabel(kind: FacilityKind, wheelchair: Boolean?, count: Int?, mode: UserMode, name: String? = null): Pair<String?, FacilityLook> =
     when (kind) {
         FacilityKind.CURB_RAMP -> null to if (wheelchair == true) FacilityLook.NORMAL else FacilityLook.DOT
         FacilityKind.SUBWAY -> when {
             mode !in ELEVATOR_MODES -> null to FacilityLook.NORMAL
-            wheelchair == true -> (if (count != null && count > 0) "지하철역 · 엘리베이터 출구 ${count}곳" else "지하철역 · 엘리베이터 출구 있음") to FacilityLook.NORMAL
+            // The elevator shows as an icon on the tag; which exits have one is in the tap card.
+            wheelchair == true -> "지하철역" to FacilityLook.NORMAL
             wheelchair == false -> "지하철역 · 엘리베이터 출구 없음" to
                 if (mode == UserMode.DISABLED) FacilityLook.GRAY else FacilityLook.NORMAL
             else -> "지하철역 · 엘리베이터 확인 안 됨" to FacilityLook.NORMAL
         }
         FacilityKind.SUBWAY_ENTRANCE -> when {
-            mode !in ELEVATOR_MODES -> null to FacilityLook.NORMAL
-            wheelchair == true -> "역 입구 · 엘리베이터" to FacilityLook.NORMAL
+            mode !in ELEVATOR_MODES -> exitNumber(name)?.let { "${it}번 출구" } to FacilityLook.NORMAL
+            // With the exit number when the name has one ("남광주역 3번 출구"), so the walker knows which exit.
+            wheelchair == true -> (exitNumber(name)?.let { "${it}번 출구" } ?: "역 입구") to FacilityLook.NORMAL
             // Not confirmed, so grayed out to let the elevator entrances stand out.
-            else -> null to FacilityLook.GRAY
+            else -> exitNumber(name)?.let { "${it}번 출구" } to FacilityLook.GRAY
         }
         else -> null to FacilityLook.NORMAL
     }
@@ -177,12 +179,54 @@ internal fun parsePois(json: JSONObject, shown: Set<FacilityKind>, mode: UserMod
             wheelchair,
             shown,
         ) ?: return@mapNotNull null
-        val (text, look) = poiLabel(kind, wheelchair, if (p.isNull("count")) null else p.optInt("count"), mode)
+        val name = p.optString("name").takeUnless { p.isNull("name") || it.isBlank() }
+        val (text, look) = poiLabel(kind, wheelchair, if (p.isNull("count")) null else p.optInt("count"), mode, name)
         Facility(
             kind, p.getDouble("lat"), p.getDouble("lon"), text = text, look = look,
-            name = p.optString("name").takeUnless { p.isNull("name") || it.isBlank() },
+            name = name,
             detail = p.optString("detail").takeUnless { p.isNull("detail") || it.isBlank() },
+            elevator = wheelchair == true && mode in ELEVATOR_MODES &&
+                (kind == FacilityKind.SUBWAY || kind == FacilityKind.SUBWAY_ENTRANCE),
         )
     }
-    return FacilityPage(MapLayers(facilities, zones = emptyList()), truncated = json.optBoolean("truncated"))
+    // The server gives each child protection zone as the school's point, so the zone is drawn as a
+    // square around it: an approximate area, not the legal boundary.
+    val zones = facilities.filter { it.kind == FacilityKind.SCHOOL_ZONE }.map { schoolZoneAround(it.lat, it.lon) }
+    return FacilityPage(MapLayers(facilities, zones = zones), truncated = json.optBoolean("truncated"))
+}
+
+/** The exit number in a subway exit's name, e.g. 3 for "남광주역 3번 출구"; null when there is none. */
+fun exitNumber(name: String?): Int? = name?.let { Regex("""(\d+)번\s*출구""").find(it)?.groupValues?.get(1)?.toIntOrNull() }
+
+/**
+ * The exits of [station] among [facilities], in number order, each as "3번 출구 · 엘리베이터 있음".
+ * Exits are matched by name ("남광주역 3번 출구" belongs to "남광주역").
+ */
+fun stationExits(station: Facility, facilities: List<Facility>): List<String> {
+    val stationName = station.name ?: return emptyList()
+    return facilities
+        .filter { it.kind == FacilityKind.SUBWAY_ENTRANCE && it.name?.startsWith(stationName) == true }
+        .mapNotNull { exit -> exitNumber(exit.name)?.let { it to exit } }
+        .distinctBy { it.first }
+        .sortedBy { it.first }
+        .map { (number, exit) ->
+            val what = exit.detail?.substringAfter(" · ", "")?.takeIf { it.isNotBlank() }
+                ?: if (exit.look == FacilityLook.GRAY) "엘리베이터 없음" else "엘리베이터 있음"
+            "${number}번 출구 · $what"
+        }
+}
+
+/** How far the drawn child protection square reaches from the school on each side. */
+private const val SCHOOL_ZONE_HALF_M = 100.0
+
+/** An orange square around a school, standing for its child protection zone. */
+internal fun schoolZoneAround(lat: Double, lon: Double): Zone {
+    val dLat = SCHOOL_ZONE_HALF_M / 111_320.0
+    val dLon = SCHOOL_ZONE_HALF_M / (111_320.0 * kotlin.math.cos(Math.toRadians(lat)))
+    return Zone(
+        label = "어린이 보호구역",
+        fillColor = 0x38EAB308,
+        strokeColor = 0xFFA16207,
+        points = listOf(lat + dLat to lon - dLon, lat + dLat to lon + dLon, lat - dLat to lon + dLon, lat - dLat to lon - dLon),
+    )
 }

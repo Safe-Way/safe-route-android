@@ -1,5 +1,20 @@
 package com.deungbul.anshimgil.ui.guide
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.AlertDialog
+import com.deungbul.anshimgil.data.HelpAhead
+import com.deungbul.anshimgil.data.RouteRequest
+import com.deungbul.anshimgil.data.RouteRepository
+import androidx.compose.material3.TextButton
+import com.deungbul.anshimgil.ui.safety.sendGuardianText
+import com.deungbul.anshimgil.ui.safety.SosOverlay
+import com.deungbul.anshimgil.ui.safety.SosButton
+import com.deungbul.anshimgil.data.guardianMessage
+import com.deungbul.anshimgil.data.GuardianAlert
+import com.deungbul.anshimgil.data.Guardian
+import com.kakao.vectormap.camera.CameraAnimation
 import androidx.compose.runtime.mutableFloatStateOf
 import com.deungbul.anshimgil.data.FacilityRepository
 import com.deungbul.anshimgil.data.ApiException
@@ -94,11 +109,20 @@ private val Green = Color(0xFF1F6B42)
 /** A real fix farther than this from the route switches to the demo walk (e.g. testing away from the route). */
 private const val FAR_FROM_ROUTE_M = 300
 private const val OFF_ROUTE_WARN_M = 40
+/** Off the route this long before finding a new route from where the walker is. */
+private const val REROUTE_AFTER_MS = 8_000L
+/** Off the route this long before offering to tell the guardians. */
+private const val OFF_ROUTE_ALERT_MS = 20_000L
 private const val DEMO_STEP_M = 8.0
 /** Close-up for walking: the next few buildings, with the map tilted so the street ahead shows. */
 private const val GUIDE_ZOOM = 19
 /** A crosswalk this close to the route line is one the route crosses. */
 private const val CROSSWALK_ON_ROUTE_M = 8.0
+/** Position updates come about once a second; moving over slightly less keeps the marker gliding. */
+private const val FOLLOW_MS = 900
+private val FOLLOW = CameraAnimation.from(FOLLOW_MS, false, true)
+/** How long the map and the arrow take to turn. */
+private const val TURN_MS = 300
 /** The map turns only when the walker turns by at least this much. */
 private const val MAP_TURN_DEGREES = 10f
 
@@ -115,12 +139,21 @@ fun GuideScreen(
     destinationName: String,
     voiceByDefault: Boolean,
     facilityRepository: FacilityRepository,
+    guardians: List<Guardian>,
+    showTurnSigns: Boolean,
+    showSos: Boolean,
+    routeRepository: RouteRepository,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var sos by remember { mutableStateOf(false) }
+    var showHelpList by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val route = result.route(type) ?: result.routes.first()
-    val guidance = remember(route) { Guidance(route.path, result.facilitiesOn(route.type)) }
+    // The route being followed; replaced by a new one from where the walker is when they leave it.
+    var active by remember { mutableStateOf(result) }
+    val route = active.route(type) ?: active.routes.first()
+    val guidance = remember(route) { Guidance(route.path, active.facilitiesOn(route.type)) }
+    val destination = remember { (result.route(type) ?: result.routes.first()).path.last() }
     var fix by remember { mutableStateOf<LatLon?>(null) }
     var demoProgress by remember { mutableDoubleStateOf(0.0) }
     var voiceOn by rememberSaveable { mutableStateOf(voiceByDefault) }
@@ -158,10 +191,11 @@ fun GuideScreen(
         if (voiceOn) tts.speak(instruction.spoken, TextToSpeech.QUEUE_FLUSH, null, "guide")
     }
 
-    LaunchedEffect(map) {
+    // Drawn again whenever the route changes (after finding a new one).
+    LaunchedEffect(map, route) {
         val m = map ?: return@LaunchedEffect
-        m.showRoutes(context, result.copy(routes = listOf(route)), route.type, destinationName)
-        m.addTurnArrows(context, guidance.turnMarks)
+        m.showRoutes(context, active.copy(routes = listOf(route)), route.type, destinationName)
+        if (showTurnSigns) m.addTurnArrows(context, guidance.turnMarks)
         me = m.addMyLocation(context, state.snapped, sizeDp = 24f)
         m.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
         m.tiltForWalking()
@@ -174,8 +208,9 @@ fun GuideScreen(
         m.addCrosswalks(context, crossings)
     }
     LaunchedEffect(map, state.snapped) {
-        me?.moveTo(state.snapped.toLatLng())
-        map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
+        // Glide to each new position over about the time until the next fix, instead of jumping.
+        me?.moveTo(state.snapped.toLatLng(), FOLLOW_MS)
+        map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM), FOLLOW)
     }
 
     // The way the walker faces: the phone's compass. In the demo walk, or without a compass,
@@ -189,9 +224,45 @@ fun GuideScreen(
     var mapBearing by remember { mutableFloatStateOf(heading) }
     LaunchedEffect(heading) { if (angleBetween(mapBearing, heading) >= MAP_TURN_DEGREES) mapBearing = heading }
     // Kakao turns the map the other way round from a compass bearing, hence the minus.
-    LaunchedEffect(map, mapBearing) { map?.moveCamera(CameraUpdateFactory.rotateTo(Math.toRadians(-mapBearing.toDouble()))) }
+    LaunchedEffect(map, mapBearing) {
+        map?.moveCamera(CameraUpdateFactory.rotateTo(Math.toRadians(-mapBearing.toDouble())), CameraAnimation.from(TURN_MS, false, true))
+    }
     // Marker rotation is measured on the screen, not the map, so take off the map's own turn.
-    LaunchedEffect(me, heading, mapBearing) { me?.pointTo(heading - mapBearing) }
+    LaunchedEffect(me, heading, mapBearing) { me?.pointTo(heading - mapBearing, TURN_MS) }
+
+    // 귀가 지킴이: off the planned route for a while, offer to tell the guardians (once per stretch off route).
+    val off = !demo && state.offRouteM > OFF_ROUTE_WARN_M
+    var offRouteLong by remember { mutableStateOf(false) }
+    var offRouteTold by remember { mutableStateOf(false) }
+    LaunchedEffect(off) {
+        if (off) {
+            delay(OFF_ROUTE_ALERT_MS)
+            offRouteLong = true
+        } else {
+            offRouteLong = false
+            offRouteTold = false
+        }
+    }
+
+    // Off the route for a few seconds: find a new route from here to the same destination, like a car
+    // navigator. The guardians can then be told the walker left the planned route.
+    var rerouting by remember { mutableStateOf(false) }
+    var rerouted by remember { mutableStateOf(false) }
+    LaunchedEffect(off) {
+        if (!off) return@LaunchedEffect
+        delay(REROUTE_AFTER_MS)
+        val here = fix ?: return@LaunchedEffect
+        rerouting = true
+        try {
+            active = routeRepository.findRoutes(RouteRequest(here, destination, mode))
+            demoProgress = 0.0
+            rerouted = true
+            if (voiceOn) tts.speak("길을 벗어나 새 길을 찾았어요", TextToSpeech.QUEUE_FLUSH, null, "reroute")
+        } catch (e: ApiException) {
+            // Too close to the destination, out of the area, or no connection: keep the old route and the warning.
+        }
+        rerouting = false
+    }
 
     // Keep the walker in the middle of the part of the map not covered by the instruction card:
     // the map's top padding moves its center down by the card's height.
@@ -202,7 +273,8 @@ fun GuideScreen(
         m.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
     }
 
-    Column(modifier = modifier.fillMaxSize().background(Color.White)) {
+    Box(modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             KakaoMapView(modifier = Modifier.fillMaxSize(), onMapReady = { map = it })
             Column(
@@ -219,7 +291,20 @@ fun GuideScreen(
                 if (!demo && state.offRouteM > OFF_ROUTE_WARN_M) {
                     StatusPill("경로에서 ${state.offRouteM}m 벗어났어요", Color(0xFFB42318))
                 }
+                if (rerouting) StatusPill("길을 다시 찾는 중…", Color(0xFF2F6FDB))
+                if ((offRouteLong || rerouted) && guardians.isNotEmpty() && !offRouteTold) {
+                    OffRouteCard(
+                        rerouted = rerouted,
+                        onTell = {
+                            sendGuardianText(context, guardians, guardianMessage(GuardianAlert.OFF_ROUTE, fix ?: state.snapped))
+                            offRouteTold = true
+                            rerouted = false
+                        },
+                        onDismiss = { offRouteTold = true; rerouted = false },
+                    )
+                }
             }
+            if (showSos) SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp))
             // The camera follows only when the position moves, so after dragging the map this brings it back.
             Surface(
                 onClick = { map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM)) },
@@ -240,24 +325,31 @@ fun GuideScreen(
         // Kept short so most of the screen is map: one line for help, one for the numbers, one row of buttons.
         Surface(shadowElevation = 8.dp, color = Color.White) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-                state.nearestHelp?.let { help ->
+                // Nearest help place, or how many lie ahead; tapping opens the whole list (도움 지점 목록).
+                val ahead = guidance.helpAhead(state.progressM)
+                if (state.nearestHelp != null || ahead.isNotEmpty()) {
+                    val help = state.nearestHelp
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(Color(0xFFFFF4E5), RoundedCornerShape(12.dp))
+                            .clickable(onClickLabel = "도움 장소 목록 보기") { showHelpList = true }
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                     ) {
                         Box(
                             contentAlignment = Alignment.Center,
-                            modifier = Modifier.size(26.dp).background(Color(help.kind.color), CircleShape),
+                            modifier = Modifier.size(26.dp).background(Color(help?.kind?.color ?: 0xFF7C2D12), CircleShape),
                         ) { Text("!", color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp) }
                         Text(
-                            "가까운 도움  ${help.kind.label} · ${sideText(help.side)} ${help.meters}m",
+                            if (help != null) "가까운 도움  ${help.kind.label} · ${sideText(help.side)} ${help.meters}m"
+                            else "가는 길에 도움 장소 ${ahead.size}곳",
                             fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
                         )
+                        Text("목록", fontSize = 14.sp, color = Color(0xFF7C2D12), fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -304,6 +396,11 @@ fun GuideScreen(
                 }
             }
         }
+    }
+    if (showHelpList) HelpListDialog(guidance.helpAhead(state.progressM), onDismiss = { showHelpList = false })
+
+    // SOS covers the whole screen, guidance included.
+    if (sos) SosOverlay(guardians, here = { fix ?: state.snapped }, onClose = { sos = false }, onAddGuardian = null)
     }
 }
 
@@ -405,3 +502,49 @@ private fun rememberTts(context: Context): TextToSpeech {
 
 private fun formatDistance(meters: Int): String =
     if (meters < 1000) "${meters}m" else "%.1fkm".format(meters / 1000.0)
+
+/** Shown after a while off the route: tell the guardians where the walker is, or dismiss. */
+@Composable
+private fun OffRouteCard(rerouted: Boolean, onTell: () -> Unit, onDismiss: () -> Unit) {
+    Surface(shape = RoundedCornerShape(14.dp), color = Color.White, shadowElevation = 4.dp) {
+        Column(Modifier.padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 4.dp)) {
+            Text(
+                if (rerouted) "정한 길에서 벗어나 새 길로 안내해요" else "정한 길에서 벗어났어요",
+                fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFB42318),
+            )
+            Row {
+                TextButton(onClick = onTell) { Text("보호자에게 알리기", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+                TextButton(onClick = onDismiss) { Text("괜찮아요", fontSize = 15.sp) }
+            }
+        }
+    }
+}
+
+/** 도움 지점 목록: every help place along the rest of the route, nearest first. */
+@Composable
+private fun HelpListDialog(places: List<HelpAhead>, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("가는 길의 도움 장소") },
+        text = {
+            if (places.isEmpty()) {
+                Text("남은 길 가까이에 도움을 청할 곳이 없어요.", fontSize = 16.sp)
+            } else {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    places.forEach { place ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(Modifier.size(12.dp).background(Color(place.kind.color), CircleShape))
+                            Text(place.kind.label, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink, modifier = Modifier.weight(1f))
+                            Text(
+                                (if (place.aheadM < 10) "바로 앞" else "${formatDistance(place.aheadM)} 앞") + " · " +
+                                    if (place.side == Turn.STRAIGHT) "길 위" else sideText(place.side),
+                                fontSize = 15.sp, color = Muted,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("닫기") } },
+    )
+}

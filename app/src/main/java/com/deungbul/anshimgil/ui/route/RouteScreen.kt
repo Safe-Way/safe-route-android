@@ -75,6 +75,7 @@ import com.deungbul.anshimgil.data.RouteRepository
 import com.deungbul.anshimgil.data.RouteRequest
 import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.RouteType
+import com.deungbul.anshimgil.data.autoNightReason
 import com.deungbul.anshimgil.data.UserMode
 import com.deungbul.anshimgil.map.KakaoMapView
 import com.deungbul.anshimgil.map.showPoints
@@ -220,6 +221,19 @@ fun RouteScreen(
     }
 
     val result = (state as? RouteState.Ready)?.result
+
+    // Evening or rain: switch night routing on by itself, unless the user set the night chip or turned
+    // automatic conditions off in settings. The reason shows under the chips.
+    var nightTouched by rememberSaveable { mutableStateOf(false) }
+    var autoNightNote by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(result) {
+        val r = result ?: return@LaunchedEffect
+        if (!autoConditions || nightTouched || "night" in conditionsOff || "night" in conditionsOn) return@LaunchedEffect
+        autoNightReason(r, java.time.LocalTime.now())?.let { reason ->
+            autoNightNote = "$reason 밤 기준을 켰어요"
+            conditionsOn = conditionsOn + "night"
+        }
+    }
     LaunchedEffect(map, result, selected) {
         val m = map ?: return@LaunchedEffect
         result?.let { m.showRoutes(context, it, selected, destination.name) }
@@ -280,6 +294,10 @@ fun RouteScreen(
                                 selected = condition.on,
                                 onClick = {
                                     val key = condition.key
+                                    if (key == "night") {
+                                        nightTouched = true
+                                        autoNightNote = null
+                                    }
                                     if (condition.on) {
                                         conditionsOff = conditionsOff + key
                                         conditionsOn = conditionsOn - key
@@ -294,6 +312,11 @@ fun RouteScreen(
                                 modifier = Modifier.heightIn(min = 40.dp),
                             )
                         }
+                    }
+                }
+                autoNightNote?.let { note ->
+                    Surface(shape = RoundedCornerShape(12.dp), color = Color.White, shadowElevation = 2.dp) {
+                        Text(note, fontSize = 13.sp, color = Muted, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
                     }
                 }
                 result?.weather?.takeIf { it.isNotEmpty() }?.let { notes ->

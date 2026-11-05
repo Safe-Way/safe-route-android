@@ -9,6 +9,7 @@ import android.graphics.Typeface
 import com.deungbul.anshimgil.data.Facility
 import com.deungbul.anshimgil.data.FacilityKind
 import com.deungbul.anshimgil.data.FacilityLook
+import com.deungbul.anshimgil.data.HELP_KINDS
 import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.MapLayers
 import com.deungbul.anshimgil.data.RouteResult
@@ -21,7 +22,9 @@ import com.kakao.vectormap.camera.CameraUpdateFactory
 import com.kakao.vectormap.route.RouteLineOptions
 import com.kakao.vectormap.route.RouteLineSegment
 import com.kakao.vectormap.route.RouteLineStyle
+import com.kakao.vectormap.label.CompetitionType
 import com.kakao.vectormap.label.Label
+import com.kakao.vectormap.label.LabelLayerOptions
 import com.kakao.vectormap.label.LabelOptions
 import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
@@ -32,9 +35,9 @@ import com.kakao.vectormap.shape.PolygonStyles
 /** Replaces everything on the map with [layers]: zones underneath, facility labels on top. */
 fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
     val shapeLayer = shapeManager?.layer
-    val labelLayer = labelManager?.layer
     shapeLayer?.removeAll()
-    labelLayer?.removeAll()
+    labelManager?.layer?.removeAll()
+    val labelLayer = labelManager?.layer
 
     val density = context.resources.displayMetrics.density
     layers.zones.forEach { zone ->
@@ -47,27 +50,51 @@ fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
     }
 
     // One style per distinct tag, since text and look can differ within a kind.
-    val styles = mutableMapOf<Triple<FacilityKind, String, FacilityLook>, LabelStyles>()
-    layers.facilities.forEach { facility ->
-        val style = styles.getOrPut(Triple(facility.kind, facility.label, facility.look)) {
-            val bitmap = when (facility.look) {
-                FacilityLook.NORMAL -> pillBitmap(facility.label, facility.kind.color.toInt(), density)
-                FacilityLook.GRAY -> pillBitmap(facility.label, GRAY, density)
-                FacilityLook.DOT -> dotBitmap(GRAY, density, sizeDp = 10f)
-            }
-            LabelStyles.from(
-                LabelStyle.from(bitmap)
-                    .setAnchorPoint(0.5f, if (facility.look == FacilityLook.DOT) 0.5f else 1f)
-                    .setApplyDpScale(false),
-            )
+    val styles = mutableMapOf<List<Any>, Pair<LabelStyles, Bitmap>>()
+    fun styleOf(facility: Facility) = styles.getOrPut(listOf(facility.kind, facility.label, facility.look, facility.elevator)) {
+        val bitmap = when (facility.look) {
+            FacilityLook.NORMAL -> pillBitmap(facility.label, facility.kind.color.toInt(), density, elevator = facility.elevator)
+            FacilityLook.GRAY -> pillBitmap(facility.label, GRAY, density)
+            FacilityLook.DOT -> dotBitmap(GRAY, density, sizeDp = 10f)
         }
-        // Stations sit on top of the toilets and stores inside them.
-        val rank = if (facility.kind == FacilityKind.SUBWAY) 5L else 0L
+        LabelStyles.from(
+            LabelStyle.from(bitmap)
+                .setAnchorPoint(0.5f, if (facility.look == FacilityLook.DOT) 0.5f else 1f)
+                .setApplyDpScale(false),
+        ) to bitmap
+    }
+
+    // Too many tags in one place are unreadable, so the more important tag wins where tags would overlap
+    // on screen ([tagRank]); zooming in makes room and shows the rest. The map redraws tags after each move.
+    val placed = mutableListOf<android.graphics.Rect>()
+    val gap = (2 * density).toInt()
+    layers.facilities.sortedByDescending { tagRank(it) }.forEach { facility ->
+        val (style, bitmap) = styleOf(facility)
+        val p = runCatching { toScreenPoint(facility.latLng) }.getOrNull()
+        if (p != null) {
+            val top = if (facility.look == FacilityLook.DOT) p.y - bitmap.height / 2 else p.y - bitmap.height
+            val box = android.graphics.Rect(p.x - bitmap.width / 2 - gap, top - gap, p.x + bitmap.width / 2 + gap, top + bitmap.height + gap)
+            if (placed.any { android.graphics.Rect.intersects(it, box) }) return@forEach
+            placed += box
+        }
         // Places with more to say (e.g. a station's elevator exits) can be tapped; the tag carries the place.
-        val options = LabelOptions.from(facility.latLng).setStyles(style).setRank(rank)
+        val options = LabelOptions.from(facility.latLng).setStyles(style).setRank(tagRank(facility))
         if (facility.detail != null) options.setClickable(true).setTag(facility)
         labelLayer?.addLabel(options)
     }
+}
+
+/**
+ * Which tag wins when tags would overlap (higher shows): stations, then elevator exits, then places to
+ * get help, then the rest. CCTV and grayed-out or unconfirmed places give way first.
+ */
+internal fun tagRank(facility: Facility): Long = when {
+    facility.look != FacilityLook.NORMAL -> 0L
+    facility.kind == FacilityKind.SUBWAY -> 50L
+    facility.kind == FacilityKind.SUBWAY_ENTRANCE -> 40L
+    facility.kind in HELP_KINDS -> 30L
+    facility.kind == FacilityKind.CCTV -> 5L
+    else -> 20L
 }
 
 /** Tags for places that are unavailable or unconfirmed. */
@@ -82,7 +109,6 @@ fun LatLon.toLatLng(): LatLng = LatLng.from(lat, lon)
  * and start/end markers, then fits the camera to the routes.
  */
 fun KakaoMap.showRoutes(context: Context, result: RouteResult, selected: RouteType, destinationName: String) {
-    showLayers(context, MapLayers(result.facilitiesOn(selected), zones = emptyList()))
     val density = context.resources.displayMetrics.density
     val lineLayer = routeLineManager?.layer ?: return
     lineLayer.removeAll()
@@ -101,6 +127,11 @@ fun KakaoMap.showRoutes(context: Context, result: RouteResult, selected: RouteTy
         )
     }
 
+    // Fit the camera first: the tags are thinned out by where they fall on screen in the final view.
+    val points = result.routes.flatMap { it.path }.map { it.toLatLng() }.toTypedArray()
+    if (points.isNotEmpty()) moveCamera(CameraUpdateFactory.fitMapPoints(points, (48 * density).toInt()))
+    showLayers(context, MapLayers(result.facilitiesOn(selected), zones = emptyList()))
+
     val path = result.route(selected)?.path ?: result.routes.firstOrNull()?.path ?: return
     labelManager?.layer?.let { labels ->
         labels.addLabel(
@@ -118,9 +149,6 @@ fun KakaoMap.showRoutes(context: Context, result: RouteResult, selected: RouteTy
                 ),
         )
     }
-
-    val points = result.routes.flatMap { it.path }.map { it.toLatLng() }.toTypedArray()
-    if (points.isNotEmpty()) moveCamera(CameraUpdateFactory.fitMapPoints(points, (48 * density).toInt()))
 }
 
 /**
@@ -158,7 +186,13 @@ fun KakaoMap.showPoints(context: Context, start: LatLon, places: List<Pair<LatLo
  */
 fun KakaoMap.addMyLocation(context: Context, point: LatLon, sizeDp: Float = 22f): Label? {
     val density = context.resources.displayMetrics.density
-    return labelManager?.layer?.addLabel(
+    // A layer of its own drawn above every tag, so a nearby store or CCTV tag never covers the walker.
+    // One walker per map, so whatever was there before is replaced.
+    val layer = labelManager?.let {
+        it.getLayer(ME_LAYER) ?: it.addLayer(LabelLayerOptions.from(ME_LAYER).setCompetitionType(CompetitionType.None).setZOrder(20_000))
+    }
+    layer?.removeAll()
+    return layer?.addLabel(
         LabelOptions.from(point.toLatLng())
             .setStyles(
                 LabelStyles.from(
@@ -171,45 +205,67 @@ fun KakaoMap.addMyLocation(context: Context, point: LatLon, sizeDp: Float = 22f)
 }
 
 /**
- * Turn arrows painted on the ground along the route, like Naver's walking guidance: a white band with
- * a dark edge bending through each turn, ending in a flat arrowhead. Both lie on the map, so they stay
- * in place when it tilts or turns.
+ * A small round sign at each sharp turn with a ↰ or ↱ in it, the same symbols as the instruction bar,
+ * so the walker sees where the next turn is and which way it goes. It always faces the screen.
  */
 fun KakaoMap.addTurnArrows(context: Context, marks: List<TurnMark>) {
     val density = context.resources.displayMetrics.density
-    val band = RouteLineStyle.from(8f * density, 0xFFFFFFFF.toInt(), 1.5f * density, TURN_EDGE)
-    // A layer of their own above the route; reused (and cleared) when the screen is shown again.
-    val layer = routeLineManager?.let { it.getLayer(TURN_LAYER) ?: it.addLayer(TURN_LAYER, 10_000) }
+    val left = LabelStyles.from(LabelStyle.from(turnSignBitmap(density, left = true)).setAnchorPoint(0.5f, 0.5f).setApplyDpScale(false))
+    val right = LabelStyles.from(LabelStyle.from(turnSignBitmap(density, left = false)).setAnchorPoint(0.5f, 0.5f).setApplyDpScale(false))
+    // Their own layer with no competition: on the default layer the signs were hidden and shown again
+    // whenever they met the map's own place names while the map moved, so they seemed to jump about.
+    val layer = labelManager?.let {
+        it.getLayer(TURN_SIGN_LAYER) ?: it.addLayer(
+            LabelLayerOptions.from(TURN_SIGN_LAYER).setCompetitionType(CompetitionType.None).setZOrder(10_000),
+        )
+    }
     layer?.removeAll()
-    marks.filter { it.shape.size >= 2 }.forEach { mark ->
-        layer?.addRouteLine(RouteLineOptions.from(RouteLineSegment.from(mark.shape.map { it.toLatLng() }, band)))
-        // The head is a chevron drawn with the same band, so band and head read as one painted arrow.
-        layer?.addRouteLine(RouteLineOptions.from(RouteLineSegment.from(arrowHead(mark.shape.last(), mark.bearing).map { it.toLatLng() }, band)))
+    marks.forEach { mark ->
+        layer?.addLabel(LabelOptions.from(mark.point.toLatLng()).setStyles(if (mark.left) left else right))
     }
 }
 
-private val TURN_EDGE = 0xFF17211B.toInt()
-private const val TURN_LAYER = "turns"
+private const val TURN_SIGN_LAYER = "turnSigns"
+private const val ME_LAYER = "me"
 
-/**
- * A chevron on the ground around the band's end [base]: its tip [HEAD_FORWARD_M] ahead along [bearing],
- * its wings [HEAD_BACK_M] behind and [HEAD_HALF_WIDTH_M] to each side.
- */
-private fun arrowHead(base: LatLon, bearing: Float): List<LatLon> {
-    val b = Math.toRadians(bearing.toDouble())
-    val mPerLat = 111_320.0
-    val mPerLon = 111_320.0 * kotlin.math.cos(Math.toRadians(base.lat))
-    val fx = kotlin.math.sin(b) // forward, east part
-    val fy = kotlin.math.cos(b) // forward, north part
-    // [ahead] meters forward and [right] meters to the right, where right of forward is (fy, -fx).
-    fun at(ahead: Double, right: Double) =
-        LatLon(base.lat + (fy * ahead - fx * right) / mPerLat, base.lon + (fx * ahead + fy * right) / mPerLon)
-    return listOf(at(-HEAD_BACK_M, -HEAD_HALF_WIDTH_M), at(HEAD_FORWARD_M, 0.0), at(-HEAD_BACK_M, HEAD_HALF_WIDTH_M))
+/** A white disc with a dark green ring and a turn arrow (↰ for left, ↱ for right). */
+private fun turnSignBitmap(density: Float, left: Boolean): Bitmap {
+    val size = (26 * density).toInt()
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val s = size.toFloat()
+    val c = s / 2
+    canvas.drawCircle(c, c, c - density, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() })
+    canvas.drawCircle(
+        c, c, c - 1.75f * density,
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { color = TURN_INK; style = Paint.Style.STROKE; strokeWidth = 1.5f * density },
+    )
+    // Drawn as ↱ (right turn) and mirrored for left: a stem up from the bottom, then across to an arrowhead.
+    canvas.save()
+    if (left) canvas.scale(-1f, 1f, c, c)
+    val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = TURN_INK; style = Paint.Style.STROKE; strokeWidth = 2.6f * density
+        strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+    }
+    val path = android.graphics.Path().apply {
+        moveTo(s * 0.40f, s * 0.74f)
+        lineTo(s * 0.40f, s * 0.48f)
+        quadTo(s * 0.40f, s * 0.40f, s * 0.48f, s * 0.40f)
+        lineTo(s * 0.62f, s * 0.40f)
+    }
+    canvas.drawPath(path, stroke)
+    val head = android.graphics.Path().apply {
+        moveTo(s * 0.74f, s * 0.40f)
+        lineTo(s * 0.58f, s * 0.29f)
+        lineTo(s * 0.58f, s * 0.51f)
+        close()
+    }
+    canvas.drawPath(head, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = TURN_INK })
+    canvas.restore()
+    return bitmap
 }
 
-private const val HEAD_FORWARD_M = 1.2
-private const val HEAD_BACK_M = 1.8
-private const val HEAD_HALF_WIDTH_M = 2.2
+private val TURN_INK = 0xFF1F6B42.toInt()
 
 /** A small zebra-crossing sign at each crosswalk on the route. */
 fun KakaoMap.addCrosswalks(context: Context, points: List<LatLon>) {
@@ -239,8 +295,11 @@ private fun crosswalkBitmap(density: Float): Bitmap {
     return bitmap
 }
 
-/** Turns the position marker so its arrow points [degrees] clockwise from north. */
-fun Label.pointTo(degrees: Float) = rotateTo(Math.toRadians(degrees.toDouble()).toFloat())
+/** Turns the position marker so its arrow points [degrees] clockwise from north, over [durationMs] if given. */
+fun Label.pointTo(degrees: Float, durationMs: Int = 0) {
+    val radians = Math.toRadians(degrees.toDouble()).toFloat()
+    if (durationMs > 0) rotateTo(radians, durationMs) else rotateTo(radians)
+}
 
 /** Map tilt for walking screens: buildings stand up in 3D and more of the street ahead is visible. */
 const val WALK_TILT_DEGREES = 50.0
@@ -286,8 +345,11 @@ fun dotBitmap(color: Int, density: Float, sizeDp: Float = 18f): Bitmap {
     return bitmap
 }
 
-/** A white rounded tag with a colored border and bold text, like the design mockup. */
-internal fun pillBitmap(text: String, color: Int, density: Float): Bitmap {
+/**
+ * A white rounded tag with a colored border and bold text, like the design mockup.
+ * With [elevator], a small elevator sign follows the text (a station or exit with an elevator).
+ */
+internal fun pillBitmap(text: String, color: Int, density: Float, elevator: Boolean = false): Bitmap {
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         this.color = color
         textSize = 13f * density
@@ -296,7 +358,9 @@ internal fun pillBitmap(text: String, color: Int, density: Float): Bitmap {
     val stroke = 2f * density
     val padX = 10f * density
     val height = 30f * density
-    val width = textPaint.measureText(text) + padX * 2
+    val iconSize = 18f * density
+    val iconGap = 6f * density
+    val width = textPaint.measureText(text) + padX * 2 + if (elevator) iconSize + iconGap else 0f
 
     val bitmap = Bitmap.createBitmap(width.toInt() + 1, height.toInt() + 1, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
@@ -313,5 +377,21 @@ internal fun pillBitmap(text: String, color: Int, density: Float): Bitmap {
     )
     val baseline = height / 2 - (textPaint.descent() + textPaint.ascent()) / 2
     canvas.drawText(text, padX, baseline, textPaint)
+    if (elevator) {
+        // Elevator sign: a filled rounded square with an up and a down triangle.
+        val left = width - padX - iconSize
+        val top = (height - iconSize) / 2
+        val box = RectF(left, top, left + iconSize, top + iconSize)
+        canvas.drawRoundRect(box, 3f * density, 3f * density, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+        val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = 0xFFFFFFFF.toInt() }
+        val cx = box.centerX()
+        val w = iconSize * 0.26f
+        canvas.drawPath(android.graphics.Path().apply {
+            moveTo(cx, top + iconSize * 0.14f); lineTo(cx + w, top + iconSize * 0.42f); lineTo(cx - w, top + iconSize * 0.42f); close()
+        }, white)
+        canvas.drawPath(android.graphics.Path().apply {
+            moveTo(cx, top + iconSize * 0.86f); lineTo(cx + w, top + iconSize * 0.58f); lineTo(cx - w, top + iconSize * 0.58f); close()
+        }, white)
+    }
     return bitmap
 }

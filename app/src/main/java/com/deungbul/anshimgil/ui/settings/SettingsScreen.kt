@@ -1,5 +1,22 @@
 package com.deungbul.anshimgil.ui.settings
 
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import com.deungbul.anshimgil.data.Guardian
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.deungbul.anshimgil.ui.safety.canSendSms
+import android.widget.Toast
+import androidx.compose.material3.OutlinedButton
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -62,9 +79,16 @@ fun SettingsScreen(
     onAutoConditionsChange: (Boolean) -> Unit,
     onTextSizeChange: (TextSize) -> Unit,
     onExtraMapItemChange: (key: String, on: Boolean) -> Unit,
+    onAddGuardian: (Guardian) -> Unit,
+    onRemoveGuardian: (Guardian) -> Unit,
+    onTurnSignsChange: (Boolean) -> Unit,
+    onSosButtonChange: (Boolean) -> Unit,
+    onResetToDefaults: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    var addingGuardian by remember { mutableStateOf(false) }
+    var confirmReset by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -78,16 +102,59 @@ fun SettingsScreen(
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "지도로 돌아가기", tint = Ink)
             }
-            Text("설정", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Ink)
+            Text("설정", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Ink, modifier = Modifier.weight(1f))
+            // Every change is saved as it is made; this confirms it and goes back to the map.
+            TextButton(
+                onClick = {
+                    Toast.makeText(context, "설정을 저장했어요", Toast.LENGTH_SHORT).show()
+                    onBack()
+                },
+                modifier = Modifier.padding(end = 8.dp),
+            ) { Text("저장", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1F6B42)) }
         }
 
         SectionTitle("내 설정")
         LinkRow("모드 바꾸기", "지금: ${mode.style().label}", onClick = onChangeMode)
         LinkRow("자주 가는 곳 관리", "집, 학교, 직장 등록과 변경", onClick = onManagePlaces)
 
+        SectionTitle("귀가 지킴이")
+        Text(
+            "SOS가 울리거나 길안내 중 정한 길에서 벗어났을 때, 여기 등록한 보호자에게 지금 위치를 문자로 보내요.",
+            fontSize = 14.sp, color = Muted,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        settings.guardians.forEach { guardian ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 16.dp, end = 4.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(guardian.name, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink)
+                    Text(guardian.phone, fontSize = 14.sp, color = Muted)
+                }
+                IconButton(onClick = { onRemoveGuardian(guardian) }) {
+                    Icon(Icons.Filled.Close, contentDescription = "${guardian.name} 삭제", tint = Muted)
+                }
+            }
+        }
+        // Turning SOS on asks to send texts, so the guardians get the text without another tap.
+        // Without the permission SOS still works and opens the message app instead.
+        val smsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onSosButtonChange(true) }
+        SwitchRow(
+            "SOS 버튼",
+            "지도 화면에 SOS 버튼을 보여 줘요. 누르고 5초가 지나면 보호자에게 지금 위치를 문자로 보내요",
+            settings.sosButton,
+        ) { on ->
+            if (on && !canSendSms(context)) smsPermission.launch(Manifest.permission.SEND_SMS) else onSosButtonChange(on)
+        }
+        if (settings.guardians.size < Guardian.MAX) {
+            LinkRow("보호자 추가", "이름과 전화번호 (최대 ${Guardian.MAX}명)") { addingGuardian = true }
+        }
+
         SectionTitle("길찾기")
         SwitchRow("음성 안내", "걷는 동안 다음 방향을 읽어 줘요", settings.voiceGuide, onVoiceChange)
         SwitchRow("상황 자동 판단", "밤, 비, 폭염 등을 알아서 경로에 반영해요", settings.autoConditions, onAutoConditionsChange)
+        SwitchRow("꺾는 곳 표시", "길안내 지도에서 크게 꺾는 곳에 ↰ ↱ 표시를 보여 줘요", settings.turnSigns, onTurnSignsChange)
 
         SectionTitle("지도에 더 보기")
         Text(
@@ -134,10 +201,68 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(16.dp),
         ) {
-            InfoText("개인정보", "고른 모드와 자주 가는 곳은 이 휴대폰에만 저장해요. 걷는 동안의 위치는 길안내에만 쓰고 저장하지 않아요.")
+            InfoText("개인정보", "고른 모드, 자주 가는 곳, 보호자 연락처는 이 휴대폰에만 저장해요. 걷는 동안의 위치는 길안내에만 쓰고 저장하지 않아요. 보호자 문자는 SOS나 ‘보호자에게 알리기’를 눌렀을 때만 나가요.")
             InfoText("데이터 출처", "공공데이터포털, 생활안전지도, 재난안전데이터 공유플랫폼, 기상청, 에어코리아, 카카오")
         }
+
+        // Back to the first-run settings, after asking once.
+        OutlinedButton(
+            onClick = { confirmReset = true },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 32.dp).heightIn(min = 52.dp),
+        ) { Text("기본 설정으로 되돌리기", fontSize = 16.sp, color = Ink) }
     }
+
+    if (confirmReset) {
+        AlertDialog(
+            onDismissRequest = { confirmReset = false },
+            title = { Text("기본 설정으로 되돌릴까요?") },
+            text = { Text("음성 안내, 상황 자동 판단, 글자 크기, 지도에 더 보기, 꺾는 곳 표시, SOS 버튼이 처음 상태로 돌아가요. 모드, 자주 가는 곳, 보호자 연락처는 그대로예요.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onResetToDefaults()
+                    confirmReset = false
+                    Toast.makeText(context, "기본 설정으로 되돌렸어요", Toast.LENGTH_SHORT).show()
+                }) { Text("되돌리기") }
+            },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("취소") } },
+        )
+    }
+
+    if (addingGuardian) {
+        GuardianDialog(
+            onDismiss = { addingGuardian = false },
+            onSave = { onAddGuardian(it); addingGuardian = false },
+        )
+    }
+}
+
+/** Name and phone number for a new guardian; saving is allowed once both look right. */
+@Composable
+private fun GuardianDialog(onDismiss: () -> Unit, onSave: (Guardian) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    val cleanPhone = Guardian.cleanPhone(phone)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("보호자 추가") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("이름 (예: 엄마)") }, singleLine = true)
+                OutlinedTextField(
+                    phone, { phone = it }, label = { Text("전화번호") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    isError = phone.isNotBlank() && cleanPhone == null,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { cleanPhone?.let { onSave(Guardian(name.trim(), it)) } },
+                enabled = name.isNotBlank() && cleanPhone != null,
+            ) { Text("저장") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
+    )
 }
 
 @Composable

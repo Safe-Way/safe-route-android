@@ -30,11 +30,17 @@ data class GuidanceState(
 
 data class HelpPoint(val kind: FacilityKind, val meters: Int, val side: Turn)
 
-/**
- * A turn on the route at [point]. [shape] is the route just before and after it, drawn as a bent arrow
- * whose tip (the last point) points [bearing] degrees from north.
- */
-data class TurnMark(val point: LatLon, val bearing: Float, val shape: List<LatLon> = listOf(point))
+/** A sharp turn on the route at [point]; [left] says which way it goes. */
+data class TurnMark(val point: LatLon, val left: Boolean)
+
+/** A place to get help further along the route: [aheadM] along the route from here, [offM] off it. */
+data class HelpAhead(val kind: FacilityKind, val aheadM: Int, val side: Turn, val offM: Int)
+
+/** Help places this far from the route still count as along it. */
+private const val HELP_LIST_OFF_M = 60.0
+
+/** A help place a few meters behind still shows, since GPS can put the walker slightly past it. */
+private const val PASSED_M = 5.0
 
 /** A change of heading at least this large counts as a turn. */
 private const val TURN_DEGREES = 30.0
@@ -42,12 +48,8 @@ private const val TURN_DEGREES = 30.0
 /** Only sharp turns, close to a right angle, get an arrow drawn on the map. */
 private const val TURN_ARROW_DEGREES = 65.0
 
-/** How far along the route the turn arrow reaches on each side of the turn. */
-private const val TURN_ARM_M = 9.0
-
-/** How far from a corner a turn arrow starts curving, and how many points draw the curve. */
-private const val CORNER_M = 3.5
-private const val CORNER_STEPS = 6
+/** Turn signs closer together than this along the route are merged into the first. */
+private const val TURN_MARK_GAP_M = 25.0
 
 /**
  * Turn-by-turn guidance along a fixed route (issue #7, FR-29·30·34).
@@ -76,53 +78,43 @@ class Guidance(private val path: List<LatLon>, private val facilities: List<Faci
     }
 
     /**
-     * Each sharp turn (about a right angle) as a short stretch of the route bending through it ([TURN_ARM_M] before and after),
-     * for drawing a turn arrow along the route; [TurnMark.bearing] is the way its tip points.
+     * Sharp turns (about a right angle) to mark on the map. Turns closer than [TURN_MARK_GAP_M] to the
+     * previous mark are left out, so a roundabout or a jog gets one sign instead of a cluster.
      */
     val turnMarks: List<TurnMark> by lazy {
-        (1 until points.lastIndex)
-            .filter { v -> abs(headingChange(points[v - 1], points[v], points[v + 1])) >= TURN_ARROW_DEGREES }
-            .map { v ->
-                val at = cumulative[v]
-                val from = (at - TURN_ARM_M).coerceAtLeast(0.0)
-                val to = (at + TURN_ARM_M).coerceAtMost(totalM)
-                val inner = (1 until points.lastIndex).filter { cumulative[it] > from && cumulative[it] < to }.map { points[it] }
-                val shape = rounded(listOf(pointAt(from)) + inner + listOf(pointAt(to)))
-                val (ax, ay) = shape[shape.size - 2]
-                val (bx, by) = shape.last()
-                val bearing = (Math.toDegrees(kotlin.math.atan2(bx - ax, by - ay)) + 360) % 360
-                TurnMark(toLatLon(points[v]), bearing.toFloat(), shape.map { toLatLon(it) })
-            }
+        val marks = mutableListOf<TurnMark>()
+        var lastAt = Double.NEGATIVE_INFINITY
+        for (v in 1 until points.lastIndex) {
+            val change = headingChange(points[v - 1], points[v], points[v + 1])
+            if (abs(change) < TURN_ARROW_DEGREES || cumulative[v] - lastAt < TURN_MARK_GAP_M) continue
+            marks += TurnMark(toLatLon(points[v]), left = change > 0)
+            lastAt = cumulative[v]
+        }
+        marks
     }
 
     /**
-     * The same line with each corner replaced by a gentle curve (up to [CORNER_M] from the corner on
-     * either side), so a turn arrow bends like a painted road sign instead of folding sharply.
+     * Places to get help along the rest of the route (도움 지점 목록): those within [maxOffM] of the route
+     * and not already passed, nearest first, each with how far ahead it is and on which side.
      */
-    private fun rounded(line: List<Pair<Double, Double>>): List<Pair<Double, Double>> {
-        if (line.size < 3) return line
-        val out = mutableListOf(line.first())
-        for (i in 1 until line.lastIndex) {
-            val (px, py) = line[i - 1]
-            val (cx, cy) = line[i]
-            val (nx, ny) = line[i + 1]
-            val r = minOf(CORNER_M, dist(line[i - 1], line[i]) / 2, dist(line[i], line[i + 1]) / 2)
-            val inLen = dist(line[i - 1], line[i]).coerceAtLeast(1e-6)
-            val outLen = dist(line[i], line[i + 1]).coerceAtLeast(1e-6)
-            val start = (cx + (px - cx) * r / inLen) to (cy + (py - cy) * r / inLen)
-            val end = (cx + (nx - cx) * r / outLen) to (cy + (ny - cy) * r / outLen)
-            // Quadratic Bézier from start to end with the corner as its control point.
-            for (k in 0..CORNER_STEPS) {
-                val t = k.toDouble() / CORNER_STEPS
-                val a = (1 - t) * (1 - t)
-                val b = 2 * (1 - t) * t
-                val c = t * t
-                out += (a * start.first + b * cx + c * end.first) to (a * start.second + b * cy + c * end.second)
+    fun helpAhead(progressM: Double, maxOffM: Double = HELP_LIST_OFF_M): List<HelpAhead> =
+        facilities.filter { it.kind in HELP_KINDS }.mapNotNull { f ->
+            val p = toXY(LatLon(f.lat, f.lon))
+            var off = Double.MAX_VALUE
+            var leg = 0
+            var t = 0.0
+            for (i in legLengths.indices) {
+                val (tt, d) = projectOnLeg(p, i)
+                if (d < off) { off = d; leg = i; t = tt }
             }
-        }
-        out += line.last()
-        return out
-    }
+            val along = cumulative[leg] + legLengths[leg] * t
+            if (off > maxOffM || along < progressM - PASSED_M) return@mapNotNull null
+            val (ax, ay) = points[leg]
+            val (bx, by) = points[leg + 1]
+            val cross = (bx - ax) * (p.second - ay) - (by - ay) * (p.first - ax)
+            val side = if (off < 3) Turn.STRAIGHT else if (cross > 0) Turn.LEFT else Turn.RIGHT
+            HelpAhead(f.kind, (along - progressM).coerceAtLeast(0.0).roundToInt(), side, off.roundToInt())
+        }.sortedBy { it.aheadM }
 
     /** Direction of travel at [progressM], looking a few meters ahead, in degrees clockwise from north. */
     fun travelBearing(progressM: Double): Float {

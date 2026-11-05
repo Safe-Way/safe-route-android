@@ -1,5 +1,12 @@
 package com.deungbul.anshimgil.ui.home
 
+import com.deungbul.anshimgil.ui.safety.SosOverlay
+import com.deungbul.anshimgil.ui.safety.SosButton
+import com.deungbul.anshimgil.data.Guardian
+import com.deungbul.anshimgil.data.MapLayers
+import androidx.compose.runtime.mutableIntStateOf
+import com.deungbul.anshimgil.data.stationExits
+import com.deungbul.anshimgil.data.FacilityKind
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.IconButton
 import com.deungbul.anshimgil.data.Facility
@@ -71,6 +78,9 @@ import com.kakao.vectormap.camera.CameraUpdateFactory
 
 private val Ink = Color(0xFF17211B)
 
+/** Zoomed out past the walking view (one step out from it already) the map shows no facility tags. */
+private const val MIN_TAG_ZOOM = 17
+
 /** Same scale as the guide screen: nearby streets with buildings in 3D, one step closer than the default 16. */
 private const val WALK_ZOOM = 17
 
@@ -94,8 +104,11 @@ fun HomeScreen(
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onPlaceSelected: (Place) -> Unit,
+    guardians: List<Guardian>,
+    showSos: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    var sos by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var map by remember { mutableStateOf<KakaoMap?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -105,6 +118,9 @@ fun HomeScreen(
     var mapNote by remember { mutableStateOf<String?>(null) }
     // The tapped place whose details are shown, e.g. a station's elevator exits.
     var picked by remember { mutableStateOf<Facility?>(null) }
+    // What the map shows now, so a station's card can list its exits.
+    var shownFacilities by remember { mutableStateOf<List<Facility>>(emptyList()) }
+    var zoom by remember { mutableIntStateOf(WALK_ZOOM) }
     val scope = rememberCoroutineScope()
 
     // The phone's position, kept up to date so the location button moves at once and the dot follows.
@@ -153,11 +169,12 @@ fun HomeScreen(
             nearbyMessage = null
             centerOn(p)
         }
-        me?.moveTo(LatLng.from(p.lat, p.lon)) ?: run { me = m.addMyLocation(context, p) }
+        // Glide between fixes (they come about once a second) instead of jumping.
+        me?.moveTo(LatLng.from(p.lat, p.lon), 900) ?: run { me = m.addMyLocation(context, p) }
     }
     // The arrow on the dot turns with the phone (compass).
     val heading = rememberCompassHeading()
-    LaunchedEffect(me, heading) { heading?.let { me?.pointTo(it) } }
+    LaunchedEffect(me, heading) { heading?.let { me?.pointTo(it, 300) } }
 
     // The server picks the place: within 1 km, open ones first, narrowed by the mode.
     fun goToNearest(kind: String, label: String) {
@@ -184,19 +201,31 @@ fun HomeScreen(
         val m = map ?: return@LaunchedEffect
         m.tiltForWalking()
         bbox = m.visibleBbox()
-        m.setOnCameraMoveEndListener { moved, _, _ -> moved.visibleBbox()?.let { bbox = it } }
+        m.setOnCameraMoveEndListener { moved, position, _ ->
+            zoom = position.zoomLevel
+            moved.visibleBbox()?.let { bbox = it }
+        }
         m.setOnLabelClickListener { _, _, label ->
             (label.tag as? Facility)?.let { picked = it }
             true
         }
     }
-    LaunchedEffect(map, mode, extraMapItems, bbox) {
+    LaunchedEffect(map, mode, extraMapItems, bbox, zoom) {
         val m = map ?: return@LaunchedEffect
         val area = bbox ?: return@LaunchedEffect
         delay(300) // wait for the map to settle after a drag
+        // Zoomed far out the user is looking for a place, not at what is on each street: no tags then.
+        if (zoom < MIN_TAG_ZOOM) {
+            m.showLayers(context, MapLayers(emptyList(), emptyList()))
+            shownFacilities = emptyList()
+            me = here?.let { m.addMyLocation(context, it) }
+            mapNote = "확대하면 시설이 보여요"
+            return@LaunchedEffect
+        }
         mapNote = try {
             val page = facilityRepository.load(mode, extraMapItems, area)
             m.showLayers(context, page.layers)
+            shownFacilities = page.layers.facilities
             // showLayers clears every label, the position dot included.
             me = here?.let { m.addMyLocation(context, it) }
             when {
@@ -305,7 +334,7 @@ fun HomeScreen(
                 color = Color.White.copy(alpha = 0.85f),
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = 12.dp, bottom = 12.dp),
+                    .padding(start = if (showSos) 88.dp else 12.dp, bottom = 12.dp),
             ) {
                 Text(
                     note,
@@ -319,12 +348,16 @@ fun HomeScreen(
         picked?.let { place ->
             PlaceDetailCard(
                 place,
+                exits = if (place.kind == FacilityKind.SUBWAY) stationExits(place, shownFacilities) else emptyList(),
                 onClose = { picked = null },
                 modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 112.dp),
             )
         }
 
         error?.let { MapMessage(it, Modifier.align(Alignment.BottomCenter)) }
+
+        if (showSos) SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 44.dp))
+        if (sos) SosOverlay(guardians, here = { here }, onClose = { sos = false }, onAddGuardian = onOpenSettings)
     }
 }
 
@@ -368,7 +401,7 @@ private fun KakaoMap.visibleBbox(): Bbox? {
  * accessible toilets, wheelchair chargers and train hours, as the server words them.
  */
 @Composable
-private fun PlaceDetailCard(place: Facility, onClose: () -> Unit, modifier: Modifier = Modifier) {
+private fun PlaceDetailCard(place: Facility, exits: List<String>, onClose: () -> Unit, modifier: Modifier = Modifier) {
     val parts = place.detail.orEmpty().split(" · ").map { it.trim() }.filter { it.isNotEmpty() }
     // The first part repeats the kind ("지하철역"), so it goes next to the name instead.
     val kindText = parts.firstOrNull()?.takeIf { place.name != null && parts.size > 1 }
@@ -384,6 +417,18 @@ private fun PlaceDetailCard(place: Facility, onClose: () -> Unit, modifier: Modi
                 IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Ink) }
             }
             lines.forEach { line -> Text("· $line", fontSize = 16.sp, color = Ink, lineHeight = 22.sp, modifier = Modifier.padding(end = 12.dp)) }
+            // Each exit on the map with whether it has an elevator, so the walker knows which exit to use.
+            if (exits.isNotEmpty()) {
+                Text("출구", fontSize = 13.sp, color = Color(0xFF5E6A62), modifier = Modifier.padding(top = 8.dp))
+                exits.forEach { exit ->
+                    val withElevator = "엘리베이터 있음" in exit
+                    Text(
+                        exit, fontSize = 15.sp, lineHeight = 21.sp,
+                        fontWeight = if (withElevator) FontWeight.Bold else FontWeight.Normal,
+                        color = if (withElevator) Color(0xFF1F6B42) else Color(0xFF5E6A62),
+                    )
+                }
+            }
         }
     }
 }
