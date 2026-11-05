@@ -92,13 +92,20 @@ fun lastKnownLocation(context: Context, maxAgeMs: Long = USABLE_MS): LatLon? {
         ?.toLatLon()
 }
 
-/** Position updates every second while the calling screen is shown. */
+/**
+ * Position updates about every second while the calling screen is shown, steadied by [PositionFilter]
+ * so rough fixes and standing-still noise do not make the marker jump around.
+ */
 @SuppressLint("MissingPermission")
 @Composable
 fun LocationUpdates(context: Context, onFix: (LatLon) -> Unit) {
     DisposableEffect(Unit) {
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        val listener = listener { onFix(it.toLatLon()) }
+        val filter = PositionFilter()
+        val listener = listener { location ->
+            filter.accept(location.toLatLon(), if (location.hasAccuracy()) location.accuracy else 0f, android.os.SystemClock.elapsedRealtime())
+                ?.let(onFix)
+        }
         enabledProviders(manager).forEach { manager.requestLocationUpdates(it, 1000L, 0f, listener) }
         onDispose { manager.removeUpdates(listener) }
     }

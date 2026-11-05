@@ -30,14 +30,22 @@ fun rememberCompassHeading(): Float? {
         val sensor = manager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
         val matrix = FloatArray(9)
         val orientation = FloatArray(3)
+        var smooth: Float? = null
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
                 SensorManager.getRotationMatrixFromVector(matrix, event.values)
                 SensorManager.getOrientation(matrix, orientation)
                 val degrees = ((Math.toDegrees(orientation[0].toDouble()) + 360) % 360).toFloat()
-                // Small wobbles would redraw the map constantly, so only turns of 3° or more count.
+                // The raw reading shakes with every step, so it is smoothed heavily (a slow average
+                // that follows a real turn within a second or so) and only turns of 12° or more count.
+                val prev = smooth
+                smooth = if (prev == null) degrees else {
+                    val diff = ((degrees - prev + 540) % 360) - 180
+                    ((prev + diff * COMPASS_SMOOTHING + 360) % 360)
+                }
+                val now = smooth ?: return
                 val old = heading
-                if (old == null || angleBetween(old, degrees) >= 3f) heading = degrees
+                if (old == null || angleBetween(old, now) >= COMPASS_STEP_DEGREES) heading = now
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -47,6 +55,12 @@ fun rememberCompassHeading(): Float? {
     }
     return heading
 }
+
+/** Share of each new compass reading in the running average (lower is steadier). */
+private const val COMPASS_SMOOTHING = 0.08f
+
+/** The heading shown changes only when the phone turns at least this much. */
+private const val COMPASS_STEP_DEGREES = 12f
 
 /** Smallest angle between two headings in degrees (0..180). */
 fun angleBetween(a: Float, b: Float): Float {
