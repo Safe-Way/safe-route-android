@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.guide
 
+import com.kakao.vectormap.camera.CameraAnimation
 import androidx.compose.runtime.mutableFloatStateOf
 import com.deungbul.anshimgil.data.FacilityRepository
 import com.deungbul.anshimgil.data.ApiException
@@ -99,6 +100,11 @@ private const val DEMO_STEP_M = 8.0
 private const val GUIDE_ZOOM = 19
 /** A crosswalk this close to the route line is one the route crosses. */
 private const val CROSSWALK_ON_ROUTE_M = 8.0
+/** Position updates come about once a second; moving over slightly less keeps the marker gliding. */
+private const val FOLLOW_MS = 900
+private val FOLLOW = CameraAnimation.from(FOLLOW_MS, false, true)
+/** How long the map and the arrow take to turn. */
+private const val TURN_MS = 300
 /** The map turns only when the walker turns by at least this much. */
 private const val MAP_TURN_DEGREES = 10f
 
@@ -174,8 +180,9 @@ fun GuideScreen(
         m.addCrosswalks(context, crossings)
     }
     LaunchedEffect(map, state.snapped) {
-        me?.moveTo(state.snapped.toLatLng())
-        map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
+        // Glide to each new position over about the time until the next fix, instead of jumping.
+        me?.moveTo(state.snapped.toLatLng(), FOLLOW_MS)
+        map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM), FOLLOW)
     }
 
     // The way the walker faces: the phone's compass. In the demo walk, or without a compass,
@@ -189,9 +196,11 @@ fun GuideScreen(
     var mapBearing by remember { mutableFloatStateOf(heading) }
     LaunchedEffect(heading) { if (angleBetween(mapBearing, heading) >= MAP_TURN_DEGREES) mapBearing = heading }
     // Kakao turns the map the other way round from a compass bearing, hence the minus.
-    LaunchedEffect(map, mapBearing) { map?.moveCamera(CameraUpdateFactory.rotateTo(Math.toRadians(-mapBearing.toDouble()))) }
+    LaunchedEffect(map, mapBearing) {
+        map?.moveCamera(CameraUpdateFactory.rotateTo(Math.toRadians(-mapBearing.toDouble())), CameraAnimation.from(TURN_MS, false, true))
+    }
     // Marker rotation is measured on the screen, not the map, so take off the map's own turn.
-    LaunchedEffect(me, heading, mapBearing) { me?.pointTo(heading - mapBearing) }
+    LaunchedEffect(me, heading, mapBearing) { me?.pointTo(heading - mapBearing, TURN_MS) }
 
     // Keep the walker in the middle of the part of the map not covered by the instruction card:
     // the map's top padding moves its center down by the card's height.

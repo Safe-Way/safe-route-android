@@ -153,11 +153,12 @@ fun HomeScreen(
             nearbyMessage = null
             centerOn(p)
         }
-        me?.moveTo(LatLng.from(p.lat, p.lon)) ?: run { me = m.addMyLocation(context, p) }
+        // Glide between fixes (they come about once a second) instead of jumping.
+        me?.moveTo(LatLng.from(p.lat, p.lon), 900) ?: run { me = m.addMyLocation(context, p) }
     }
     // The arrow on the dot turns with the phone (compass).
     val heading = rememberCompassHeading()
-    LaunchedEffect(me, heading) { heading?.let { me?.pointTo(it) } }
+    LaunchedEffect(me, heading) { heading?.let { me?.pointTo(it, 300) } }
 
     // The server picks the place: within 1 km, open ones first, narrowed by the mode.
     fun goToNearest(kind: String, label: String) {

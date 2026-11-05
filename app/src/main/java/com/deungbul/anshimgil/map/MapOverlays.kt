@@ -239,8 +239,11 @@ private fun crosswalkBitmap(density: Float): Bitmap {
     return bitmap
 }
 
-/** Turns the position marker so its arrow points [degrees] clockwise from north. */
-fun Label.pointTo(degrees: Float) = rotateTo(Math.toRadians(degrees.toDouble()).toFloat())
+/** Turns the position marker so its arrow points [degrees] clockwise from north, over [durationMs] if given. */
+fun Label.pointTo(degrees: Float, durationMs: Int = 0) {
+    val radians = Math.toRadians(degrees.toDouble()).toFloat()
+    if (durationMs > 0) rotateTo(radians, durationMs) else rotateTo(radians)
+}
 
 /** Map tilt for walking screens: buildings stand up in 3D and more of the street ahead is visible. */
 const val WALK_TILT_DEGREES = 50.0
