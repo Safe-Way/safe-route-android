@@ -96,4 +96,16 @@ class SettingsRepository(private val context: Context) {
     suspend fun setSosButton(on: Boolean) {
         context.settingsDataStore.edit { it[sosButtonKey] = on }
     }
+
+    /** Back to the first-run choices. The mode, saved places and guardians are the user's own and stay. */
+    suspend fun resetToDefaults() {
+        context.settingsDataStore.edit {
+            it.remove(voiceKey)
+            it.remove(autoConditionsKey)
+            it.remove(textSizeKey)
+            it.remove(extraMapItemsKey)
+            it.remove(turnSignsKey)
+            it.remove(sosButtonKey)
+        }
+    }
 }

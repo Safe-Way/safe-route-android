@@ -213,6 +213,7 @@ fun AppRoot(
                         guardians = settings.guardians,
                         showTurnSigns = settings.turnSigns,
                         showSos = settings.sosButton,
+                        routeRepository = routeRepository,
                         onFinish = { screen = Screen.Home },
                         modifier = modifier,
                     )

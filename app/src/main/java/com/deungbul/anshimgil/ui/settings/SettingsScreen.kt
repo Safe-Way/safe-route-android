@@ -15,6 +15,8 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.deungbul.anshimgil.ui.safety.canSendSms
+import android.widget.Toast
+import androidx.compose.material3.OutlinedButton
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -81,10 +83,12 @@ fun SettingsScreen(
     onRemoveGuardian: (Guardian) -> Unit,
     onTurnSignsChange: (Boolean) -> Unit,
     onSosButtonChange: (Boolean) -> Unit,
+    onResetToDefaults: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     var addingGuardian by remember { mutableStateOf(false) }
+    var confirmReset by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -98,7 +102,15 @@ fun SettingsScreen(
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "지도로 돌아가기", tint = Ink)
             }
-            Text("설정", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Ink)
+            Text("설정", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Ink, modifier = Modifier.weight(1f))
+            // Every change is saved as it is made; this confirms it and goes back to the map.
+            TextButton(
+                onClick = {
+                    Toast.makeText(context, "설정을 저장했어요", Toast.LENGTH_SHORT).show()
+                    onBack()
+                },
+                modifier = Modifier.padding(end = 8.dp),
+            ) { Text("저장", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1F6B42)) }
         }
 
         SectionTitle("내 설정")
@@ -192,6 +204,28 @@ fun SettingsScreen(
             InfoText("개인정보", "고른 모드, 자주 가는 곳, 보호자 연락처는 이 휴대폰에만 저장해요. 걷는 동안의 위치는 길안내에만 쓰고 저장하지 않아요. 보호자 문자는 SOS나 ‘보호자에게 알리기’를 눌렀을 때만 나가요.")
             InfoText("데이터 출처", "공공데이터포털, 생활안전지도, 재난안전데이터 공유플랫폼, 기상청, 에어코리아, 카카오")
         }
+
+        // Back to the first-run settings, after asking once.
+        OutlinedButton(
+            onClick = { confirmReset = true },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 32.dp).heightIn(min = 52.dp),
+        ) { Text("기본 설정으로 되돌리기", fontSize = 16.sp, color = Ink) }
+    }
+
+    if (confirmReset) {
+        AlertDialog(
+            onDismissRequest = { confirmReset = false },
+            title = { Text("기본 설정으로 되돌릴까요?") },
+            text = { Text("음성 안내, 상황 자동 판단, 글자 크기, 지도에 더 보기, 꺾는 곳 표시, SOS 버튼이 처음 상태로 돌아가요. 모드, 자주 가는 곳, 보호자 연락처는 그대로예요.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onResetToDefaults()
+                    confirmReset = false
+                    Toast.makeText(context, "기본 설정으로 되돌렸어요", Toast.LENGTH_SHORT).show()
+                }) { Text("되돌리기") }
+            },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("취소") } },
+        )
     }
 
     if (addingGuardian) {
