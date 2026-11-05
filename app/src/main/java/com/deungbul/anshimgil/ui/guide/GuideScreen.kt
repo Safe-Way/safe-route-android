@@ -101,7 +101,7 @@ fun GuideScreen(
 ) {
     val context = LocalContext.current
     val route = result.route(type) ?: result.routes.first()
-    val guidance = remember(route) { Guidance(route.path, result.facilities) }
+    val guidance = remember(route) { Guidance(route.path, result.facilitiesOn(route.type)) }
     var fix by remember { mutableStateOf<LatLon?>(null) }
     var demoProgress by remember { mutableDoubleStateOf(0.0) }
     var voiceOn by rememberSaveable { mutableStateOf(voiceByDefault) }

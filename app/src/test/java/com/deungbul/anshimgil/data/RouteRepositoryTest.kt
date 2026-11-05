@@ -60,6 +60,9 @@ class RouteRepositoryTest {
             result.explanation.items,
         )
         assertEquals(listOf(FacilityKind.CCTV, FacilityKind.GUARD_HOUSE), result.facilities.map { it.kind })
+        // CCTV is on both routes, the guard house only on the safe one
+        assertEquals(listOf(FacilityKind.CCTV, FacilityKind.GUARD_HOUSE), result.facilitiesOn(RouteType.SAFE).map { it.kind })
+        assertEquals(listOf(FacilityKind.CCTV), result.facilitiesOn(RouteType.SHORTEST).map { it.kind })
         assertFalse(result.dataQuality.ok)
         assertEquals("이 지역은 안전 데이터가 부족합니다", result.dataQuality.message)
     }

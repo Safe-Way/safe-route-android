@@ -64,7 +64,7 @@ fun LatLon.toLatLng(): LatLng = LatLng.from(lat, lon)
  * and start/end markers, then fits the camera to the routes.
  */
 fun KakaoMap.showRoutes(context: Context, result: RouteResult, selected: RouteType, destinationName: String) {
-    showLayers(context, MapLayers(result.facilities, zones = emptyList()))
+    showLayers(context, MapLayers(result.facilitiesOn(selected), zones = emptyList()))
     val density = context.resources.displayMetrics.density
     val lineLayer = routeLineManager?.layer ?: return
     lineLayer.removeAll()
