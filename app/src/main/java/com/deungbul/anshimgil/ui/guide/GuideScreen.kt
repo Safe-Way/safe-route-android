@@ -126,7 +126,6 @@ fun GuideScreen(
     var voiceOn by rememberSaveable { mutableStateOf(voiceByDefault) }
     var map by remember { mutableStateOf<KakaoMap?>(null) }
     var me by remember { mutableStateOf<Label?>(null) }
-    var turnLabels by remember { mutableStateOf<List<Label>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
     var hasPermission by remember { mutableStateOf(hasLocationPermission(context)) }
@@ -162,7 +161,7 @@ fun GuideScreen(
     LaunchedEffect(map) {
         val m = map ?: return@LaunchedEffect
         m.showRoutes(context, result.copy(routes = listOf(route)), route.type, destinationName)
-        turnLabels = m.addTurnArrows(context, guidance.turnMarks)
+        m.addTurnArrows(context, guidance.turnMarks)
         me = m.addMyLocation(context, state.snapped, sizeDp = 24f)
         m.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
         m.tiltForWalking()
@@ -192,9 +191,6 @@ fun GuideScreen(
     // Kakao turns the map the other way round from a compass bearing, hence the minus.
     LaunchedEffect(map, mapBearing) { map?.moveCamera(CameraUpdateFactory.rotateTo(Math.toRadians(-mapBearing.toDouble()))) }
     // Marker rotation is measured on the screen, not the map, so take off the map's own turn.
-    LaunchedEffect(turnLabels, mapBearing) {
-        turnLabels.zip(guidance.turnMarks.filter { it.shape.size >= 2 }).forEach { (label, mark) -> label.pointTo(mark.bearing - mapBearing) }
-    }
     LaunchedEffect(me, heading, mapBearing) { me?.pointTo(heading - mapBearing) }
 
     // Keep the walker in the middle of the part of the map not covered by the instruction card:
