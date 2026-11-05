@@ -53,6 +53,7 @@ internal fun parseRouteResult(json: JSONObject): RouteResult {
     val night = conditionsJson?.optBoolean("night") ?: false
     val manual = conditionsJson?.optString("nightSource") == "manual"
     val conditions = if (night || manual) listOf(Condition("night", "밤", night)) else emptyList()
+    val weather = weatherNotes(conditionsJson)
 
     val routes = json.optJSONArray("routes").objects().mapNotNull { route ->
         val type = runCatching { RouteType.valueOf(route.getString("kind").uppercase()) }.getOrNull() ?: return@mapNotNull null
@@ -93,11 +94,29 @@ internal fun parseRouteResult(json: JSONObject): RouteResult {
         routes = routes,
         explanation = explanation,
         facilities = facilities,
+        weather = weather,
         dataQuality = DataQuality(
             ok = (quality?.optString("status") ?: "OK") == "OK",
             message = quality?.optString("message")?.takeUnless { quality.isNull("message") || it.isBlank() },
         ),
     )
+}
+
+/**
+ * Weather and air from `conditions` (rain, heat, cold, tempC, dustBad). Nothing is shown
+ * for a part the server could not get (weatherAvailable / dustAvailable false).
+ */
+internal fun weatherNotes(conditions: JSONObject?): List<String> {
+    if (conditions == null) return emptyList()
+    val notes = mutableListOf<String>()
+    if (conditions.optBoolean("weatherAvailable")) {
+        if (conditions.optBoolean("rain")) notes += "비"
+        if (conditions.optBoolean("heat")) notes += "폭염"
+        if (conditions.optBoolean("cold")) notes += "한파"
+        if (conditions.has("tempC") && !conditions.isNull("tempC")) notes += "${conditions.optDouble("tempC").roundToInt()}°C"
+    }
+    if (conditions.optBoolean("dustAvailable") && conditions.optBoolean("dustBad")) notes += "미세먼지 나쁨"
+    return notes
 }
 
 /**

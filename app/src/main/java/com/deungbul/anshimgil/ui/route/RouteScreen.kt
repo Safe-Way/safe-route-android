@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -90,7 +91,8 @@ private val Green = Color(0xFF1F6B42)
 private sealed interface RouteState {
     data object Loading : RouteState
     data class Ready(val result: RouteResult) : RouteState
-    data class Failed(val message: String) : RouteState
+    /** [retryHelps] is false when trying again gives the same answer, e.g. start and destination too close. */
+    data class Failed(val message: String, val retryHelps: Boolean) : RouteState
 }
 
 /**
@@ -137,7 +139,7 @@ fun RouteScreen(
                 ),
             )
         } catch (e: ApiException) {
-            RouteState.Failed(e.message)
+            RouteState.Failed(e.message, retryHelps = e.code !in setOf("SAME_POINT", "OUT_OF_AREA", "BAD_PARAM"))
         }
     }
     // After the user turns location on (or allows it) in the phone's settings, find the start again.
@@ -221,7 +223,7 @@ fun RouteScreen(
                 origin?.issue?.takeIf { startPlace == null }?.let { issue ->
                     LocationNotice(issue, onFix = { fixLocation(issue) })
                 }
-                // Night is always shown so it can also be switched on in daytime.
+                // Night is always shown so it can also be switched on in daytime; weather is shown for information.
                 result?.let { r -> r.conditions.ifEmpty { listOf(Condition("night", "밤", false)) } }?.let { conditions ->
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         Surface(shape = RoundedCornerShape(16.dp), color = Ink, contentColor = Color.White) {
@@ -248,24 +250,43 @@ fun RouteScreen(
                         }
                     }
                 }
+                result?.weather?.takeIf { it.isNotEmpty() }?.let { notes ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        notes.forEach { note ->
+                            Surface(shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 2.dp) {
+                                Text(note, fontSize = 14.sp, color = Ink, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        Surface(shadowElevation = 8.dp, color = Color.White) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-            ) {
-                when (val s = state) {
-                    RouteState.Loading -> Text(if (origin == null) "현재 위치를 찾는 중…" else "길을 찾는 중…", fontSize = 16.sp, color = Muted, modifier = Modifier.padding(vertical = 24.dp))
-                    is RouteState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(s.message, fontSize = 16.sp, color = Color(0xFFB42318))
-                        TextButton(onClick = { retry++ }) { Text("다시 시도") }
+        // At most a bit over half the screen so the map stays visible with large text;
+        // the details scroll while the start button stays in view.
+        val maxPanel = (LocalConfiguration.current.screenHeightDp * 0.55f).dp
+        Surface(shadowElevation = 8.dp, color = Color.White, modifier = Modifier.heightIn(max = maxPanel)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(16.dp)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    when (val s = state) {
+                        RouteState.Loading -> Text(if (origin == null) "현재 위치를 찾는 중…" else "길을 찾는 중…", fontSize = 16.sp, color = Muted, modifier = Modifier.padding(vertical = 24.dp))
+                        is RouteState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(s.message, fontSize = 16.sp, color = Color(0xFFB42318))
+                            if (s.retryHelps) {
+                                TextButton(onClick = { retry++ }) { Text("다시 시도") }
+                            } else {
+                                TextButton(onClick = onPickStart) { Text("출발지 바꾸기") }
+                            }
+                        }
+                        is RouteState.Ready -> RouteDetails(s.result, selected, onSelect = { selected = it })
                     }
-                    is RouteState.Ready -> RouteDetails(s.result, selected, onSelect = { selected = it }, onStart = { onStart(s.result, selected) })
                 }
+                (state as? RouteState.Ready)?.let { s -> StartButton(s.result, selected, onStart = { onStart(s.result, selected) }) }
             }
         }
     }
@@ -297,7 +318,6 @@ private fun RouteDetails(
     result: RouteResult,
     selected: RouteType,
     onSelect: (RouteType) -> Unit,
-    onStart: () -> Unit,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.selectableGroup()) {
         listOf(RouteType.SAFE, RouteType.SHORTEST).forEach { type ->
@@ -341,7 +361,10 @@ private fun RouteDetails(
             )
         }
     }
+}
 
+@Composable
+private fun StartButton(result: RouteResult, selected: RouteType, onStart: () -> Unit) {
     Button(
         onClick = onStart,
         shape = RoundedCornerShape(16.dp),

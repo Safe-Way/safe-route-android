@@ -82,16 +82,19 @@ class FacilityRepositoryTest {
     }
 
     @Test
-    fun stationsShowElevatorsForSeniorAndDisabled() {
-        val detail = "지하철역 · 엘리베이터 3대 · 장애인 화장실 2곳"
-        assertEquals(null to FacilityLook.NORMAL, poiLabel(FacilityKind.SUBWAY, true, detail, UserMode.GENERAL))
-        assertEquals("지하철역 · 엘리베이터 3대" to FacilityLook.NORMAL, poiLabel(FacilityKind.SUBWAY, true, detail, UserMode.SENIOR))
-        // 녹동역: no elevator, grayed out only in disabled mode
-        val nokdong = "지하철역 · 엘리베이터 없음"
-        assertEquals("지하철역 · 엘리베이터 없음" to FacilityLook.GRAY, poiLabel(FacilityKind.SUBWAY, false, nokdong, UserMode.DISABLED))
-        assertEquals(FacilityLook.NORMAL, poiLabel(FacilityKind.SUBWAY, false, nokdong, UserMode.SENIOR).second)
-        // Every mode shows stations
-        UserMode.entries.forEach { assertTrue(FacilityKind.SUBWAY in it.shownKinds(emptySet())) }
+    fun stationsShowElevatorExitsForSeniorAndDisabled() {
+        assertEquals(null to FacilityLook.NORMAL, poiLabel(FacilityKind.SUBWAY, true, 2, UserMode.GENERAL))
+        assertEquals("지하철역 · 엘리베이터 출구 2곳" to FacilityLook.NORMAL, poiLabel(FacilityKind.SUBWAY, true, 2, UserMode.SENIOR))
+        // 양동시장역: no street elevator, grayed out only in disabled mode
+        assertEquals("지하철역 · 엘리베이터 출구 없음" to FacilityLook.GRAY, poiLabel(FacilityKind.SUBWAY, false, 1, UserMode.DISABLED))
+        assertEquals(FacilityLook.NORMAL, poiLabel(FacilityKind.SUBWAY, false, 1, UserMode.SENIOR).second)
+        // 녹동역: not confirmed
+        assertEquals("지하철역 · 엘리베이터 확인 안 됨", poiLabel(FacilityKind.SUBWAY, null, 1, UserMode.DISABLED).first)
+        // Every mode shows stations and entrances
+        UserMode.entries.forEach {
+            assertTrue(FacilityKind.SUBWAY in it.shownKinds(emptySet()))
+            assertTrue("subway_entrance" in serverKinds(it.shownKinds(emptySet())))
+        }
     }
 
     @Test

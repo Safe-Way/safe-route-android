@@ -40,7 +40,7 @@ class ServerFacilityRepository : FacilityRepository {
         val kinds = serverKinds(shown)
         if (kinds.isEmpty()) return FacilityPage(MapLayers(emptyList(), emptyList()), truncated = false)
         val b = bbox.clamped()
-        val json = ServerApi.get(
+        suspend fun fetch(kinds: Set<String>) = ServerApi.get(
             "/api/pois",
             mapOf(
                 "bbox" to "%.6f,%.6f,%.6f,%.6f".format(java.util.Locale.US, b.west, b.south, b.east, b.north),
@@ -49,6 +49,12 @@ class ServerFacilityRepository : FacilityRepository {
                 "limit" to 1000,
             ),
         )
+        val json = try {
+            fetch(kinds)
+        } catch (e: ApiException) {
+            // A server not yet updated rejects subway entrances; show the rest instead of nothing.
+            if (e.code == "BAD_PARAM" && "subway_entrance" in e.message) fetch(kinds - "subway_entrance") else throw e
+        }
         return parsePois(json, shown, mode)
     }
 }
@@ -75,8 +81,7 @@ internal fun serverKinds(shown: Set<FacilityKind>): Set<String> = shown.mapNotNu
         FacilityKind.STAIRS -> "stairs"
         FacilityKind.SCHOOL_ZONE -> "school_zone"
         FacilityKind.SUBWAY -> "subway"
-        // TODO: send "subway_entrance" once the server knows it; an unknown kind fails the whole request.
-        FacilityKind.SUBWAY_ENTRANCE -> null
+        FacilityKind.SUBWAY_ENTRANCE -> "subway_entrance"
     }
 }.toSet()
 
@@ -112,24 +117,27 @@ internal fun poiKind(kind: String, sub: String?, wheelchair: Boolean?, shown: Se
 /** Modes that care about elevators: stations get an elevator badge, entrances with one are highlighted. */
 private val ELEVATOR_MODES = setOf(UserMode.SENIOR, UserMode.DISABLED)
 
-private val ELEVATOR_COUNT = Regex("""엘리베이터 (\d+)대""")
-
-/** Tag text and look for one place, per the team's rules (11/5). */
-internal fun poiLabel(kind: FacilityKind, wheelchair: Boolean?, detail: String?, mode: UserMode): Pair<String?, FacilityLook> =
+/**
+ * Tag text and look for one place, per the team's rules (11/5).
+ * For a station, [wheelchair] says whether an exit has an elevator down from the street,
+ * and [count] is how many such exits there are.
+ */
+internal fun poiLabel(kind: FacilityKind, wheelchair: Boolean?, count: Int?, mode: UserMode): Pair<String?, FacilityLook> =
     when (kind) {
         FacilityKind.CURB_RAMP -> null to if (wheelchair == true) FacilityLook.NORMAL else FacilityLook.DOT
         FacilityKind.SUBWAY -> when {
             mode !in ELEVATOR_MODES -> null to FacilityLook.NORMAL
-            wheelchair == false -> "지하철역 · 엘리베이터 없음" to
+            wheelchair == true -> (if (count != null && count > 0) "지하철역 · 엘리베이터 출구 ${count}곳" else "지하철역 · 엘리베이터 출구 있음") to FacilityLook.NORMAL
+            wheelchair == false -> "지하철역 · 엘리베이터 출구 없음" to
                 if (mode == UserMode.DISABLED) FacilityLook.GRAY else FacilityLook.NORMAL
-            else -> {
-                val count = detail?.let { ELEVATOR_COUNT.find(it)?.groupValues?.get(1) }
-                (if (count != null) "지하철역 · 엘리베이터 ${count}대" else null) to FacilityLook.NORMAL
-            }
+            else -> "지하철역 · 엘리베이터 확인 안 됨" to FacilityLook.NORMAL
         }
-        FacilityKind.SUBWAY_ENTRANCE ->
-            if (mode in ELEVATOR_MODES && wheelchair == true) "역 입구 · 엘리베이터" to FacilityLook.NORMAL
-            else null to FacilityLook.NORMAL
+        FacilityKind.SUBWAY_ENTRANCE -> when {
+            mode !in ELEVATOR_MODES -> null to FacilityLook.NORMAL
+            wheelchair == true -> "역 입구 · 엘리베이터" to FacilityLook.NORMAL
+            // Not confirmed, so grayed out to let the elevator entrances stand out.
+            else -> null to FacilityLook.GRAY
+        }
         else -> null to FacilityLook.NORMAL
     }
 
@@ -144,7 +152,7 @@ internal fun parsePois(json: JSONObject, shown: Set<FacilityKind>, mode: UserMod
             wheelchair,
             shown,
         ) ?: return@mapNotNull null
-        val (text, look) = poiLabel(kind, wheelchair, p.optString("detail").takeUnless { p.isNull("detail") }, mode)
+        val (text, look) = poiLabel(kind, wheelchair, if (p.isNull("count")) null else p.optInt("count"), mode)
         Facility(kind, p.getDouble("lat"), p.getDouble("lon"), text = text, look = look)
     }
     return FacilityPage(MapLayers(facilities, zones = emptyList()), truncated = json.optBoolean("truncated"))
