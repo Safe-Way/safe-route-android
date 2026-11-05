@@ -171,45 +171,56 @@ fun KakaoMap.addMyLocation(context: Context, point: LatLon, sizeDp: Float = 22f)
 }
 
 /**
- * Turn arrows painted on the ground along the route, like Naver's walking guidance: a white band with
- * a dark edge bending through each turn, ending in a flat arrowhead. Both lie on the map, so they stay
- * in place when it tilts or turns.
+ * A small round sign at each sharp turn with a ↰ or ↱ in it, the same symbols as the instruction bar,
+ * so the walker sees where the next turn is and which way it goes. It always faces the screen.
  */
 fun KakaoMap.addTurnArrows(context: Context, marks: List<TurnMark>) {
     val density = context.resources.displayMetrics.density
-    val band = RouteLineStyle.from(8f * density, 0xFFFFFFFF.toInt(), 1.5f * density, TURN_EDGE)
-    // A layer of their own above the route; reused (and cleared) when the screen is shown again.
-    val layer = routeLineManager?.let { it.getLayer(TURN_LAYER) ?: it.addLayer(TURN_LAYER, 10_000) }
-    layer?.removeAll()
-    marks.filter { it.shape.size >= 2 }.forEach { mark ->
-        layer?.addRouteLine(RouteLineOptions.from(RouteLineSegment.from(mark.shape.map { it.toLatLng() }, band)))
-        // The head is a chevron drawn with the same band, so band and head read as one painted arrow.
-        layer?.addRouteLine(RouteLineOptions.from(RouteLineSegment.from(arrowHead(mark.shape.last(), mark.bearing).map { it.toLatLng() }, band)))
+    val left = LabelStyles.from(LabelStyle.from(turnSignBitmap(density, left = true)).setAnchorPoint(0.5f, 0.5f).setApplyDpScale(false))
+    val right = LabelStyles.from(LabelStyle.from(turnSignBitmap(density, left = false)).setAnchorPoint(0.5f, 0.5f).setApplyDpScale(false))
+    marks.forEach { mark ->
+        labelManager?.layer?.addLabel(LabelOptions.from(mark.point.toLatLng()).setStyles(if (mark.left) left else right).setRank(7))
     }
 }
 
-private val TURN_EDGE = 0xFF17211B.toInt()
-private const val TURN_LAYER = "turns"
-
-/**
- * A chevron on the ground around the band's end [base]: its tip [HEAD_FORWARD_M] ahead along [bearing],
- * its wings [HEAD_BACK_M] behind and [HEAD_HALF_WIDTH_M] to each side.
- */
-private fun arrowHead(base: LatLon, bearing: Float): List<LatLon> {
-    val b = Math.toRadians(bearing.toDouble())
-    val mPerLat = 111_320.0
-    val mPerLon = 111_320.0 * kotlin.math.cos(Math.toRadians(base.lat))
-    val fx = kotlin.math.sin(b) // forward, east part
-    val fy = kotlin.math.cos(b) // forward, north part
-    // [ahead] meters forward and [right] meters to the right, where right of forward is (fy, -fx).
-    fun at(ahead: Double, right: Double) =
-        LatLon(base.lat + (fy * ahead - fx * right) / mPerLat, base.lon + (fx * ahead + fy * right) / mPerLon)
-    return listOf(at(-HEAD_BACK_M, -HEAD_HALF_WIDTH_M), at(HEAD_FORWARD_M, 0.0), at(-HEAD_BACK_M, HEAD_HALF_WIDTH_M))
+/** A white disc with a dark green ring and a turn arrow (↰ for left, ↱ for right). */
+private fun turnSignBitmap(density: Float, left: Boolean): Bitmap {
+    val size = (26 * density).toInt()
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val s = size.toFloat()
+    val c = s / 2
+    canvas.drawCircle(c, c, c - density, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() })
+    canvas.drawCircle(
+        c, c, c - 1.75f * density,
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { color = TURN_INK; style = Paint.Style.STROKE; strokeWidth = 1.5f * density },
+    )
+    // Drawn as ↱ (right turn) and mirrored for left: a stem up from the bottom, then across to an arrowhead.
+    canvas.save()
+    if (left) canvas.scale(-1f, 1f, c, c)
+    val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = TURN_INK; style = Paint.Style.STROKE; strokeWidth = 2.6f * density
+        strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+    }
+    val path = android.graphics.Path().apply {
+        moveTo(s * 0.40f, s * 0.74f)
+        lineTo(s * 0.40f, s * 0.48f)
+        quadTo(s * 0.40f, s * 0.40f, s * 0.48f, s * 0.40f)
+        lineTo(s * 0.62f, s * 0.40f)
+    }
+    canvas.drawPath(path, stroke)
+    val head = android.graphics.Path().apply {
+        moveTo(s * 0.74f, s * 0.40f)
+        lineTo(s * 0.58f, s * 0.29f)
+        lineTo(s * 0.58f, s * 0.51f)
+        close()
+    }
+    canvas.drawPath(head, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = TURN_INK })
+    canvas.restore()
+    return bitmap
 }
 
-private const val HEAD_FORWARD_M = 1.2
-private const val HEAD_BACK_M = 1.8
-private const val HEAD_HALF_WIDTH_M = 2.2
+private val TURN_INK = 0xFF1F6B42.toInt()
 
 /** A small zebra-crossing sign at each crosswalk on the route. */
 fun KakaoMap.addCrosswalks(context: Context, points: List<LatLon>) {

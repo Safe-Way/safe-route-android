@@ -30,11 +30,8 @@ data class GuidanceState(
 
 data class HelpPoint(val kind: FacilityKind, val meters: Int, val side: Turn)
 
-/**
- * A turn on the route at [point]. [shape] is the route just before and after it, drawn as a bent arrow
- * whose tip (the last point) points [bearing] degrees from north.
- */
-data class TurnMark(val point: LatLon, val bearing: Float, val shape: List<LatLon> = listOf(point))
+/** A sharp turn on the route at [point]; [left] says which way it goes. */
+data class TurnMark(val point: LatLon, val left: Boolean)
 
 /** A change of heading at least this large counts as a turn. */
 private const val TURN_DEGREES = 30.0
@@ -42,12 +39,8 @@ private const val TURN_DEGREES = 30.0
 /** Only sharp turns, close to a right angle, get an arrow drawn on the map. */
 private const val TURN_ARROW_DEGREES = 65.0
 
-/** How far along the route the turn arrow reaches on each side of the turn. */
-private const val TURN_ARM_M = 9.0
-
-/** How far from a corner a turn arrow starts curving, and how many points draw the curve. */
-private const val CORNER_M = 3.5
-private const val CORNER_STEPS = 6
+/** Turn signs closer together than this along the route are merged into the first. */
+private const val TURN_MARK_GAP_M = 25.0
 
 /**
  * Turn-by-turn guidance along a fixed route (issue #7, FR-29·30·34).
@@ -76,52 +69,19 @@ class Guidance(private val path: List<LatLon>, private val facilities: List<Faci
     }
 
     /**
-     * Each sharp turn (about a right angle) as a short stretch of the route bending through it ([TURN_ARM_M] before and after),
-     * for drawing a turn arrow along the route; [TurnMark.bearing] is the way its tip points.
+     * Sharp turns (about a right angle) to mark on the map. Turns closer than [TURN_MARK_GAP_M] to the
+     * previous mark are left out, so a roundabout or a jog gets one sign instead of a cluster.
      */
     val turnMarks: List<TurnMark> by lazy {
-        (1 until points.lastIndex)
-            .filter { v -> abs(headingChange(points[v - 1], points[v], points[v + 1])) >= TURN_ARROW_DEGREES }
-            .map { v ->
-                val at = cumulative[v]
-                val from = (at - TURN_ARM_M).coerceAtLeast(0.0)
-                val to = (at + TURN_ARM_M).coerceAtMost(totalM)
-                val inner = (1 until points.lastIndex).filter { cumulative[it] > from && cumulative[it] < to }.map { points[it] }
-                val shape = rounded(listOf(pointAt(from)) + inner + listOf(pointAt(to)))
-                val (ax, ay) = shape[shape.size - 2]
-                val (bx, by) = shape.last()
-                val bearing = (Math.toDegrees(kotlin.math.atan2(bx - ax, by - ay)) + 360) % 360
-                TurnMark(toLatLon(points[v]), bearing.toFloat(), shape.map { toLatLon(it) })
-            }
-    }
-
-    /**
-     * The same line with each corner replaced by a gentle curve (up to [CORNER_M] from the corner on
-     * either side), so a turn arrow bends like a painted road sign instead of folding sharply.
-     */
-    private fun rounded(line: List<Pair<Double, Double>>): List<Pair<Double, Double>> {
-        if (line.size < 3) return line
-        val out = mutableListOf(line.first())
-        for (i in 1 until line.lastIndex) {
-            val (px, py) = line[i - 1]
-            val (cx, cy) = line[i]
-            val (nx, ny) = line[i + 1]
-            val r = minOf(CORNER_M, dist(line[i - 1], line[i]) / 2, dist(line[i], line[i + 1]) / 2)
-            val inLen = dist(line[i - 1], line[i]).coerceAtLeast(1e-6)
-            val outLen = dist(line[i], line[i + 1]).coerceAtLeast(1e-6)
-            val start = (cx + (px - cx) * r / inLen) to (cy + (py - cy) * r / inLen)
-            val end = (cx + (nx - cx) * r / outLen) to (cy + (ny - cy) * r / outLen)
-            // Quadratic Bézier from start to end with the corner as its control point.
-            for (k in 0..CORNER_STEPS) {
-                val t = k.toDouble() / CORNER_STEPS
-                val a = (1 - t) * (1 - t)
-                val b = 2 * (1 - t) * t
-                val c = t * t
-                out += (a * start.first + b * cx + c * end.first) to (a * start.second + b * cy + c * end.second)
-            }
+        val marks = mutableListOf<TurnMark>()
+        var lastAt = Double.NEGATIVE_INFINITY
+        for (v in 1 until points.lastIndex) {
+            val change = headingChange(points[v - 1], points[v], points[v + 1])
+            if (abs(change) < TURN_ARROW_DEGREES || cumulative[v] - lastAt < TURN_MARK_GAP_M) continue
+            marks += TurnMark(toLatLon(points[v]), left = change > 0)
+            lastAt = cumulative[v]
         }
-        out += line.last()
-        return out
+        marks
     }
 
     /** Direction of travel at [progressM], looking a few meters ahead, in degrees clockwise from north. */
