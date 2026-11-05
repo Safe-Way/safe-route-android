@@ -109,6 +109,8 @@ private val Green = Color(0xFF1F6B42)
 /** A real fix farther than this from the route switches to the demo walk (e.g. testing away from the route). */
 private const val FAR_FROM_ROUTE_M = 300
 private const val OFF_ROUTE_WARN_M = 40
+/** Going back along the route less than this is treated as GPS noise. */
+private const val BACKTRACK_M = 25.0
 /** Off the route this long before finding a new route from where the walker is. */
 private const val REROUTE_AFTER_MS = 8_000L
 /** Off the route this long before offering to tell the guardians. */
@@ -172,7 +174,17 @@ fun GuideScreen(
     }
     if (hasPermission) LocationUpdates(context) { fix = it }
 
-    val realState = fix?.let { guidance.update(it) }
+    // Along the route the walker only goes forward: a fix a few meters behind the last one is GPS noise,
+    // so the marker stays put instead of sliding back and forth. A real step back (U-turn) still shows.
+    var furthest by remember(guidance) { mutableDoubleStateOf(0.0) }
+    val realState = fix?.let { guidance.update(it) }?.let { raw ->
+        if (raw.progressM < furthest && furthest - raw.progressM < BACKTRACK_M && raw.offRouteM <= OFF_ROUTE_WARN_M) {
+            guidance.atProgress(furthest).copy(offRouteM = raw.offRouteM)
+        } else {
+            raw
+        }
+    }
+    LaunchedEffect(realState?.progressM) { realState?.let { furthest = it.progressM } }
     val demo = realState == null || realState.offRouteM > FAR_FROM_ROUTE_M
     val state: GuidanceState = if (demo) guidance.atProgress(demoProgress) else realState!!
 
