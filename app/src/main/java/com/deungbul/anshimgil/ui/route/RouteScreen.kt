@@ -75,6 +75,7 @@ import com.deungbul.anshimgil.data.RouteRepository
 import com.deungbul.anshimgil.data.RouteRequest
 import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.RouteType
+import com.deungbul.anshimgil.data.walkMinutes
 import com.deungbul.anshimgil.data.autoNightReason
 import com.deungbul.anshimgil.data.UserMode
 import com.deungbul.anshimgil.map.KakaoMapView
@@ -124,6 +125,8 @@ fun RouteScreen(
     onPickStart: () -> Unit,
     onSwap: (Origin) -> Unit,
     onChangeDestination: (Place) -> Unit,
+    /** The walker's own pace (see personalSpeed); route times are worked out from it. */
+    walkSpeedMPerMin: Double,
     onStart: (RouteResult, RouteType) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -356,10 +359,10 @@ fun RouteScreen(
                                 else -> TextButton(onClick = onPickStart) { Text("출발지 바꾸기") }
                             }
                         }
-                        is RouteState.Ready -> RouteDetails(s.result, selected, onSelect = { selected = it })
+                        is RouteState.Ready -> RouteDetails(s.result.atPace(walkSpeedMPerMin), selected, onSelect = { selected = it })
                     }
                 }
-                (state as? RouteState.Ready)?.let { s -> StartButton(s.result, selected, onStart = { onStart(s.result, selected) }) }
+                (state as? RouteState.Ready)?.let { s -> StartButton(s.result.atPace(walkSpeedMPerMin), selected, onStart = { onStart(s.result, selected) }) }
             }
         }
     }
@@ -524,3 +527,7 @@ internal fun arrivalTime(minutes: Int): String = LocalTime.now().plusMinutes(min
 
 internal fun formatDistance(meters: Int): String =
     if (meters < 1000) "${meters}m" else "%.1fkm".format(meters / 1000.0)
+
+/** The same routes with walking times from the walker's own pace instead of the mode's default. */
+private fun RouteResult.atPace(speedMPerMin: Double): RouteResult =
+    copy(routes = routes.map { it.copy(durationMin = walkMinutes(it.distanceM.toDouble(), speedMPerMin)) })
