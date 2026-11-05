@@ -19,6 +19,7 @@ import com.kakao.vectormap.camera.CameraUpdateFactory
 import com.kakao.vectormap.route.RouteLineOptions
 import com.kakao.vectormap.route.RouteLineSegment
 import com.kakao.vectormap.route.RouteLineStyle
+import com.kakao.vectormap.label.Label
 import com.kakao.vectormap.label.LabelOptions
 import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
@@ -115,6 +116,16 @@ fun KakaoMap.showRoutes(context: Context, result: RouteResult, selected: RouteTy
 
     val points = result.routes.flatMap { it.path }.map { it.toLatLng() }.toTypedArray()
     if (points.isNotEmpty()) moveCamera(CameraUpdateFactory.fitMapPoints(points, (48 * density).toInt()))
+}
+
+/** The phone's position as a blue dot above everything else; move it later with `Label.moveTo`. */
+fun KakaoMap.addMyLocation(context: Context, point: LatLon): Label? {
+    val density = context.resources.displayMetrics.density
+    return labelManager?.layer?.addLabel(
+        LabelOptions.from(point.toLatLng())
+            .setStyles(LabelStyles.from(LabelStyle.from(dotBitmap(0xFF2F6FDB.toInt(), density, 22f)).setApplyDpScale(false)))
+            .setRank(10),
+    )
 }
 
 /** A filled circle with a white ring, used for the user's position. */
