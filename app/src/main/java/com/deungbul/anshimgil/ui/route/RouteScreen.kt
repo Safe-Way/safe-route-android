@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.deungbul.anshimgil.data.ALL_CONDITION_KEYS
+import com.deungbul.anshimgil.data.Condition
 import com.deungbul.anshimgil.data.ApiException
 import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.Origin
@@ -69,6 +72,9 @@ import com.deungbul.anshimgil.map.KakaoMapView
 import com.deungbul.anshimgil.map.showRoutes
 import com.deungbul.anshimgil.ui.mode.style
 import com.kakao.vectormap.KakaoMap
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 private val Ink = Color(0xFF17211B)
 private val Muted = Color(0xFF4A564E)
@@ -82,39 +88,45 @@ private sealed interface RouteState {
 
 /**
  * Shortest vs safe route with the difference in numbers (issue #6, FR-06·07).
- * Condition chips switch detected situations off and on (FR-03).
+ * The night chip switches night routing off and on, also in daytime (FR-03).
+ * [startPlace] is a searched starting point; null starts at the phone's position.
  */
 @Composable
 fun RouteScreen(
     mode: UserMode,
+    startPlace: Place?,
     destination: Place,
     routeRepository: RouteRepository,
     autoConditions: Boolean,
     onBack: () -> Unit,
+    onPickStart: () -> Unit,
+    onSwap: (Origin) -> Unit,
     onStart: (RouteResult, RouteType) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     var conditionsOff by rememberSaveable { mutableStateOf(if (autoConditions) emptySet() else ALL_CONDITION_KEYS) }
+    var conditionsOn by rememberSaveable { mutableStateOf(emptySet<String>()) }
     var selected by rememberSaveable { mutableStateOf(RouteType.SAFE) }
     var state by remember { mutableStateOf<RouteState>(RouteState.Loading) }
     var retry by remember { mutableIntStateOf(0) }
     var map by remember { mutableStateOf<KakaoMap?>(null) }
     var origin by remember { mutableStateOf<Origin?>(null) }
 
-    // Ask for location once; without it the route starts at the demo point.
-    var asked by remember { mutableStateOf(hasLocationPermission(context)) }
+    // Ask for location once when starting from it; without it the route starts at the demo point.
+    var asked by remember { mutableStateOf(startPlace != null || hasLocationPermission(context)) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { asked = true }
     LaunchedEffect(Unit) { if (!asked) permissionLauncher.launch(LOCATION_PERMISSIONS) }
 
-    LaunchedEffect(asked, conditionsOff, retry) {
+    LaunchedEffect(asked, conditionsOff, conditionsOn, retry) {
         if (!asked) return@LaunchedEffect
         state = RouteState.Loading
-        val from = chooseOrigin(currentLocation(context)).also { origin = it }
+        val from = (startPlace?.let { Origin(LatLon(it.lat, it.lon), it.name, fromGps = false) }
+            ?: chooseOrigin(currentLocation(context))).also { origin = it }
         state = try {
             RouteState.Ready(
                 routeRepository.findRoutes(
-                    RouteRequest(from.point, LatLon(destination.lat, destination.lon), mode, conditionsOff),
+                    RouteRequest(from.point, LatLon(destination.lat, destination.lon), mode, conditionsOff, conditionsOn),
                 ),
             )
         } catch (e: ApiException) {
@@ -142,8 +154,18 @@ fun RouteScreen(
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "검색으로 돌아가기", tint = Ink)
                         }
-                        Text(origin?.label ?: "현재 위치", fontSize = 15.sp, color = Muted)
-                        Text("  →  ", fontSize = 15.sp, color = Muted)
+                        // Tap the start to search for another one.
+                        Text(
+                            origin?.label ?: startPlace?.name ?: "현재 위치", fontSize = 15.sp, color = Muted,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .clickable(onClickLabel = "출발지 바꾸기", onClick = onPickStart)
+                                .padding(vertical = 8.dp),
+                        )
+                        IconButton(onClick = { origin?.let(onSwap) }, enabled = origin != null) {
+                            Icon(Icons.Filled.SwapHoriz, contentDescription = "출발과 도착 바꾸기", tint = Ink)
+                        }
                         Text(
                             destination.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink,
                             maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
@@ -157,7 +179,8 @@ fun RouteScreen(
                         }
                     }
                 }
-                result?.conditions?.takeIf { it.isNotEmpty() }?.let { conditions ->
+                // Night is always shown so it can also be switched on in daytime.
+                result?.let { r -> r.conditions.ifEmpty { listOf(Condition("night", "밤", false)) } }?.let { conditions ->
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         Surface(shape = RoundedCornerShape(16.dp), color = Ink, contentColor = Color.White) {
                             Text("지금", fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
@@ -166,9 +189,16 @@ fun RouteScreen(
                             FilterChip(
                                 selected = condition.on,
                                 onClick = {
-                                    conditionsOff = if (condition.on) conditionsOff + condition.key else conditionsOff - condition.key
+                                    val key = condition.key
+                                    if (condition.on) {
+                                        conditionsOff = conditionsOff + key
+                                        conditionsOn = conditionsOn - key
+                                    } else {
+                                        conditionsOff = conditionsOff - key
+                                        conditionsOn = conditionsOn + key
+                                    }
                                 },
-                                label = { Text(condition.label + if (condition.on) "" else " 끔", fontSize = 14.sp) },
+                                label = { Text("${condition.label} 기준 " + if (condition.on) "켜짐" else "꺼짐", fontSize = 14.sp) },
                                 // Solid background so the text stays readable over the map.
                                 colors = FilterChipDefaults.filterChipColors(containerColor = Color.White),
                                 modifier = Modifier.heightIn(min = 40.dp),
@@ -298,9 +328,15 @@ private fun RouteCard(route: RouteOption, selected: Boolean, only: Boolean, onCl
             }
             Text("${route.durationMin}분", fontSize = 26.sp, fontWeight = FontWeight.Black, color = Ink)
             Text(formatDistance(route.distanceM), fontSize = 14.sp, color = Muted)
+            Text("도착 ${arrivalTime(route.durationMin)}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Ink)
         }
     }
 }
+
+private val ARRIVAL_FORMAT = DateTimeFormatter.ofPattern("a h:mm", Locale.KOREAN)
+
+/** Clock time after walking [minutes] from now, e.g. "오전 9:48". */
+internal fun arrivalTime(minutes: Int): String = LocalTime.now().plusMinutes(minutes.toLong()).format(ARRIVAL_FORMAT)
 
 internal fun formatDistance(meters: Int): String =
     if (meters < 1000) "${meters}m" else "%.1fkm".format(meters / 1000.0)

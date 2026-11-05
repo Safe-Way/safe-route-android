@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import android.content.Context
 import com.deungbul.anshimgil.location.LOCATION_PERMISSIONS
 import com.deungbul.anshimgil.location.LocationUpdates
+import com.deungbul.anshimgil.ui.route.arrivalTime
 import com.deungbul.anshimgil.location.hasLocationPermission
 import com.deungbul.anshimgil.data.Guidance
 import com.deungbul.anshimgil.data.GuidanceState
@@ -71,8 +72,6 @@ import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val Ink = Color(0xFF17211B)
@@ -198,7 +197,7 @@ fun GuideScreen(
                     val minutes = (state.remainingM.toDouble() / mode.walkingSpeedMPerMin).let { kotlin.math.ceil(it).toInt() }
                     Stat("남은 거리", formatDistance(state.remainingM), Modifier.weight(1f))
                     Stat("남은 시간", "${minutes}분", Modifier.weight(1f))
-                    Stat("도착", LocalTime.now().plusMinutes(minutes.toLong()).format(ARRIVAL_FORMAT), Modifier.weight(1f))
+                    Stat("도착", arrivalTime(minutes), Modifier.weight(1f))
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -325,8 +324,6 @@ private fun rememberTts(context: Context): TextToSpeech {
     DisposableEffect(tts) { onDispose { tts.stop(); tts.shutdown() } }
     return tts
 }
-
-private val ARRIVAL_FORMAT = DateTimeFormatter.ofPattern("a h:mm", Locale.KOREAN)
 
 private fun formatDistance(meters: Int): String =
     if (meters < 1000) "${meters}m" else "%.1fkm".format(meters / 1000.0)

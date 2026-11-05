@@ -87,10 +87,12 @@ private sealed interface SavedMode {
 /** Screens reachable from the home map. */
 private sealed interface Screen {
     data object Home : Screen
-    data object Search : Screen
+    /** [startFor] is set while choosing a new start for that route. */
+    data class Search(val startFor: Route? = null) : Screen
     data object Settings : Screen
-    data class Route(val destination: Place) : Screen
-    data class Guide(val destination: Place, val result: RouteResult, val type: RouteType) : Screen
+    /** [start] null means the phone's position. */
+    data class Route(val destination: Place, val start: Place? = null) : Screen
+    data class Guide(val route: Route, val result: RouteResult, val type: RouteType) : Screen
 }
 
 /** First launch shows the mode picker; after that the map opens directly. */
@@ -137,7 +139,7 @@ fun AppRoot(
                         settings = settings,
                         onBack = { screen = Screen.Home },
                         onChangeMode = { changingMode = true },
-                        onManagePlaces = { screen = Screen.Search },
+                        onManagePlaces = { screen = Screen.Search() },
                         onVoiceChange = { scope.launch { settingsRepository.setVoiceGuide(it) } },
                         onAutoConditionsChange = { scope.launch { settingsRepository.setAutoConditions(it) } },
                         onTextSizeChange = { scope.launch { settingsRepository.setTextSize(it) } },
@@ -145,37 +147,56 @@ fun AppRoot(
                         modifier = modifier,
                     )
                 }
-                screen == Screen.Search -> {
-                    BackHandler { screen = Screen.Home }
-                    SearchScreen(
-                        placeRepository = placeRepository,
-                        savedPlaces = savedPlaces,
-                        onBack = { screen = Screen.Home },
-                        onPlaceSelected = { place -> screen = Screen.Route(place) },
-                        modifier = modifier,
-                    )
+                screen is Screen.Search -> {
+                    val startFor = (screen as Screen.Search).startFor
+                    val back = { screen = startFor ?: Screen.Home }
+                    BackHandler(onBack = back)
+                    // key: a fresh search box when switching between destination and start.
+                    androidx.compose.runtime.key(startFor) {
+                        SearchScreen(
+                            placeRepository = placeRepository,
+                            savedPlaces = savedPlaces,
+                            onBack = back,
+                            onPlaceSelected = { place ->
+                                screen = startFor?.copy(start = place) ?: Screen.Route(place)
+                            },
+                            modifier = modifier,
+                            placeholder = if (startFor != null) "어디서 출발할까요?" else "어디로 갈까요?",
+                            onUseCurrentLocation = startFor?.let { route -> { screen = route.copy(start = null) } },
+                        )
+                    }
                 }
                 screen is Screen.Route -> {
-                    val destination = (screen as Screen.Route).destination
-                    BackHandler { screen = Screen.Search }
-                    RouteScreen(
-                        mode = mode,
-                        destination = destination,
-                        routeRepository = routeRepository,
-                        autoConditions = settings.autoConditions,
-                        onBack = { screen = Screen.Search },
-                        onStart = { result, type -> screen = Screen.Guide(destination, result, type) },
-                        modifier = modifier,
-                    )
+                    val route = screen as Screen.Route
+                    BackHandler { screen = Screen.Search() }
+                    // key: find the route again whenever the start or destination changes.
+                    androidx.compose.runtime.key(route) {
+                        RouteScreen(
+                            mode = mode,
+                            startPlace = route.start,
+                            destination = route.destination,
+                            routeRepository = routeRepository,
+                            autoConditions = settings.autoConditions,
+                            onBack = { screen = Screen.Search() },
+                            onPickStart = { screen = Screen.Search(startFor = route) },
+                            onSwap = { from ->
+                                val fromPlace = route.start
+                                    ?: Place("here", from.label, "", from.point.lat, from.point.lon, null)
+                                screen = Screen.Route(destination = fromPlace, start = route.destination)
+                            },
+                            onStart = { result, type -> screen = Screen.Guide(route, result, type) },
+                            modifier = modifier,
+                        )
+                    }
                 }
                 screen is Screen.Guide -> {
                     val guide = screen as Screen.Guide
-                    BackHandler { screen = Screen.Route(guide.destination) }
+                    BackHandler { screen = guide.route }
                     GuideScreen(
                         mode = mode,
                         result = guide.result,
                         type = guide.type,
-                        destinationName = guide.destination.name,
+                        destinationName = guide.route.destination.name,
                         voiceByDefault = settings.voiceGuide,
                         onFinish = { screen = Screen.Home },
                         modifier = modifier,
@@ -184,8 +205,10 @@ fun AppRoot(
                 else -> HomeScreen(
                     mode = mode,
                     extraMapItems = settings.extraMapItems,
-                    onOpenSearch = { screen = Screen.Search },
+                    placeRepository = placeRepository,
+                    onOpenSearch = { screen = Screen.Search() },
                     onOpenSettings = { screen = Screen.Settings },
+                    onPlaceSelected = { place -> screen = Screen.Route(place) },
                     modifier = modifier,
                 )
             }

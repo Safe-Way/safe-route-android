@@ -99,5 +99,7 @@ class RouteRepositoryTest {
         assertEquals("wheelchair", auto.getString("mode"))
         assertFalse(auto.has("conditionsOff"))
         assertEquals("off", RouteRequest(origin, destination, UserMode.GENERAL, setOf("night")).toJson().getString("night"))
+        // Switched on in daytime
+        assertEquals("on", RouteRequest(origin, destination, UserMode.GENERAL, conditionsOn = setOf("night")).toJson().getString("night"))
     }
 }
