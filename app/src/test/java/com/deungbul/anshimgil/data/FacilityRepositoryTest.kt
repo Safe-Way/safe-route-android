@@ -103,4 +103,15 @@ class FacilityRepositoryTest {
         assertNull(poiLabel(FacilityKind.SUBWAY_ENTRANCE, null, null, UserMode.DISABLED).first)
         assertNull(poiLabel(FacilityKind.SUBWAY_ENTRANCE, true, null, UserMode.CHILD).first)
     }
+
+    @Test
+    fun stationKeepsNameAndDetailForTheTapCard() {
+        val json = JSONObject(
+            """{"pois":[{"kind":"subway","sub":null,"name":"문화전당역","lat":35.147,"lon":126.919,"wheelchair":true,"count":3,
+               "detail":"지하철역 · 엘리베이터 있는 출구 3곳(2·3·4번) · 장애인 화장실 2곳"}],"truncated":false}""",
+        )
+        val station = parsePois(json, UserMode.DISABLED.shownKinds(emptySet()), UserMode.DISABLED).layers.facilities.single()
+        assertEquals("문화전당역", station.name)
+        assertEquals("지하철역 · 엘리베이터 있는 출구 3곳(2·3·4번) · 장애인 화장실 2곳", station.detail)
+    }
 }

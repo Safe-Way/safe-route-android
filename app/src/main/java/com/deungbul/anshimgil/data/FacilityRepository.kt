@@ -178,7 +178,11 @@ internal fun parsePois(json: JSONObject, shown: Set<FacilityKind>, mode: UserMod
             shown,
         ) ?: return@mapNotNull null
         val (text, look) = poiLabel(kind, wheelchair, if (p.isNull("count")) null else p.optInt("count"), mode)
-        Facility(kind, p.getDouble("lat"), p.getDouble("lon"), text = text, look = look)
+        Facility(
+            kind, p.getDouble("lat"), p.getDouble("lon"), text = text, look = look,
+            name = p.optString("name").takeUnless { p.isNull("name") || it.isBlank() },
+            detail = p.optString("detail").takeUnless { p.isNull("detail") || it.isBlank() },
+        )
     }
     return FacilityPage(MapLayers(facilities, zones = emptyList()), truncated = json.optBoolean("truncated"))
 }
