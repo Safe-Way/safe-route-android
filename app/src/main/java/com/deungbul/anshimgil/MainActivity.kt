@@ -128,6 +128,8 @@ fun AppRoot(
                             scope.launch {
                                 modeRepository.save(picked)
                                 changingMode = false
+                                // Straight to the map, also when the mode was changed from settings.
+                                screen = Screen.Home
                             }
                         },
                         modifier = modifier,
