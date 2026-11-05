@@ -8,11 +8,13 @@ import com.deungbul.anshimgil.data.guardianMessage
 import com.deungbul.anshimgil.data.GuardianAlert
 import com.deungbul.anshimgil.data.Guardian
 import com.kakao.vectormap.camera.CameraAnimation
+import androidx.compose.runtime.mutableFloatStateOf
 import com.deungbul.anshimgil.data.FacilityRepository
 import com.deungbul.anshimgil.data.ApiException
 import com.deungbul.anshimgil.data.bboxAround
 import com.deungbul.anshimgil.map.addTurnArrows
 import com.deungbul.anshimgil.map.addCrosswalks
+import com.deungbul.anshimgil.location.angleBetween
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.boundsInParent
@@ -112,6 +114,8 @@ private const val FOLLOW_MS = 900
 private val FOLLOW = CameraAnimation.from(FOLLOW_MS, false, true)
 /** How long the map and the arrow take to turn. */
 private const val TURN_MS = 300
+/** The map turns only when the way ahead on the route turns by at least this much. */
+private const val MAP_TURN_DEGREES = 20f
 
 /**
  * Walking guidance along the chosen route (issue #7): next turn, nearest help, remaining distance,
@@ -198,9 +202,19 @@ fun GuideScreen(
     val travel = guidance.travelBearing(state.progressM)
     val heading = if (demo || compass == null) travel else compass
 
-    // The map stays north-up so the turn signs and streets keep still on screen while walking;
-    // only the walker's arrow turns to show which way they face.
-    LaunchedEffect(me, heading) { me?.pointTo(heading, TURN_MS) }
+    // The map turns so the way ahead on the route points up. It follows the route, not the compass:
+    // with the compass the map (and the turn signs on it) kept sliding around whenever the phone moved.
+    // It turns only when the route bends by [MAP_TURN_DEGREES] or more, i.e. at turns.
+    var mapBearing by remember { mutableFloatStateOf(travel) }
+    LaunchedEffect(travel) { if (angleBetween(mapBearing, travel) >= MAP_TURN_DEGREES) mapBearing = travel }
+    // Kakao turns the map the other way round from a compass bearing, hence the minus. No animation,
+    // so it does not fight the animated follow of the walker's position.
+    LaunchedEffect(map, mapBearing) {
+        map?.moveCamera(CameraUpdateFactory.rotateTo(Math.toRadians(-mapBearing.toDouble())))
+        map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
+    }
+    // Marker rotation is measured on the screen, not the map, so take off the map's own turn.
+    LaunchedEffect(me, heading, mapBearing) { me?.pointTo(heading - mapBearing, TURN_MS) }
 
     // 귀가 지킴이: off the planned route for a while, offer to tell the guardians (once per stretch off route).
     val off = !demo && state.offRouteM > OFF_ROUTE_WARN_M
