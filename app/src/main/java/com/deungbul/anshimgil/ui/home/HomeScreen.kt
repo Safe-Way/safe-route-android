@@ -1,5 +1,11 @@
 package com.deungbul.anshimgil.ui.home
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import com.deungbul.anshimgil.data.nextTrainLines
+import com.deungbul.anshimgil.data.matchStation
+import com.deungbul.anshimgil.data.SubwayTrains
 import com.deungbul.anshimgil.ui.safety.SosOverlay
 import com.deungbul.anshimgil.ui.safety.SosButton
 import com.deungbul.anshimgil.data.Guardian
@@ -406,8 +412,28 @@ private fun PlaceDetailCard(place: Facility, exits: List<String>, onClose: () ->
     // The first part repeats the kind ("지하철역"), so it goes next to the name instead.
     val kindText = parts.firstOrNull()?.takeIf { place.name != null && parts.size > 1 }
     val lines = if (kindText != null) parts.drop(1) else parts
+
+    // A station's next trains each way, from the server's timetable (live position when it knows it).
+    var trains by remember(place) { mutableStateOf<List<String>?>(null) }
+    var trainsFailed by remember(place) { mutableStateOf(false) }
+    if (place.kind == FacilityKind.SUBWAY) {
+        LaunchedEffect(place) {
+            trains = try {
+                matchStation(place.name, SubwayTrains.near(place.lat, place.lon))?.let { nextTrainLines(it.trains) } ?: emptyList()
+            } catch (e: ApiException) {
+                trainsFailed = true
+                null
+            }
+        }
+    }
+
     Surface(shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 6.dp, modifier = modifier.fillMaxWidth()) {
-        Column(Modifier.padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 14.dp)) {
+        Column(
+            Modifier
+                .heightIn(max = 420.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 14.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // The kind ("지하철역") sits small above the name so a long station name keeps one line.
                 Column(Modifier.weight(1f).padding(top = 8.dp)) {
@@ -415,6 +441,23 @@ private fun PlaceDetailCard(place: Facility, exits: List<String>, onClose: () ->
                     Text(place.name ?: place.label, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Ink)
                 }
                 IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Ink) }
+            }
+            if (place.kind == FacilityKind.SUBWAY) {
+                val next = trains
+                when {
+                    next == null && !trainsFailed -> Text("다음 열차 찾는 중…", fontSize = 15.sp, color = Color(0xFF5E6A62))
+                    next.isNullOrEmpty() -> Text("다음 열차 정보가 없어요", fontSize = 15.sp, color = Color(0xFF5E6A62))
+                    else -> Column(
+                        Modifier
+                            .padding(end = 12.dp, bottom = 6.dp)
+                            .fillMaxWidth()
+                            .background(Color(0xFFEFF4FB), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    ) {
+                        Text("다음 열차", fontSize = 13.sp, color = Color(0xFF2F5BB7), fontWeight = FontWeight.Bold)
+                        next.forEach { Text(it, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink) }
+                    }
+                }
             }
             lines.forEach { line -> Text("· $line", fontSize = 16.sp, color = Ink, lineHeight = 22.sp, modifier = Modifier.padding(end = 12.dp)) }
             // Each exit on the map with whether it has an elevator, so the walker knows which exit to use.
