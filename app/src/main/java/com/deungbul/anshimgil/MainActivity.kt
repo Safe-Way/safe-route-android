@@ -204,6 +204,7 @@ fun AppRoot(
                         type = guide.type,
                         destinationName = guide.route.destination.name,
                         voiceByDefault = settings.voiceGuide,
+                        facilityRepository = facilityRepository,
                         onFinish = { screen = Screen.Home },
                         modifier = modifier,
                     )
