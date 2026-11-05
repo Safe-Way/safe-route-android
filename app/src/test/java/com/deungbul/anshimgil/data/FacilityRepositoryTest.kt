@@ -23,8 +23,11 @@ class FacilityRepositoryTest {
         assertEquals(FacilityKind.ELEVATOR, poiKind("footbridge", null, true, shown))
         assertEquals(FacilityKind.OVERPASS, poiKind("footbridge", "없음", false, shown))
         assertEquals(FacilityKind.CURB_RAMP, poiKind("crosswalk", null, true, shown))
-        // Unknown curb height is left off
-        assertNull(poiKind("crosswalk", "신호 모름", null, shown))
+        // Unknown curb height is a small gray dot; a known high curb is left off
+        assertEquals(FacilityKind.CURB_RAMP, poiKind("crosswalk", "신호 모름", null, shown))
+        assertEquals(FacilityLook.DOT, poiLabel(FacilityKind.CURB_RAMP, null, null, UserMode.DISABLED).second)
+        assertEquals(FacilityLook.NORMAL, poiLabel(FacilityKind.CURB_RAMP, true, null, UserMode.DISABLED).second)
+        assertNull(poiKind("crosswalk", null, false, shown))
     }
 
     @Test
@@ -51,7 +54,7 @@ class FacilityRepositoryTest {
              "truncated":true}
             """.trimIndent(),
         )
-        val page = parsePois(json, UserMode.GENERAL.shownKinds(emptySet()))
+        val page = parsePois(json, UserMode.GENERAL.shownKinds(emptySet()), UserMode.GENERAL)
         // General mode does not show stairs
         assertEquals(listOf(Facility(FacilityKind.CCTV, 35.14, 126.93)), page.layers.facilities)
         assertTrue(page.truncated)
@@ -76,5 +79,25 @@ class FacilityRepositoryTest {
         assertEquals("578606", one.places.single().id)
         assertEquals(60, one.places.single().distanceM)
         assertNull(one.message)
+    }
+
+    @Test
+    fun stationsShowElevatorsForSeniorAndDisabled() {
+        val detail = "지하철역 · 엘리베이터 3대 · 장애인 화장실 2곳"
+        assertEquals(null to FacilityLook.NORMAL, poiLabel(FacilityKind.SUBWAY, true, detail, UserMode.GENERAL))
+        assertEquals("지하철역 · 엘리베이터 3대" to FacilityLook.NORMAL, poiLabel(FacilityKind.SUBWAY, true, detail, UserMode.SENIOR))
+        // 녹동역: no elevator, grayed out only in disabled mode
+        val nokdong = "지하철역 · 엘리베이터 없음"
+        assertEquals("지하철역 · 엘리베이터 없음" to FacilityLook.GRAY, poiLabel(FacilityKind.SUBWAY, false, nokdong, UserMode.DISABLED))
+        assertEquals(FacilityLook.NORMAL, poiLabel(FacilityKind.SUBWAY, false, nokdong, UserMode.SENIOR).second)
+        // Every mode shows stations
+        UserMode.entries.forEach { assertTrue(FacilityKind.SUBWAY in it.shownKinds(emptySet())) }
+    }
+
+    @Test
+    fun entrancesWithElevatorStandOutForSeniorAndDisabled() {
+        assertEquals("역 입구 · 엘리베이터", poiLabel(FacilityKind.SUBWAY_ENTRANCE, true, null, UserMode.DISABLED).first)
+        assertNull(poiLabel(FacilityKind.SUBWAY_ENTRANCE, null, null, UserMode.DISABLED).first)
+        assertNull(poiLabel(FacilityKind.SUBWAY_ENTRANCE, true, null, UserMode.CHILD).first)
     }
 }

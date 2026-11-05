@@ -45,9 +45,11 @@ class ServerFacilityRepository : FacilityRepository {
             mapOf(
                 "bbox" to "%.6f,%.6f,%.6f,%.6f".format(java.util.Locale.US, b.west, b.south, b.east, b.north),
                 "kinds" to kinds.sorted().joinToString(","),
+                // The default is 500; the server sends the ones nearest the middle first.
+                "limit" to 1000,
             ),
         )
-        return parsePois(json, shown)
+        return parsePois(json, shown, mode)
     }
 }
 
@@ -72,6 +74,9 @@ internal fun serverKinds(shown: Set<FacilityKind>): Set<String> = shown.mapNotNu
         FacilityKind.ELEVATOR, FacilityKind.OVERPASS -> "footbridge"
         FacilityKind.STAIRS -> "stairs"
         FacilityKind.SCHOOL_ZONE -> "school_zone"
+        FacilityKind.SUBWAY -> "subway"
+        // TODO: send "subway_entrance" once the server knows it; an unknown kind fails the whole request.
+        FacilityKind.SUBWAY_ENTRANCE -> null
     }
 }.toSet()
 
@@ -92,27 +97,55 @@ internal fun poiKind(kind: String, sub: String?, wheelchair: Boolean?, shown: Se
             else -> emptyList()
         }
         "toilet" -> if (wheelchair == true) listOf(FacilityKind.ACCESSIBLE_TOILET, FacilityKind.TOILET) else listOf(FacilityKind.TOILET)
-        // Only crossings known to have lowered curbs; the rest are unknown.
-        "crosswalk" -> if (wheelchair == true) listOf(FacilityKind.CURB_RAMP) else emptyList()
+        // Lowered curbs are shown; unknown ones as a gray dot (see [poiLook]); known high curbs are left out.
+        "crosswalk" -> if (wheelchair != false) listOf(FacilityKind.CURB_RAMP) else emptyList()
         "footbridge" -> if (wheelchair == true) listOf(FacilityKind.ELEVATOR) else listOf(FacilityKind.OVERPASS)
         "stairs" -> listOf(FacilityKind.STAIRS)
         "school_zone" -> listOf(FacilityKind.SCHOOL_ZONE)
+        "subway" -> listOf(FacilityKind.SUBWAY)
+        "subway_entrance" -> listOf(FacilityKind.SUBWAY_ENTRANCE)
         else -> emptyList()
     }
     return candidates.firstOrNull { it in shown }
 }
 
-internal fun parsePois(json: JSONObject, shown: Set<FacilityKind>): FacilityPage {
+/** Modes that care about elevators: stations get an elevator badge, entrances with one are highlighted. */
+private val ELEVATOR_MODES = setOf(UserMode.SENIOR, UserMode.DISABLED)
+
+private val ELEVATOR_COUNT = Regex("""엘리베이터 (\d+)대""")
+
+/** Tag text and look for one place, per the team's rules (11/5). */
+internal fun poiLabel(kind: FacilityKind, wheelchair: Boolean?, detail: String?, mode: UserMode): Pair<String?, FacilityLook> =
+    when (kind) {
+        FacilityKind.CURB_RAMP -> null to if (wheelchair == true) FacilityLook.NORMAL else FacilityLook.DOT
+        FacilityKind.SUBWAY -> when {
+            mode !in ELEVATOR_MODES -> null to FacilityLook.NORMAL
+            wheelchair == false -> "지하철역 · 엘리베이터 없음" to
+                if (mode == UserMode.DISABLED) FacilityLook.GRAY else FacilityLook.NORMAL
+            else -> {
+                val count = detail?.let { ELEVATOR_COUNT.find(it)?.groupValues?.get(1) }
+                (if (count != null) "지하철역 · 엘리베이터 ${count}대" else null) to FacilityLook.NORMAL
+            }
+        }
+        FacilityKind.SUBWAY_ENTRANCE ->
+            if (mode in ELEVATOR_MODES && wheelchair == true) "역 입구 · 엘리베이터" to FacilityLook.NORMAL
+            else null to FacilityLook.NORMAL
+        else -> null to FacilityLook.NORMAL
+    }
+
+internal fun parsePois(json: JSONObject, shown: Set<FacilityKind>, mode: UserMode): FacilityPage {
     val pois = json.optJSONArray("pois")
     val facilities = if (pois == null) emptyList() else (0 until pois.length()).mapNotNull { i ->
         val p = pois.getJSONObject(i)
+        val wheelchair = if (p.isNull("wheelchair")) null else p.optBoolean("wheelchair")
         val kind = poiKind(
             p.optString("kind"),
             p.optString("sub").takeUnless { p.isNull("sub") },
-            if (p.isNull("wheelchair")) null else p.optBoolean("wheelchair"),
+            wheelchair,
             shown,
         ) ?: return@mapNotNull null
-        Facility(kind, p.getDouble("lat"), p.getDouble("lon"))
+        val (text, look) = poiLabel(kind, wheelchair, p.optString("detail").takeUnless { p.isNull("detail") }, mode)
+        Facility(kind, p.getDouble("lat"), p.getDouble("lon"), text = text, look = look)
     }
     return FacilityPage(MapLayers(facilities, zones = emptyList()), truncated = json.optBoolean("truncated"))
 }

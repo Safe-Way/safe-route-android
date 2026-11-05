@@ -8,6 +8,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import com.deungbul.anshimgil.data.Facility
 import com.deungbul.anshimgil.data.FacilityKind
+import com.deungbul.anshimgil.data.FacilityLook
 import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.MapLayers
 import com.deungbul.anshimgil.data.RouteResult
@@ -42,18 +43,29 @@ fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
         )
     }
 
-    val styles = mutableMapOf<FacilityKind, LabelStyles>()
+    // One style per distinct tag, since text and look can differ within a kind.
+    val styles = mutableMapOf<Triple<FacilityKind, String, FacilityLook>, LabelStyles>()
     layers.facilities.forEach { facility ->
-        val style = styles.getOrPut(facility.kind) {
+        val style = styles.getOrPut(Triple(facility.kind, facility.label, facility.look)) {
+            val bitmap = when (facility.look) {
+                FacilityLook.NORMAL -> pillBitmap(facility.label, facility.kind.color.toInt(), density)
+                FacilityLook.GRAY -> pillBitmap(facility.label, GRAY, density)
+                FacilityLook.DOT -> dotBitmap(GRAY, density, sizeDp = 10f)
+            }
             LabelStyles.from(
-                LabelStyle.from(pillBitmap(facility.kind.label, facility.kind.color.toInt(), density))
-                    .setAnchorPoint(0.5f, 1f)
+                LabelStyle.from(bitmap)
+                    .setAnchorPoint(0.5f, if (facility.look == FacilityLook.DOT) 0.5f else 1f)
                     .setApplyDpScale(false),
             )
         }
-        labelLayer?.addLabel(LabelOptions.from(facility.latLng).setStyles(style))
+        // Stations sit on top of the toilets and stores inside them.
+        val rank = if (facility.kind == FacilityKind.SUBWAY) 5L else 0L
+        labelLayer?.addLabel(LabelOptions.from(facility.latLng).setStyles(style).setRank(rank))
     }
 }
+
+/** Tags for places that are unavailable or unconfirmed. */
+private val GRAY = 0xFF9AA39D.toInt()
 
 private val Facility.latLng: LatLng get() = LatLng.from(lat, lon)
 
