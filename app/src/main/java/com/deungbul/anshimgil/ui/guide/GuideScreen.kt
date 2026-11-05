@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.TurnRight
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Straight
 import androidx.compose.material3.Icon
@@ -164,6 +165,21 @@ fun GuideScreen(
                 }
                 if (!demo && state.offRouteM > OFF_ROUTE_WARN_M) {
                     StatusPill("경로에서 ${state.offRouteM}m 벗어났어요", Color(0xFFB42318))
+                }
+            }
+            // The camera follows only when the position moves, so after dragging the map this brings it back.
+            Surface(
+                onClick = { map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), 17)) },
+                shape = CircleShape,
+                color = Color.White,
+                shadowElevation = 4.dp,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .size(52.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.MyLocation, contentDescription = "내 위치로 이동", tint = Color(0xFF2F6FDB))
                 }
             }
         }
