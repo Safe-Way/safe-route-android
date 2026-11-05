@@ -30,6 +30,12 @@ data class GuidanceState(
 
 data class HelpPoint(val kind: FacilityKind, val meters: Int, val side: Turn)
 
+/** A turn on the route, drawn as an arrow pointing the way the route goes on ([bearing], degrees from north). */
+data class TurnMark(val point: LatLon, val bearing: Float)
+
+/** A change of heading at least this large counts as a turn. */
+private const val TURN_DEGREES = 30.0
+
 /**
  * Turn-by-turn guidance along a fixed route (issue #7, FR-29·30·34).
  * Uses a flat-earth approximation, which is accurate enough over a few kilometers.
@@ -56,6 +62,32 @@ class Guidance(private val path: List<LatLon>, private val facilities: List<Faci
         return stateAt(progress, bestLeg, best)
     }
 
+    /** Where the route turns (heading changes by 30° or more), with the direction it goes on in. */
+    val turnMarks: List<TurnMark> by lazy {
+        (1 until points.lastIndex)
+            .filter { v -> abs(headingChange(points[v - 1], points[v], points[v + 1])) >= TURN_DEGREES }
+            .map { v ->
+                val (ax, ay) = points[v]
+                val (bx, by) = points[v + 1]
+                val bearing = (Math.toDegrees(kotlin.math.atan2(bx - ax, by - ay)) + 360) % 360
+                TurnMark(toLatLon(points[v]), bearing.toFloat())
+            }
+    }
+
+    /** Direction of travel at [progressM], looking a few meters ahead, in degrees clockwise from north. */
+    fun travelBearing(progressM: Double): Float {
+        val (ax, ay) = pointAt(progressM.coerceIn(0.0, totalM))
+        val (bx, by) = pointAt((progressM + 10).coerceIn(0.0, totalM))
+        if (ax == bx && ay == by) return 0f
+        return ((Math.toDegrees(kotlin.math.atan2(bx - ax, by - ay)) + 360) % 360).toFloat()
+    }
+
+    /** Meters from [position] to the nearest point of the route. */
+    fun distanceToRoute(position: LatLon): Double {
+        val p = toXY(position)
+        return legLengths.indices.minOf { projectOnLeg(p, it).second }
+    }
+
     /** Guidance at a given distance along the route; used for the demo walk without GPS. */
     fun atProgress(progressM: Double): GuidanceState {
         val progress = progressM.coerceIn(0.0, totalM)
@@ -72,7 +104,7 @@ class Guidance(private val path: List<LatLon>, private val facilities: List<Faci
         var toTurn = remaining
         for (v in (leg + 1) until points.lastIndex) {
             val change = headingChange(points[v - 1], points[v], points[v + 1])
-            if (abs(change) >= 30.0) {
+            if (abs(change) >= TURN_DEGREES) {
                 turn = if (change > 0) Turn.LEFT else Turn.RIGHT
                 toTurn = cumulative[v] - progress
                 break

@@ -1,5 +1,12 @@
 package com.deungbul.anshimgil.ui.guide
 
+import androidx.compose.runtime.mutableFloatStateOf
+import com.deungbul.anshimgil.data.FacilityRepository
+import com.deungbul.anshimgil.data.ApiException
+import com.deungbul.anshimgil.data.bboxAround
+import com.deungbul.anshimgil.map.addTurnArrows
+import com.deungbul.anshimgil.map.addCrosswalks
+import com.deungbul.anshimgil.location.angleBetween
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.boundsInParent
@@ -70,7 +77,6 @@ import com.deungbul.anshimgil.map.KakaoMapView
 import com.deungbul.anshimgil.map.addMyLocation
 import com.deungbul.anshimgil.map.pointTo
 import com.deungbul.anshimgil.map.tiltForWalking
-import com.deungbul.anshimgil.location.bearingDegrees
 import com.deungbul.anshimgil.location.rememberCompassHeading
 import com.deungbul.anshimgil.map.showRoutes
 import com.deungbul.anshimgil.map.toLatLng
@@ -91,6 +97,10 @@ private const val OFF_ROUTE_WARN_M = 40
 private const val DEMO_STEP_M = 8.0
 /** Close-up for walking: the next few buildings, with the map tilted so the street ahead shows. */
 private const val GUIDE_ZOOM = 19
+/** A crosswalk this close to the route line is one the route crosses. */
+private const val CROSSWALK_ON_ROUTE_M = 8.0
+/** The map turns only when the way ahead changes by at least this much. */
+private const val MAP_TURN_DEGREES = 15f
 
 /**
  * Walking guidance along the chosen route (issue #7): next turn, nearest help, remaining distance,
@@ -104,6 +114,7 @@ fun GuideScreen(
     type: RouteType,
     destinationName: String,
     voiceByDefault: Boolean,
+    facilityRepository: FacilityRepository,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -115,6 +126,7 @@ fun GuideScreen(
     var voiceOn by rememberSaveable { mutableStateOf(voiceByDefault) }
     var map by remember { mutableStateOf<KakaoMap?>(null) }
     var me by remember { mutableStateOf<Label?>(null) }
+    var turnLabels by remember { mutableStateOf<List<Label>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
     var hasPermission by remember { mutableStateOf(hasLocationPermission(context)) }
@@ -150,24 +162,40 @@ fun GuideScreen(
     LaunchedEffect(map) {
         val m = map ?: return@LaunchedEffect
         m.showRoutes(context, result.copy(routes = listOf(route)), route.type, destinationName)
+        turnLabels = m.addTurnArrows(context, guidance.turnMarks)
         me = m.addMyLocation(context, state.snapped, sizeDp = 24f)
         m.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
         m.tiltForWalking()
+        // Crosswalks the route goes over: the map's crosswalks lying on the route line.
+        val crossings = try {
+            facilityRepository.crosswalks(bboxAround(route.path)).filter { guidance.distanceToRoute(it) <= CROSSWALK_ON_ROUTE_M }
+        } catch (e: ApiException) {
+            emptyList()
+        }
+        m.addCrosswalks(context, crossings)
     }
     LaunchedEffect(map, state.snapped) {
         me?.moveTo(state.snapped.toLatLng())
         map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
     }
 
+    // Heading-up: the map turns so the way ahead on the route points up the screen.
+    // Small bends are ignored so the map does not keep swaying.
+    var mapBearing by remember { mutableFloatStateOf(guidance.travelBearing(0.0)) }
+    val travel = guidance.travelBearing(state.progressM)
+    LaunchedEffect(travel) { if (angleBetween(mapBearing, travel) >= MAP_TURN_DEGREES) mapBearing = travel }
+    // Kakao turns the map the other way round from a compass bearing, hence the minus.
+    LaunchedEffect(map, mapBearing) { map?.moveCamera(CameraUpdateFactory.rotateTo(Math.toRadians(-mapBearing.toDouble()))) }
+    // Marker rotation is measured on the screen, not the map, so take off the map's own turn.
+    LaunchedEffect(turnLabels, mapBearing) {
+        turnLabels.zip(guidance.turnMarks).forEach { (label, mark) -> label.pointTo(mark.bearing - mapBearing) }
+    }
+
     // The arrow shows which way the walker faces (compass). In the demo walk, or without a compass,
     // it points along the route instead.
     val compass = rememberCompassHeading()
-    val heading = if (demo || compass == null) {
-        bearingDegrees(state.snapped, guidance.atProgress(state.progressM + 5).snapped)
-    } else {
-        compass
-    }
-    LaunchedEffect(me, heading) { me?.pointTo(heading) }
+    val heading = if (demo || compass == null) travel else compass
+    LaunchedEffect(me, heading, mapBearing) { me?.pointTo(heading - mapBearing) }
 
     // Keep the walker in the middle of the part of the map not covered by the instruction card:
     // the map's top padding moves its center down by the card's height.
@@ -317,15 +345,16 @@ private fun sideText(side: Turn) = when (side) {
 @Composable
 private fun InstructionCard(state: GuidanceState, instruction: Instruction) {
     // Slightly see-through so the map under it still shows.
-    Surface(shape = RoundedCornerShape(20.dp), color = Ink.copy(alpha = 0.82f), contentColor = Color.White) {
+    // Thin bar: distance and action side by side so the map keeps most of the screen.
+    Surface(shape = RoundedCornerShape(16.dp), color = Ink.copy(alpha = 0.82f), contentColor = Color.White) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
         ) {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(64.dp).background(Color(0xFF2E8B57), RoundedCornerShape(16.dp)),
+                modifier = Modifier.size(44.dp).background(Color(0xFF2E8B57), RoundedCornerShape(12.dp)),
             ) {
                 val icon = when {
                     state.arrived || state.nextTurn == Turn.ARRIVE -> Icons.Filled.Flag
@@ -333,11 +362,11 @@ private fun InstructionCard(state: GuidanceState, instruction: Instruction) {
                     state.nextTurn == Turn.RIGHT -> Icons.Filled.TurnRight
                     else -> Icons.Filled.Straight
                 }
-                Icon(icon, contentDescription = null, modifier = Modifier.size(40.dp))
+                Icon(icon, contentDescription = null, modifier = Modifier.size(30.dp))
             }
-            Column {
-                Text(instruction.big, fontSize = 30.sp, fontWeight = FontWeight.Black)
-                Text(instruction.action, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(instruction.big, fontSize = 24.sp, fontWeight = FontWeight.Black, maxLines = 1)
+                Text(instruction.action, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

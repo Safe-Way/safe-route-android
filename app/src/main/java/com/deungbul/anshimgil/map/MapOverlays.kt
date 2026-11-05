@@ -14,6 +14,7 @@ import com.deungbul.anshimgil.data.MapLayers
 import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.RouteType
 import com.deungbul.anshimgil.data.distanceMeters
+import com.deungbul.anshimgil.data.TurnMark
 import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.LatLng
 import com.kakao.vectormap.camera.CameraUpdateFactory
@@ -164,6 +165,73 @@ fun KakaoMap.addMyLocation(context: Context, point: LatLon, sizeDp: Float = 22f)
             )
             .setRank(10),
     )
+}
+
+/** Arrows on the route where it turns, each pointing the way the route goes on. */
+fun KakaoMap.addTurnArrows(context: Context, marks: List<TurnMark>): List<Label> {
+    val density = context.resources.displayMetrics.density
+    val style = LabelStyles.from(LabelStyle.from(turnArrowBitmap(density)).setAnchorPoint(0.5f, 0.5f).setApplyDpScale(false))
+    return marks.mapNotNull { mark ->
+        labelManager?.layer?.addLabel(LabelOptions.from(mark.point.toLatLng()).setStyles(style).setRank(7))
+            ?.also { it.pointTo(mark.bearing) }
+    }
+}
+
+/** A small zebra-crossing sign at each crosswalk on the route. */
+fun KakaoMap.addCrosswalks(context: Context, points: List<LatLon>) {
+    val density = context.resources.displayMetrics.density
+    val style = LabelStyles.from(LabelStyle.from(crosswalkBitmap(density)).setAnchorPoint(0.5f, 0.5f).setApplyDpScale(false))
+    points.forEach { labelManager?.layer?.addLabel(LabelOptions.from(it.toLatLng()).setStyles(style).setRank(6)) }
+}
+
+/** White arrow with a dark green edge, pointing up (north) until turned. */
+private fun turnArrowBitmap(density: Float): Bitmap {
+    val size = (30 * density).toInt()
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val s = size.toFloat()
+    val arrow = android.graphics.Path().apply {
+        moveTo(s * 0.5f, s * 0.08f)
+        lineTo(s * 0.88f, s * 0.52f)
+        lineTo(s * 0.64f, s * 0.52f)
+        lineTo(s * 0.64f, s * 0.92f)
+        lineTo(s * 0.36f, s * 0.92f)
+        lineTo(s * 0.36f, s * 0.52f)
+        lineTo(s * 0.12f, s * 0.52f)
+        close()
+    }
+    canvas.drawPath(arrow, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() })
+    canvas.drawPath(
+        arrow,
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFF0F4D2C.toInt()
+            style = Paint.Style.STROKE
+            strokeWidth = 2.5f * density
+            strokeJoin = Paint.Join.ROUND
+        },
+    )
+    return bitmap
+}
+
+/** A rounded white square with dark stripes, like a road crossing seen from above. */
+private fun crosswalkBitmap(density: Float): Bitmap {
+    val size = (22 * density).toInt()
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val s = size.toFloat()
+    val r = 5 * density
+    canvas.drawRoundRect(RectF(0f, 0f, s, s), r, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() })
+    canvas.drawRoundRect(
+        RectF(density, density, s - density, s - density), r, r,
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF3A4540.toInt(); style = Paint.Style.STROKE; strokeWidth = 1.5f * density },
+    )
+    val stripe = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF3A4540.toInt() }
+    val w = s / 9
+    for (i in 0 until 4) {
+        val x = w * (1 + 2 * i)
+        canvas.drawRect(x, s * 0.25f, x + w, s * 0.75f, stripe)
+    }
+    return bitmap
 }
 
 /** Turns the position marker so its arrow points [degrees] clockwise from north. */

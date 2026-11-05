@@ -24,6 +24,9 @@ interface FacilityRepository {
     /** Throws [ApiException]. */
     suspend fun load(mode: UserMode, extras: Set<String>, bbox: Bbox): FacilityPage
 
+    /** Crosswalk positions in [bbox], for marking the ones a route crosses. Throws [ApiException]. */
+    suspend fun crosswalks(bbox: Bbox): List<LatLon> = emptyList()
+
     /** True when the facilities are made up (no server). */
     val isExample: Boolean
 
@@ -57,7 +60,29 @@ class ServerFacilityRepository : FacilityRepository {
         }
         return parsePois(json, shown, mode)
     }
+
+    override suspend fun crosswalks(bbox: Bbox): List<LatLon> {
+        val b = bbox.clamped()
+        val json = ServerApi.get(
+            "/api/pois",
+            mapOf(
+                "bbox" to "%.6f,%.6f,%.6f,%.6f".format(java.util.Locale.US, b.west, b.south, b.east, b.north),
+                "kinds" to "crosswalk",
+                "limit" to 1000,
+            ),
+        )
+        val pois = json.optJSONArray("pois") ?: return emptyList()
+        return (0 until pois.length()).map { i -> pois.getJSONObject(i).let { LatLon(it.getDouble("lat"), it.getDouble("lon")) } }
+    }
 }
+
+/** The area around a route with a small margin, for loading what lies along it. */
+fun bboxAround(path: List<LatLon>, marginDeg: Double = 0.0005) = Bbox(
+    west = path.minOf { it.lon } - marginDeg,
+    south = path.minOf { it.lat } - marginDeg,
+    east = path.maxOf { it.lon } + marginDeg,
+    north = path.maxOf { it.lat } + marginDeg,
+)
 
 class FakeFacilityRepository : FacilityRepository {
     override val isExample = true
