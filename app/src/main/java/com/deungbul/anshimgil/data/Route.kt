@@ -44,10 +44,17 @@ data class RouteRequest(
     val mode: UserMode,
     /** Condition keys the user switched off (FR-03). */
     val conditionsOff: Set<String> = emptySet(),
+    /** Condition keys the user switched on even though they were not detected, e.g. night in daytime. */
+    val conditionsOn: Set<String> = emptySet(),
 )
 
-/** The server's `night` value: off when the user switched night off, otherwise judged from sunset. */
-val RouteRequest.night: String get() = if ("night" in conditionsOff) "off" else "auto"
+/** The server's `night` value: what the user chose, otherwise judged from sunset. */
+val RouteRequest.night: String
+    get() = when ("night") {
+        in conditionsOff -> "off"
+        in conditionsOn -> "on"
+        else -> "auto"
+    }
 
 /** Walking speed per mode in meters per minute (requirements 0.2; disabled is a placeholder). */
 val UserMode.walkingSpeedMPerMin: Int

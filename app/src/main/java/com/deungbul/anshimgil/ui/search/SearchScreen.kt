@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Search
@@ -77,7 +78,10 @@ private sealed interface Results {
     data class Failed(val message: String) : Results
 }
 
-/** Search with saved shortcuts (issue #4). Picking a place hands it to [onPlaceSelected] for routing. */
+/**
+ * Search with saved shortcuts (issue #4). Picking a place hands it to [onPlaceSelected].
+ * When choosing a start, [onUseCurrentLocation] adds a "start from here" row.
+ */
 @Composable
 fun SearchScreen(
     placeRepository: PlaceRepository,
@@ -85,6 +89,8 @@ fun SearchScreen(
     onBack: () -> Unit,
     onPlaceSelected: (Place) -> Unit,
     modifier: Modifier = Modifier,
+    placeholder: String = "어디로 갈까요?",
+    onUseCurrentLocation: (() -> Unit)? = null,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var results by remember { mutableStateOf<Results>(Results.Idle) }
@@ -138,7 +144,7 @@ fun SearchScreen(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text("어디로 갈까요?", fontSize = 17.sp) },
+                placeholder = { Text(placeholder, fontSize = 17.sp) },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = Green) },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
@@ -180,6 +186,24 @@ fun SearchScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                onUseCurrentLocation?.let { useHere ->
+                    item {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFFEEF6F0))
+                                .clickable(role = Role.Button, onClick = useHere)
+                                .heightIn(min = 60.dp)
+                                .padding(horizontal = 16.dp),
+                        ) {
+                            Icon(Icons.Filled.MyLocation, contentDescription = null, tint = Color(0xFF2F6FDB))
+                            Text("현재 위치에서 출발", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink)
+                        }
+                    }
+                }
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("자주 가는 곳", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Ink, modifier = Modifier.weight(1f))
