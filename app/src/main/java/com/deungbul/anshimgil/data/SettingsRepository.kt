@@ -9,9 +9,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 enum class TextSize(val label: String, val scale: Float) {
+    SMALL("작게", 0.9f),
     NORMAL("보통", 1f),
     LARGE("크게", 1.15f),
-    EXTRA_LARGE("아주 크게", 1.3f),
 }
 
 data class AppSettings(
@@ -46,7 +46,9 @@ class SettingsRepository(private val context: Context) {
         AppSettings(
             voiceGuide = prefs[voiceKey] ?: true,
             autoConditions = prefs[autoConditionsKey] ?: true,
-            textSize = TextSize.entries.firstOrNull { it.name == prefs[textSizeKey] } ?: TextSize.NORMAL,
+            // "아주 크게" was dropped; whoever chose it gets the largest size left.
+            textSize = if (prefs[textSizeKey] == "EXTRA_LARGE") TextSize.LARGE
+            else TextSize.entries.firstOrNull { it.name == prefs[textSizeKey] } ?: TextSize.NORMAL,
             extraMapItems = prefs[extraMapItemsKey].orEmpty(),
             guardians = prefs[guardiansKey].orEmpty().lines().mapNotNull { Guardian.decode(it) },
             turnSigns = prefs[turnSignsKey] ?: false,
