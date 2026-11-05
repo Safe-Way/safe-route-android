@@ -80,6 +80,18 @@ suspend fun currentLocation(context: Context, timeoutMs: Long = 8_000): LatLon? 
     return fresh ?: (recent ?: lastKnown(USABLE_MS))?.toLatLon()
 }
 
+/** The newest position the phone already has, without waiting; null if none from the last [maxAgeMs]. */
+@SuppressLint("MissingPermission")
+fun lastKnownLocation(context: Context, maxAgeMs: Long = USABLE_MS): LatLon? {
+    if (!hasLocationPermission(context)) return null
+    val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    return enabledProviders(manager)
+        .mapNotNull { runCatching { manager.getLastKnownLocation(it) }.getOrNull() }
+        .filter { System.currentTimeMillis() - it.time < maxAgeMs }
+        .maxByOrNull { it.time }
+        ?.toLatLon()
+}
+
 /** Position updates every second while the calling screen is shown. */
 @SuppressLint("MissingPermission")
 @Composable
@@ -92,8 +104,12 @@ fun LocationUpdates(context: Context, onFix: (LatLon) -> Unit) {
     }
 }
 
+/**
+ * "fused" (Android 12+) combines GPS, Wi-Fi and cell towers, so it answers indoors where GPS alone
+ * may never get a fix. On phones without it, isProviderEnabled is false and it is skipped.
+ */
 private fun enabledProviders(manager: LocationManager) =
-    listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+    listOf("fused", LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
         .filter { runCatching { manager.isProviderEnabled(it) }.getOrDefault(false) }
 
 /**

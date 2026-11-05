@@ -42,9 +42,19 @@ import com.deungbul.anshimgil.data.FacilityRepository
 import com.deungbul.anshimgil.data.Place
 import com.deungbul.anshimgil.data.PlaceRepository
 import com.deungbul.anshimgil.data.UserMode
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.deungbul.anshimgil.data.LatLon
+import com.deungbul.anshimgil.data.chooseOrigin
+import com.deungbul.anshimgil.location.LOCATION_PERMISSIONS
+import com.deungbul.anshimgil.location.LocationUpdates
+import com.deungbul.anshimgil.location.hasLocationPermission
+import com.deungbul.anshimgil.location.lastKnownLocation
 import com.deungbul.anshimgil.location.phoneOrigin
 import com.deungbul.anshimgil.map.KakaoMapView
+import com.deungbul.anshimgil.map.addMyLocation
 import com.deungbul.anshimgil.map.showLayers
+import com.kakao.vectormap.label.Label
 import com.deungbul.anshimgil.ui.common.MapMessage
 import com.deungbul.anshimgil.ui.mode.style
 import com.kakao.vectormap.KakaoMap
@@ -86,15 +96,64 @@ fun HomeScreen(
     var mapNote by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
+    // The phone's position, kept up to date so the location button moves at once and the dot follows.
+    var hasPermission by remember { mutableStateOf(hasLocationPermission(context)) }
+    var here by remember { mutableStateOf(lastKnownLocation(context)) }
+    var me by remember { mutableStateOf<Label?>(null) }
+    var locating by remember { mutableStateOf(false) }
+    if (hasPermission) LocationUpdates(context) { here = it }
+    // Whether the next fix should also move the map (pressed while the position was still unknown).
+    var centerOnFix by remember { mutableStateOf(false) }
+
+    fun centerOn(p: LatLon) {
+        map?.moveCamera(CameraUpdateFactory.newCenterPosition(LatLng.from(p.lat, p.lon), 16))
+    }
+
+    fun locate() {
+        here?.let { centerOn(it); nearbyMessage = null; return }
+        if (locating) return
+        locating = true
+        centerOnFix = true
+        nearbyMessage = "현재 위치를 찾는 중이에요…"
+        scope.launch {
+            val origin = phoneOrigin(context, timeoutMs = 6_000)
+            locating = false
+            // A fix that arrived through the updates meanwhile has already moved the map.
+            if (!centerOnFix) return@launch
+            centerOnFix = false
+            if (origin.fromGps) here = origin.point
+            // Say why the map went to Chosun University instead of the phone's position.
+            nearbyMessage = origin.issue?.message?.replace("에서 출발해요", "을 보여 줘요")
+            centerOn(origin.point)
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        hasPermission = hasLocationPermission(context)
+        locate()
+    }
+
+    LaunchedEffect(map, here) {
+        val m = map ?: return@LaunchedEffect
+        val p = here ?: return@LaunchedEffect
+        if (centerOnFix) {
+            centerOnFix = false
+            nearbyMessage = null
+            centerOn(p)
+        }
+        me?.moveTo(LatLng.from(p.lat, p.lon)) ?: run { me = m.addMyLocation(context, p) }
+    }
+
     // The server picks the place: within 1 km, open ones first, narrowed by the mode.
     fun goToNearest(kind: String, label: String) {
         if (finding != null) return
         finding = kind
         nearbyMessage = null
         scope.launch {
-            val here = phoneOrigin(context).point
+            // Outside Gwangju the server has no places, so the demo point is used as for routes.
+            val from = here?.let { chooseOrigin(it).point } ?: phoneOrigin(context).point
             try {
-                val result = placeRepository.nearby(kind, mode, here.lat, here.lon)
+                val result = placeRepository.nearby(kind, mode, from.lat, from.lon)
                 val nearest = result.places.firstOrNull()
                 if (nearest != null) onPlaceSelected(nearest)
                 else nearbyMessage = result.message ?: "가까운 ${label}을(를) 찾지 못했어요"
@@ -118,6 +177,8 @@ fun HomeScreen(
         mapNote = try {
             val page = facilityRepository.load(mode, extraMapItems, area)
             m.showLayers(context, page.layers)
+            // showLayers clears every label, the position dot included.
+            me = here?.let { m.addMyLocation(context, it) }
             when {
                 facilityRepository.isExample -> "시설 정보: 예시 데이터 (서버 연결 전)"
                 page.truncated -> "시설이 많아 일부만 보여요. 확대하면 더 보여요"
@@ -201,15 +262,7 @@ fun HomeScreen(
 
         // The phone's position when it is known and in Gwangju, otherwise the demo area.
         Surface(
-            onClick = {
-                scope.launch {
-                    val origin = phoneOrigin(context)
-                    // Say why the map went to Chosun University instead of the phone's position.
-                    nearbyMessage = origin.issue?.message?.replace("에서 출발해요", "을 보여 줘요")
-                    val p = origin.point
-                    map?.moveCamera(CameraUpdateFactory.newCenterPosition(LatLng.from(p.lat, p.lon), 16))
-                }
-            },
+            onClick = { if (hasPermission) locate() else permissionLauncher.launch(LOCATION_PERMISSIONS) },
             shape = CircleShape,
             color = Color.White,
             shadowElevation = 4.dp,
