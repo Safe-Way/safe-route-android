@@ -22,7 +22,9 @@ import com.kakao.vectormap.camera.CameraUpdateFactory
 import com.kakao.vectormap.route.RouteLineOptions
 import com.kakao.vectormap.route.RouteLineSegment
 import com.kakao.vectormap.route.RouteLineStyle
+import com.kakao.vectormap.label.CompetitionType
 import com.kakao.vectormap.label.Label
+import com.kakao.vectormap.label.LabelLayerOptions
 import com.kakao.vectormap.label.LabelOptions
 import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
@@ -204,10 +206,20 @@ fun KakaoMap.addTurnArrows(context: Context, marks: List<TurnMark>) {
     val density = context.resources.displayMetrics.density
     val left = LabelStyles.from(LabelStyle.from(turnSignBitmap(density, left = true)).setAnchorPoint(0.5f, 0.5f).setApplyDpScale(false))
     val right = LabelStyles.from(LabelStyle.from(turnSignBitmap(density, left = false)).setAnchorPoint(0.5f, 0.5f).setApplyDpScale(false))
+    // Their own layer with no competition: on the default layer the signs were hidden and shown again
+    // whenever they met the map's own place names while the map moved, so they seemed to jump about.
+    val layer = labelManager?.let {
+        it.getLayer(TURN_SIGN_LAYER) ?: it.addLayer(
+            LabelLayerOptions.from(TURN_SIGN_LAYER).setCompetitionType(CompetitionType.None).setZOrder(10_000),
+        )
+    }
+    layer?.removeAll()
     marks.forEach { mark ->
-        labelManager?.layer?.addLabel(LabelOptions.from(mark.point.toLatLng()).setStyles(if (mark.left) left else right).setRank(7))
+        layer?.addLabel(LabelOptions.from(mark.point.toLatLng()).setStyles(if (mark.left) left else right))
     }
 }
+
+private const val TURN_SIGN_LAYER = "turnSigns"
 
 /** A white disc with a dark green ring and a turn arrow (↰ for left, ↱ for right). */
 private fun turnSignBitmap(density: Float, left: Boolean): Bitmap {
