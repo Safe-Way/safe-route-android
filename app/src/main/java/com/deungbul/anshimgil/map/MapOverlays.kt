@@ -63,7 +63,10 @@ fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
         }
         // Stations sit on top of the toilets and stores inside them.
         val rank = if (facility.kind == FacilityKind.SUBWAY) 5L else 0L
-        labelLayer?.addLabel(LabelOptions.from(facility.latLng).setStyles(style).setRank(rank))
+        // Places with more to say (e.g. a station's elevator exits) can be tapped; the tag carries the place.
+        val options = LabelOptions.from(facility.latLng).setStyles(style).setRank(rank)
+        if (facility.detail != null) options.setClickable(true).setTag(facility)
+        labelLayer?.addLabel(options)
     }
 }
 

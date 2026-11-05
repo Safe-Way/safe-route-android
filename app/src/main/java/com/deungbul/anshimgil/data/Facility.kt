@@ -39,6 +39,10 @@ data class Facility(
     val route: RouteType? = null,
     val text: String? = null,
     val look: FacilityLook = FacilityLook.NORMAL,
+    /** The place's own name, e.g. "문화전당역", when the server gives one. */
+    val name: String? = null,
+    /** The server's one-line summary, e.g. which subway exits have elevators; shown when the tag is tapped. */
+    val detail: String? = null,
 ) {
     val label: String get() = text ?: kind.label
 }

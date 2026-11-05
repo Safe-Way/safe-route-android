@@ -1,5 +1,9 @@
 package com.deungbul.anshimgil.ui.home
 
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.layout.Spacer
+import com.deungbul.anshimgil.data.Facility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -100,6 +104,8 @@ fun HomeScreen(
     var nearbyMessage by remember { mutableStateOf<String?>(null) }
     var bbox by remember { mutableStateOf<Bbox?>(null) }
     var mapNote by remember { mutableStateOf<String?>(null) }
+    // The tapped place whose details are shown, e.g. a station's elevator exits.
+    var picked by remember { mutableStateOf<Facility?>(null) }
     val scope = rememberCoroutineScope()
 
     // The phone's position, kept up to date so the location button moves at once and the dot follows.
@@ -180,6 +186,10 @@ fun HomeScreen(
         m.tiltForWalking()
         bbox = m.visibleBbox()
         m.setOnCameraMoveEndListener { moved, _, _ -> moved.visibleBbox()?.let { bbox = it } }
+        m.setOnLabelClickListener { _, _, label ->
+            (label.tag as? Facility)?.let { picked = it }
+            true
+        }
     }
     LaunchedEffect(map, mode, extraMapItems, bbox) {
         val m = map ?: return@LaunchedEffect
@@ -307,6 +317,14 @@ fun HomeScreen(
             }
         }
 
+        picked?.let { place ->
+            PlaceDetailCard(
+                place,
+                onClose = { picked = null },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 112.dp),
+            )
+        }
+
         error?.let { MapMessage(it, Modifier.align(Alignment.BottomCenter)) }
     }
 }
@@ -344,4 +362,27 @@ private fun KakaoMap.visibleBbox(): Bbox? {
         west = minOf(a.longitude, b.longitude), south = minOf(a.latitude, b.latitude),
         east = maxOf(a.longitude, b.longitude), north = maxOf(a.latitude, b.latitude),
     )
+}
+
+/**
+ * Details of a tapped place, one item per line: for a station, which exits have elevators,
+ * accessible toilets, wheelchair chargers and train hours, as the server words them.
+ */
+@Composable
+private fun PlaceDetailCard(place: Facility, onClose: () -> Unit, modifier: Modifier = Modifier) {
+    val parts = place.detail.orEmpty().split(" · ").map { it.trim() }.filter { it.isNotEmpty() }
+    // The first part repeats the kind ("지하철역"), so it goes next to the name instead.
+    val kindText = parts.firstOrNull()?.takeIf { place.name != null && parts.size > 1 }
+    val lines = if (kindText != null) parts.drop(1) else parts
+    Surface(shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 6.dp, modifier = modifier.fillMaxWidth()) {
+        Column(Modifier.padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(place.name ?: place.label, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink, modifier = Modifier.weight(1f, fill = false))
+                kindText?.let { Text("  $it", fontSize = 14.sp, color = Color(0xFF5E6A62)) }
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Ink) }
+            }
+            lines.forEach { line -> Text("· $line", fontSize = 16.sp, color = Ink, lineHeight = 22.sp, modifier = Modifier.padding(end = 12.dp)) }
+        }
+    }
 }
