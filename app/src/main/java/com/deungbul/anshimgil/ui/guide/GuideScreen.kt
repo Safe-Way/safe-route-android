@@ -84,8 +84,8 @@ private val Green = Color(0xFF1F6B42)
 private const val FAR_FROM_ROUTE_M = 300
 private const val OFF_ROUTE_WARN_M = 40
 private const val DEMO_STEP_M = 8.0
-/** Close enough to see the next turn, with the map tilted so the street ahead shows. */
-private const val GUIDE_ZOOM = 18
+/** Close-up for walking: the next few buildings, with the map tilted so the street ahead shows. */
+private const val GUIDE_ZOOM = 19
 
 /**
  * Walking guidance along the chosen route (issue #7): next turn, nearest help, remaining distance,
