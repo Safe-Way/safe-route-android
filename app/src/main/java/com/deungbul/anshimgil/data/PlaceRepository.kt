@@ -69,6 +69,27 @@ class FakePlaceRepository : PlaceRepository {
     }
 }
 
+/** How far a walk is offered instead of a destination that is too far (straight line). */
+const val WALKABLE_M = 3_000
+
+/** The search word for other branches of the same place: "스타벅스 광주용봉점" → "스타벅스". */
+fun brandOf(name: String): String {
+    val first = name.trim().substringBefore(' ')
+    return if (first.length >= 2) first else name.trim()
+}
+
+/**
+ * The nearest other place with the same brand within walking distance, from search [results]
+ * sorted nearest first; null when there is none.
+ */
+fun nearestSameBrand(destination: Place, results: List<Place>): Place? {
+    val brand = brandOf(destination.name)
+    return results
+        .filter { it.name.startsWith(brand) && it.name != destination.name }
+        .filter { (it.distanceM ?: Int.MAX_VALUE) <= WALKABLE_M }
+        .minByOrNull { it.distanceM ?: Int.MAX_VALUE }
+}
+
 /** Straight-line distance, good enough for sorting nearby results. */
 fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Int {
     val r = 6_371_000.0

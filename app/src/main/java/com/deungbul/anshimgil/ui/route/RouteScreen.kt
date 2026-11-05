@@ -77,7 +77,11 @@ import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.RouteType
 import com.deungbul.anshimgil.data.UserMode
 import com.deungbul.anshimgil.map.KakaoMapView
+import com.deungbul.anshimgil.map.showPoints
 import com.deungbul.anshimgil.map.showRoutes
+import com.deungbul.anshimgil.data.PlaceRepository
+import com.deungbul.anshimgil.data.brandOf
+import com.deungbul.anshimgil.data.nearestSameBrand
 import com.deungbul.anshimgil.ui.mode.style
 import com.kakao.vectormap.KakaoMap
 import java.time.LocalTime
@@ -92,7 +96,14 @@ private sealed interface RouteState {
     data object Loading : RouteState
     data class Ready(val result: RouteResult) : RouteState
     /** [retryHelps] is false when trying again gives the same answer, e.g. start and destination too close. */
-    data class Failed(val message: String, val retryHelps: Boolean) : RouteState
+    data class Failed(val message: String, val retryHelps: Boolean, val code: String? = null) : RouteState
+}
+
+/** A nearer place of the same brand, looked up when the destination is too far to walk. */
+private sealed interface Nearer {
+    data object Looking : Nearer
+    data object None : Nearer
+    data class Found(val place: Place) : Nearer
 }
 
 /**
@@ -106,10 +117,12 @@ fun RouteScreen(
     startPlace: Place?,
     destination: Place,
     routeRepository: RouteRepository,
+    placeRepository: PlaceRepository,
     autoConditions: Boolean,
     onBack: () -> Unit,
     onPickStart: () -> Unit,
     onSwap: (Origin) -> Unit,
+    onChangeDestination: (Place) -> Unit,
     onStart: (RouteResult, RouteType) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -139,7 +152,40 @@ fun RouteScreen(
                 ),
             )
         } catch (e: ApiException) {
-            RouteState.Failed(e.message, retryHelps = e.code !in setOf("SAME_POINT", "OUT_OF_AREA", "BAD_PARAM"))
+            RouteState.Failed(e.message, retryHelps = e.code !in NO_RETRY_CODES, code = e.code)
+        }
+    }
+
+    // Too far: look for the nearest branch of the same place (e.g. another Starbucks) to walk to instead.
+    var nearer by remember { mutableStateOf<Nearer?>(null) }
+    LaunchedEffect(state) {
+        nearer = null
+        val from = origin ?: return@LaunchedEffect
+        if ((state as? RouteState.Failed)?.code != "TOO_FAR") return@LaunchedEffect
+        nearer = Nearer.Looking
+        nearer = try {
+            val results = placeRepository.search(brandOf(destination.name), from.point.lat, from.point.lon)
+            nearestSameBrand(destination, results)?.let { Nearer.Found(it) } ?: Nearer.None
+        } catch (e: ApiException) {
+            Nearer.None
+        }
+    }
+
+    // No route: still show where the start and the destination (or the nearer place) are.
+    LaunchedEffect(map, state, nearer) {
+        val m = map ?: return@LaunchedEffect
+        val from = origin ?: return@LaunchedEffect
+        val dest = LatLon(destination.lat, destination.lon)
+        when ((state as? RouteState.Failed)?.code) {
+            "SAME_POINT" -> m.showPoints(context, from.point, listOf(dest to destination.name), focus = listOf(dest))
+            "TOO_FAR" -> when (val n = nearer) {
+                is Nearer.Found -> {
+                    val near = LatLon(n.place.lat, n.place.lon)
+                    m.showPoints(context, from.point, listOf(near to n.place.name, dest to destination.name), focus = listOf(near))
+                }
+                Nearer.None -> m.showPoints(context, from.point, listOf(dest to destination.name), focus = listOf(dest))
+                else -> Unit
+            }
         }
     }
     // After the user turns location on (or allows it) in the phone's settings, find the start again.
@@ -277,10 +323,14 @@ fun RouteScreen(
                         RouteState.Loading -> Text(if (origin == null) "현재 위치를 찾는 중…" else "길을 찾는 중…", fontSize = 16.sp, color = Muted, modifier = Modifier.padding(vertical = 24.dp))
                         is RouteState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(s.message, fontSize = 16.sp, color = Color(0xFFB42318))
-                            if (s.retryHelps) {
-                                TextButton(onClick = { retry++ }) { Text("다시 시도") }
-                            } else {
-                                TextButton(onClick = onPickStart) { Text("출발지 바꾸기") }
+                            when {
+                                s.code == "SAME_POINT" -> {
+                                    Text("바로 옆이에요. 지도에서 위치를 확인하세요.", fontSize = 15.sp, color = Muted)
+                                    TextButton(onClick = onPickStart) { Text("출발지 바꾸기") }
+                                }
+                                s.code == "TOO_FAR" -> NearerChoice(nearer, onGo = onChangeDestination, onSearch = onBack)
+                                s.retryHelps -> TextButton(onClick = { retry++ }) { Text("다시 시도") }
+                                else -> TextButton(onClick = onPickStart) { Text("출발지 바꾸기") }
                             }
                         }
                         is RouteState.Ready -> RouteDetails(s.result, selected, onSelect = { selected = it })
@@ -290,6 +340,31 @@ fun RouteScreen(
             }
         }
     }
+}
+
+/** Trying again gives the same answer for these, so the panel offers something else. */
+private val NO_RETRY_CODES = setOf("SAME_POINT", "TOO_FAR", "OUT_OF_AREA", "BAD_PARAM")
+
+/** For a destination too far to walk: the nearest place of the same brand, or another search. */
+@Composable
+private fun NearerChoice(nearer: Nearer?, onGo: (Place) -> Unit, onSearch: () -> Unit) {
+    when (nearer) {
+        is Nearer.Found -> {
+            val place = nearer.place
+            Text("가장 가까운 같은 곳이에요. 누르면 이곳으로 길을 찾아요.", fontSize = 15.sp, color = Muted)
+            Button(
+                onClick = { onGo(place) },
+                colors = ButtonDefaults.buttonColors(containerColor = Green),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            ) {
+                val distance = place.distanceM?.let { if (it < 1000) " (${it}m)" else " (%.1fkm)".format(Locale.KOREA, it / 1000.0) } ?: ""
+                Text("${place.name}$distance", fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Nearer.Looking -> Text("가까운 곳을 찾는 중…", fontSize = 15.sp, color = Muted)
+        else -> Text("걸어서 갈 만한 거리에 같은 곳이 없어요", fontSize = 15.sp, color = Muted)
+    }
+    TextButton(onClick = onSearch) { Text("다른 곳 찾기") }
 }
 
 @Composable
