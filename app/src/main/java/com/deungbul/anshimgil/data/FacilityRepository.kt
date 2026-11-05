@@ -147,7 +147,7 @@ private val ELEVATOR_MODES = setOf(UserMode.SENIOR, UserMode.DISABLED)
  * For a station, [wheelchair] says whether an exit has an elevator down from the street,
  * and [count] is how many such exits there are.
  */
-internal fun poiLabel(kind: FacilityKind, wheelchair: Boolean?, count: Int?, mode: UserMode): Pair<String?, FacilityLook> =
+internal fun poiLabel(kind: FacilityKind, wheelchair: Boolean?, count: Int?, mode: UserMode, name: String? = null): Pair<String?, FacilityLook> =
     when (kind) {
         FacilityKind.CURB_RAMP -> null to if (wheelchair == true) FacilityLook.NORMAL else FacilityLook.DOT
         FacilityKind.SUBWAY -> when {
@@ -159,9 +159,10 @@ internal fun poiLabel(kind: FacilityKind, wheelchair: Boolean?, count: Int?, mod
         }
         FacilityKind.SUBWAY_ENTRANCE -> when {
             mode !in ELEVATOR_MODES -> null to FacilityLook.NORMAL
-            wheelchair == true -> "역 입구 · 엘리베이터" to FacilityLook.NORMAL
+            // With the exit number when the name has one ("남광주역 3번 출구"), so the walker knows which exit.
+            wheelchair == true -> (exitNumber(name)?.let { "${it}번 출구 · 엘리베이터" } ?: "역 입구 · 엘리베이터") to FacilityLook.NORMAL
             // Not confirmed, so grayed out to let the elevator entrances stand out.
-            else -> null to FacilityLook.GRAY
+            else -> exitNumber(name)?.let { "${it}번 출구" } to FacilityLook.GRAY
         }
         else -> null to FacilityLook.NORMAL
     }
@@ -177,12 +178,34 @@ internal fun parsePois(json: JSONObject, shown: Set<FacilityKind>, mode: UserMod
             wheelchair,
             shown,
         ) ?: return@mapNotNull null
-        val (text, look) = poiLabel(kind, wheelchair, if (p.isNull("count")) null else p.optInt("count"), mode)
+        val name = p.optString("name").takeUnless { p.isNull("name") || it.isBlank() }
+        val (text, look) = poiLabel(kind, wheelchair, if (p.isNull("count")) null else p.optInt("count"), mode, name)
         Facility(
             kind, p.getDouble("lat"), p.getDouble("lon"), text = text, look = look,
-            name = p.optString("name").takeUnless { p.isNull("name") || it.isBlank() },
+            name = name,
             detail = p.optString("detail").takeUnless { p.isNull("detail") || it.isBlank() },
         )
     }
     return FacilityPage(MapLayers(facilities, zones = emptyList()), truncated = json.optBoolean("truncated"))
+}
+
+/** The exit number in a subway exit's name, e.g. 3 for "남광주역 3번 출구"; null when there is none. */
+fun exitNumber(name: String?): Int? = name?.let { Regex("""(\d+)번\s*출구""").find(it)?.groupValues?.get(1)?.toIntOrNull() }
+
+/**
+ * The exits of [station] among [facilities], in number order, each as "3번 출구 · 엘리베이터 있음".
+ * Exits are matched by name ("남광주역 3번 출구" belongs to "남광주역").
+ */
+fun stationExits(station: Facility, facilities: List<Facility>): List<String> {
+    val stationName = station.name ?: return emptyList()
+    return facilities
+        .filter { it.kind == FacilityKind.SUBWAY_ENTRANCE && it.name?.startsWith(stationName) == true }
+        .mapNotNull { exit -> exitNumber(exit.name)?.let { it to exit } }
+        .distinctBy { it.first }
+        .sortedBy { it.first }
+        .map { (number, exit) ->
+            val what = exit.detail?.substringAfter(" · ", "")?.takeIf { it.isNotBlank() }
+                ?: if (exit.look == FacilityLook.GRAY) "엘리베이터 없음" else "엘리베이터 있음"
+            "${number}번 출구 · $what"
+        }
 }

@@ -100,6 +100,8 @@ class FacilityRepositoryTest {
     @Test
     fun entrancesWithElevatorStandOutForSeniorAndDisabled() {
         assertEquals("역 입구 · 엘리베이터", poiLabel(FacilityKind.SUBWAY_ENTRANCE, true, null, UserMode.DISABLED).first)
+        assertEquals("3번 출구 · 엘리베이터", poiLabel(FacilityKind.SUBWAY_ENTRANCE, true, null, UserMode.DISABLED, "남광주역 3번 출구").first)
+        assertEquals("1번 출구" to FacilityLook.GRAY, poiLabel(FacilityKind.SUBWAY_ENTRANCE, false, null, UserMode.DISABLED, "남광주역 1번 출구"))
         assertNull(poiLabel(FacilityKind.SUBWAY_ENTRANCE, null, null, UserMode.DISABLED).first)
         assertNull(poiLabel(FacilityKind.SUBWAY_ENTRANCE, true, null, UserMode.CHILD).first)
     }
@@ -113,5 +115,16 @@ class FacilityRepositoryTest {
         val station = parsePois(json, UserMode.DISABLED.shownKinds(emptySet()), UserMode.DISABLED).layers.facilities.single()
         assertEquals("문화전당역", station.name)
         assertEquals("지하철역 · 엘리베이터 있는 출구 3곳(2·3·4번) · 장애인 화장실 2곳", station.detail)
+    }
+
+    @Test
+    fun stationCardListsItsExitsInOrder() {
+        val station = Facility(FacilityKind.SUBWAY, 35.14, 126.92, name = "남광주역")
+        val exits = listOf(
+            Facility(FacilityKind.SUBWAY_ENTRANCE, 0.0, 0.0, name = "남광주역 4번 출구", detail = "지하철 출입구 · 엘리베이터 있음"),
+            Facility(FacilityKind.SUBWAY_ENTRANCE, 0.0, 0.0, name = "남광주역 1번 출구", detail = "지하철 출입구 · 엘리베이터 없음"),
+            Facility(FacilityKind.SUBWAY_ENTRANCE, 0.0, 0.0, name = "학동증심사입구역 1번 출구", detail = "지하철 출입구 · 엘리베이터 있음"),
+        )
+        assertEquals(listOf("1번 출구 · 엘리베이터 없음", "4번 출구 · 엘리베이터 있음"), stationExits(station, exits))
     }
 }
