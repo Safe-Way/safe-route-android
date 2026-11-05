@@ -167,14 +167,54 @@ fun KakaoMap.addMyLocation(context: Context, point: LatLon, sizeDp: Float = 22f)
     )
 }
 
-/** Arrows on the route where it turns, each pointing the way the route goes on. */
+/**
+ * Turn arrows drawn along the route, like a road sign painted on it: a white band with a dark edge
+ * bending through each turn, ending in an arrowhead. Returns the arrowheads, which need turning
+ * whenever the map turns (see [pointTo]).
+ */
 fun KakaoMap.addTurnArrows(context: Context, marks: List<TurnMark>): List<Label> {
     val density = context.resources.displayMetrics.density
-    val style = LabelStyles.from(LabelStyle.from(turnArrowBitmap(density)).setAnchorPoint(0.5f, 0.5f).setApplyDpScale(false))
+    val band = RouteLineStyle.from(7f * density, 0xFFFFFFFF.toInt(), 1.5f * density, TURN_EDGE)
+    // A layer of their own above the route; reused (and cleared) when the screen is shown again.
+    val layer = routeLineManager?.let { it.getLayer(TURN_LAYER) ?: it.addLayer(TURN_LAYER, 10_000) }
+    layer?.removeAll()
+    marks.filter { it.shape.size >= 2 }.forEach { mark ->
+        layer?.addRouteLine(RouteLineOptions.from(RouteLineSegment.from(mark.shape.map { it.toLatLng() }, band)))
+    }
+    // The head's base sits on the band's end, so the tip reaches a little past it.
+    val head = LabelStyles.from(LabelStyle.from(arrowHeadBitmap(density)).setAnchorPoint(0.5f, 0.75f).setApplyDpScale(false))
     return marks.mapNotNull { mark ->
-        labelManager?.layer?.addLabel(LabelOptions.from(mark.point.toLatLng()).setStyles(style).setRank(7))
+        labelManager?.layer?.addLabel(LabelOptions.from(mark.shape.last().toLatLng()).setStyles(head).setRank(7))
             ?.also { it.pointTo(mark.bearing) }
     }
+}
+
+private val TURN_EDGE = 0xFF17211B.toInt()
+private const val TURN_LAYER = "turns"
+
+/** A white triangle with a dark edge, pointing up until turned. */
+private fun arrowHeadBitmap(density: Float): Bitmap {
+    val size = (22 * density).toInt()
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val s = size.toFloat()
+    val path = android.graphics.Path().apply {
+        moveTo(s * 0.5f, s * 0.1f)
+        lineTo(s * 0.92f, s * 0.75f)
+        lineTo(s * 0.08f, s * 0.75f)
+        close()
+    }
+    canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() })
+    canvas.drawPath(
+        path,
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = TURN_EDGE
+            style = Paint.Style.STROKE
+            strokeWidth = 1.5f * density
+            strokeJoin = Paint.Join.ROUND
+        },
+    )
+    return bitmap
 }
 
 /** A small zebra-crossing sign at each crosswalk on the route. */
@@ -182,35 +222,6 @@ fun KakaoMap.addCrosswalks(context: Context, points: List<LatLon>) {
     val density = context.resources.displayMetrics.density
     val style = LabelStyles.from(LabelStyle.from(crosswalkBitmap(density)).setAnchorPoint(0.5f, 0.5f).setApplyDpScale(false))
     points.forEach { labelManager?.layer?.addLabel(LabelOptions.from(it.toLatLng()).setStyles(style).setRank(6)) }
-}
-
-/** White arrow with a dark green edge, pointing up (north) until turned. */
-private fun turnArrowBitmap(density: Float): Bitmap {
-    val size = (30 * density).toInt()
-    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    val s = size.toFloat()
-    val arrow = android.graphics.Path().apply {
-        moveTo(s * 0.5f, s * 0.08f)
-        lineTo(s * 0.88f, s * 0.52f)
-        lineTo(s * 0.64f, s * 0.52f)
-        lineTo(s * 0.64f, s * 0.92f)
-        lineTo(s * 0.36f, s * 0.92f)
-        lineTo(s * 0.36f, s * 0.52f)
-        lineTo(s * 0.12f, s * 0.52f)
-        close()
-    }
-    canvas.drawPath(arrow, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() })
-    canvas.drawPath(
-        arrow,
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFF0F4D2C.toInt()
-            style = Paint.Style.STROKE
-            strokeWidth = 2.5f * density
-            strokeJoin = Paint.Join.ROUND
-        },
-    )
-    return bitmap
 }
 
 /** A rounded white square with dark stripes, like a road crossing seen from above. */

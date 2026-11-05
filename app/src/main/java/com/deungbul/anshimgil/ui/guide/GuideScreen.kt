@@ -99,8 +99,8 @@ private const val DEMO_STEP_M = 8.0
 private const val GUIDE_ZOOM = 19
 /** A crosswalk this close to the route line is one the route crosses. */
 private const val CROSSWALK_ON_ROUTE_M = 8.0
-/** The map turns only when the way ahead changes by at least this much. */
-private const val MAP_TURN_DEGREES = 15f
+/** The map turns only when the walker turns by at least this much. */
+private const val MAP_TURN_DEGREES = 10f
 
 /**
  * Walking guidance along the chosen route (issue #7): next turn, nearest help, remaining distance,
@@ -179,22 +179,22 @@ fun GuideScreen(
         map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
     }
 
-    // Heading-up: the map turns so the way ahead on the route points up the screen.
-    // Small bends are ignored so the map does not keep swaying.
-    var mapBearing by remember { mutableFloatStateOf(guidance.travelBearing(0.0)) }
+    // The way the walker faces: the phone's compass. In the demo walk, or without a compass,
+    // the way ahead on the route instead.
+    val compass = rememberCompassHeading()
     val travel = guidance.travelBearing(state.progressM)
-    LaunchedEffect(travel) { if (angleBetween(mapBearing, travel) >= MAP_TURN_DEGREES) mapBearing = travel }
+    val heading = if (demo || compass == null) travel else compass
+
+    // Heading-up, like Naver's walking guidance: the map turns so the way the walker faces points up.
+    // Small wobbles are ignored so the map does not keep swaying.
+    var mapBearing by remember { mutableFloatStateOf(heading) }
+    LaunchedEffect(heading) { if (angleBetween(mapBearing, heading) >= MAP_TURN_DEGREES) mapBearing = heading }
     // Kakao turns the map the other way round from a compass bearing, hence the minus.
     LaunchedEffect(map, mapBearing) { map?.moveCamera(CameraUpdateFactory.rotateTo(Math.toRadians(-mapBearing.toDouble()))) }
     // Marker rotation is measured on the screen, not the map, so take off the map's own turn.
     LaunchedEffect(turnLabels, mapBearing) {
-        turnLabels.zip(guidance.turnMarks).forEach { (label, mark) -> label.pointTo(mark.bearing - mapBearing) }
+        turnLabels.zip(guidance.turnMarks.filter { it.shape.size >= 2 }).forEach { (label, mark) -> label.pointTo(mark.bearing - mapBearing) }
     }
-
-    // The arrow shows which way the walker faces (compass). In the demo walk, or without a compass,
-    // it points along the route instead.
-    val compass = rememberCompassHeading()
-    val heading = if (demo || compass == null) travel else compass
     LaunchedEffect(me, heading, mapBearing) { me?.pointTo(heading - mapBearing) }
 
     // Keep the walker in the middle of the part of the map not covered by the instruction card:

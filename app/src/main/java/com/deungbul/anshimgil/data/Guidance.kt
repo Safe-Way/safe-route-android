@@ -30,11 +30,17 @@ data class GuidanceState(
 
 data class HelpPoint(val kind: FacilityKind, val meters: Int, val side: Turn)
 
-/** A turn on the route, drawn as an arrow pointing the way the route goes on ([bearing], degrees from north). */
-data class TurnMark(val point: LatLon, val bearing: Float)
+/**
+ * A turn on the route at [point]. [shape] is the route just before and after it, drawn as a bent arrow
+ * whose tip (the last point) points [bearing] degrees from north.
+ */
+data class TurnMark(val point: LatLon, val bearing: Float, val shape: List<LatLon> = listOf(point))
 
 /** A change of heading at least this large counts as a turn. */
 private const val TURN_DEGREES = 30.0
+
+/** How far along the route the turn arrow reaches on each side of the turn. */
+private const val TURN_ARM_M = 9.0
 
 /**
  * Turn-by-turn guidance along a fixed route (issue #7, FR-29·30·34).
@@ -62,15 +68,23 @@ class Guidance(private val path: List<LatLon>, private val facilities: List<Faci
         return stateAt(progress, bestLeg, best)
     }
 
-    /** Where the route turns (heading changes by 30° or more), with the direction it goes on in. */
+    /**
+     * Each turn as a short stretch of the route bending through it ([TURN_ARM_M] before and after),
+     * for drawing a turn arrow along the route; [TurnMark.bearing] is the way its tip points.
+     */
     val turnMarks: List<TurnMark> by lazy {
         (1 until points.lastIndex)
             .filter { v -> abs(headingChange(points[v - 1], points[v], points[v + 1])) >= TURN_DEGREES }
             .map { v ->
-                val (ax, ay) = points[v]
-                val (bx, by) = points[v + 1]
+                val at = cumulative[v]
+                val from = (at - TURN_ARM_M).coerceAtLeast(0.0)
+                val to = (at + TURN_ARM_M).coerceAtMost(totalM)
+                val inner = (1 until points.lastIndex).filter { cumulative[it] > from && cumulative[it] < to }.map { points[it] }
+                val shape = listOf(pointAt(from)) + inner + listOf(pointAt(to))
+                val (ax, ay) = shape[shape.size - 2]
+                val (bx, by) = shape.last()
                 val bearing = (Math.toDegrees(kotlin.math.atan2(bx - ax, by - ay)) + 360) % 360
-                TurnMark(toLatLon(points[v]), bearing.toFloat())
+                TurnMark(toLatLon(points[v]), bearing.toFloat(), shape.map { toLatLon(it) })
             }
     }
 
