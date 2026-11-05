@@ -147,6 +147,8 @@ fun AppRoot(
                         onAutoConditionsChange = { scope.launch { settingsRepository.setAutoConditions(it) } },
                         onTextSizeChange = { scope.launch { settingsRepository.setTextSize(it) } },
                         onExtraMapItemChange = { key, on -> scope.launch { settingsRepository.setExtraMapItem(key, on) } },
+                        onAddGuardian = { scope.launch { settingsRepository.addGuardian(it) } },
+                        onRemoveGuardian = { scope.launch { settingsRepository.removeGuardian(it) } },
                         modifier = modifier,
                     )
                 }
@@ -205,6 +207,7 @@ fun AppRoot(
                         destinationName = guide.route.destination.name,
                         voiceByDefault = settings.voiceGuide,
                         facilityRepository = facilityRepository,
+                        guardians = settings.guardians,
                         onFinish = { screen = Screen.Home },
                         modifier = modifier,
                     )
@@ -217,6 +220,7 @@ fun AppRoot(
                     onOpenSearch = { screen = Screen.Search() },
                     onOpenSettings = { screen = Screen.Settings },
                     onPlaceSelected = { place -> screen = Screen.Route(place, fromHome = true) },
+                    guardians = settings.guardians,
                     modifier = modifier,
                 )
             }

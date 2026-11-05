@@ -1,5 +1,8 @@
 package com.deungbul.anshimgil.ui.home
 
+import com.deungbul.anshimgil.ui.safety.SosOverlay
+import com.deungbul.anshimgil.ui.safety.SosButton
+import com.deungbul.anshimgil.data.Guardian
 import com.deungbul.anshimgil.data.MapLayers
 import androidx.compose.runtime.mutableIntStateOf
 import com.deungbul.anshimgil.data.stationExits
@@ -101,8 +104,10 @@ fun HomeScreen(
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onPlaceSelected: (Place) -> Unit,
+    guardians: List<Guardian>,
     modifier: Modifier = Modifier,
 ) {
+    var sos by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var map by remember { mutableStateOf<KakaoMap?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -328,7 +333,7 @@ fun HomeScreen(
                 color = Color.White.copy(alpha = 0.85f),
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = 12.dp, bottom = 12.dp),
+                    .padding(start = 88.dp, bottom = 12.dp),
             ) {
                 Text(
                     note,
@@ -349,6 +354,9 @@ fun HomeScreen(
         }
 
         error?.let { MapMessage(it, Modifier.align(Alignment.BottomCenter)) }
+
+        SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 44.dp))
+        if (sos) SosOverlay(guardians, here = { here }, onClose = { sos = false }, onAddGuardian = onOpenSettings)
     }
 }
 

@@ -1,5 +1,12 @@
 package com.deungbul.anshimgil.ui.guide
 
+import androidx.compose.material3.TextButton
+import com.deungbul.anshimgil.ui.safety.openGuardianText
+import com.deungbul.anshimgil.ui.safety.SosOverlay
+import com.deungbul.anshimgil.ui.safety.SosButton
+import com.deungbul.anshimgil.data.guardianMessage
+import com.deungbul.anshimgil.data.GuardianAlert
+import com.deungbul.anshimgil.data.Guardian
 import com.kakao.vectormap.camera.CameraAnimation
 import androidx.compose.runtime.mutableFloatStateOf
 import com.deungbul.anshimgil.data.FacilityRepository
@@ -95,6 +102,8 @@ private val Green = Color(0xFF1F6B42)
 /** A real fix farther than this from the route switches to the demo walk (e.g. testing away from the route). */
 private const val FAR_FROM_ROUTE_M = 300
 private const val OFF_ROUTE_WARN_M = 40
+/** Off the route this long before offering to tell the guardians. */
+private const val OFF_ROUTE_ALERT_MS = 20_000L
 private const val DEMO_STEP_M = 8.0
 /** Close-up for walking: the next few buildings, with the map tilted so the street ahead shows. */
 private const val GUIDE_ZOOM = 19
@@ -121,9 +130,11 @@ fun GuideScreen(
     destinationName: String,
     voiceByDefault: Boolean,
     facilityRepository: FacilityRepository,
+    guardians: List<Guardian>,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var sos by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val route = result.route(type) ?: result.routes.first()
     val guidance = remember(route) { Guidance(route.path, result.facilitiesOn(route.type)) }
@@ -202,6 +213,20 @@ fun GuideScreen(
     // Marker rotation is measured on the screen, not the map, so take off the map's own turn.
     LaunchedEffect(me, heading, mapBearing) { me?.pointTo(heading - mapBearing, TURN_MS) }
 
+    // 귀가 지킴이: off the planned route for a while, offer to tell the guardians (once per stretch off route).
+    val off = !demo && state.offRouteM > OFF_ROUTE_WARN_M
+    var offRouteLong by remember { mutableStateOf(false) }
+    var offRouteTold by remember { mutableStateOf(false) }
+    LaunchedEffect(off) {
+        if (off) {
+            delay(OFF_ROUTE_ALERT_MS)
+            offRouteLong = true
+        } else {
+            offRouteLong = false
+            offRouteTold = false
+        }
+    }
+
     // Keep the walker in the middle of the part of the map not covered by the instruction card:
     // the map's top padding moves its center down by the card's height.
     var overlayBottomPx by remember { mutableIntStateOf(0) }
@@ -211,7 +236,8 @@ fun GuideScreen(
         m.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
     }
 
-    Column(modifier = modifier.fillMaxSize().background(Color.White)) {
+    Box(modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             KakaoMapView(modifier = Modifier.fillMaxSize(), onMapReady = { map = it })
             Column(
@@ -228,7 +254,17 @@ fun GuideScreen(
                 if (!demo && state.offRouteM > OFF_ROUTE_WARN_M) {
                     StatusPill("경로에서 ${state.offRouteM}m 벗어났어요", Color(0xFFB42318))
                 }
+                if (offRouteLong && guardians.isNotEmpty() && !offRouteTold) {
+                    OffRouteCard(
+                        onTell = {
+                            openGuardianText(context, guardians, guardianMessage(GuardianAlert.OFF_ROUTE, fix ?: state.snapped))
+                            offRouteTold = true
+                        },
+                        onDismiss = { offRouteTold = true },
+                    )
+                }
             }
+            SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp))
             // The camera follows only when the position moves, so after dragging the map this brings it back.
             Surface(
                 onClick = { map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM)) },
@@ -313,6 +349,9 @@ fun GuideScreen(
                 }
             }
         }
+    }
+    // SOS covers the whole screen, guidance included.
+    if (sos) SosOverlay(guardians, here = { fix ?: state.snapped }, onClose = { sos = false }, onAddGuardian = null)
     }
 }
 
@@ -414,3 +453,17 @@ private fun rememberTts(context: Context): TextToSpeech {
 
 private fun formatDistance(meters: Int): String =
     if (meters < 1000) "${meters}m" else "%.1fkm".format(meters / 1000.0)
+
+/** Shown after a while off the route: tell the guardians where the walker is, or dismiss. */
+@Composable
+private fun OffRouteCard(onTell: () -> Unit, onDismiss: () -> Unit) {
+    Surface(shape = RoundedCornerShape(14.dp), color = Color.White, shadowElevation = 4.dp) {
+        Column(Modifier.padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 4.dp)) {
+            Text("정한 길에서 벗어났어요", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFB42318))
+            Row {
+                TextButton(onClick = onTell) { Text("보호자에게 알리기", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+                TextButton(onClick = onDismiss) { Text("괜찮아요", fontSize = 15.sp) }
+            }
+        }
+    }
+}

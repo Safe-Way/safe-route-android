@@ -1,5 +1,16 @@
 package com.deungbul.anshimgil.ui.settings
 
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import com.deungbul.anshimgil.data.Guardian
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -62,9 +73,12 @@ fun SettingsScreen(
     onAutoConditionsChange: (Boolean) -> Unit,
     onTextSizeChange: (TextSize) -> Unit,
     onExtraMapItemChange: (key: String, on: Boolean) -> Unit,
+    onAddGuardian: (Guardian) -> Unit,
+    onRemoveGuardian: (Guardian) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    var addingGuardian by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -84,6 +98,30 @@ fun SettingsScreen(
         SectionTitle("내 설정")
         LinkRow("모드 바꾸기", "지금: ${mode.style().label}", onClick = onChangeMode)
         LinkRow("자주 가는 곳 관리", "집, 학교, 직장 등록과 변경", onClick = onManagePlaces)
+
+        SectionTitle("귀가 지킴이")
+        Text(
+            "SOS를 누르거나 길안내 중 정한 길에서 벗어나면, 여기 등록한 보호자에게 지금 위치를 문자로 보낼 수 있어요.",
+            fontSize = 14.sp, color = Muted,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        settings.guardians.forEach { guardian ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 16.dp, end = 4.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(guardian.name, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink)
+                    Text(guardian.phone, fontSize = 14.sp, color = Muted)
+                }
+                IconButton(onClick = { onRemoveGuardian(guardian) }) {
+                    Icon(Icons.Filled.Close, contentDescription = "${guardian.name} 삭제", tint = Muted)
+                }
+            }
+        }
+        if (settings.guardians.size < Guardian.MAX) {
+            LinkRow("보호자 추가", "이름과 전화번호 (최대 ${Guardian.MAX}명)") { addingGuardian = true }
+        }
 
         SectionTitle("길찾기")
         SwitchRow("음성 안내", "걷는 동안 다음 방향을 읽어 줘요", settings.voiceGuide, onVoiceChange)
@@ -134,10 +172,46 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(16.dp),
         ) {
-            InfoText("개인정보", "고른 모드와 자주 가는 곳은 이 휴대폰에만 저장해요. 걷는 동안의 위치는 길안내에만 쓰고 저장하지 않아요.")
+            InfoText("개인정보", "고른 모드, 자주 가는 곳, 보호자 연락처는 이 휴대폰에만 저장해요. 걷는 동안의 위치는 길안내에만 쓰고 저장하지 않아요. 보호자 문자는 직접 보내기를 눌러야 나가요.")
             InfoText("데이터 출처", "공공데이터포털, 생활안전지도, 재난안전데이터 공유플랫폼, 기상청, 에어코리아, 카카오")
         }
     }
+
+    if (addingGuardian) {
+        GuardianDialog(
+            onDismiss = { addingGuardian = false },
+            onSave = { onAddGuardian(it); addingGuardian = false },
+        )
+    }
+}
+
+/** Name and phone number for a new guardian; saving is allowed once both look right. */
+@Composable
+private fun GuardianDialog(onDismiss: () -> Unit, onSave: (Guardian) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    val cleanPhone = Guardian.cleanPhone(phone)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("보호자 추가") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("이름 (예: 엄마)") }, singleLine = true)
+                OutlinedTextField(
+                    phone, { phone = it }, label = { Text("전화번호") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    isError = phone.isNotBlank() && cleanPhone == null,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { cleanPhone?.let { onSave(Guardian(name.trim(), it)) } },
+                enabled = name.isNotBlank() && cleanPhone != null,
+            ) { Text("저장") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
+    )
 }
 
 @Composable

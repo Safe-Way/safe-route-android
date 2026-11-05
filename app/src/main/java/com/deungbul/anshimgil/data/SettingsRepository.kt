@@ -20,6 +20,8 @@ data class AppSettings(
     val textSize: TextSize = TextSize.NORMAL,
     /** Map items added on top of the mode's own (see [optionalMapItems]). */
     val extraMapItems: Set<String> = emptySet(),
+    /** People texted on SOS or when leaving the route, in the order they were added. */
+    val guardians: List<Guardian> = emptyList(),
 )
 
 /** Situations routing can react to; all are switched off when auto-detection is off. */
@@ -31,6 +33,8 @@ class SettingsRepository(private val context: Context) {
     private val autoConditionsKey = booleanPreferencesKey("auto_conditions")
     private val textSizeKey = stringPreferencesKey("text_size")
     private val extraMapItemsKey = stringSetPreferencesKey("extra_map_items")
+    // One line per guardian, kept in order (a string set would lose it).
+    private val guardiansKey = stringPreferencesKey("guardians")
 
     val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
         AppSettings(
@@ -38,6 +42,7 @@ class SettingsRepository(private val context: Context) {
             autoConditions = prefs[autoConditionsKey] ?: true,
             textSize = TextSize.entries.firstOrNull { it.name == prefs[textSizeKey] } ?: TextSize.NORMAL,
             extraMapItems = prefs[extraMapItemsKey].orEmpty(),
+            guardians = prefs[guardiansKey].orEmpty().lines().mapNotNull { Guardian.decode(it) },
         )
     }
 
@@ -57,6 +62,22 @@ class SettingsRepository(private val context: Context) {
         context.settingsDataStore.edit {
             val now = it[extraMapItemsKey].orEmpty()
             it[extraMapItemsKey] = if (on) now + key else now - key
+        }
+    }
+
+    suspend fun addGuardian(guardian: Guardian) {
+        context.settingsDataStore.edit {
+            val now = it[guardiansKey].orEmpty().lines().mapNotNull { line -> Guardian.decode(line) }
+            if (now.size < Guardian.MAX && now.none { g -> g.phone == guardian.phone }) {
+                it[guardiansKey] = (now + guardian).joinToString("\n") { g -> g.encode() }
+            }
+        }
+    }
+
+    suspend fun removeGuardian(guardian: Guardian) {
+        context.settingsDataStore.edit {
+            val now = it[guardiansKey].orEmpty().lines().mapNotNull { line -> Guardian.decode(line) }
+            it[guardiansKey] = (now - guardian).joinToString("\n") { g -> g.encode() }
         }
     }
 }
