@@ -92,8 +92,8 @@ private sealed interface Screen {
     /** [startFor] is set while choosing a new start for that route. */
     data class Search(val startFor: Route? = null) : Screen
     data object Settings : Screen
-    /** [start] null means the phone's position. */
-    data class Route(val destination: Place, val start: Place? = null) : Screen
+    /** [start] null means the phone's position. [fromHome]: opened from a home shortcut, so back returns home. */
+    data class Route(val destination: Place, val start: Place? = null, val fromHome: Boolean = false) : Screen
     data class Guide(val route: Route, val result: RouteResult, val type: RouteType) : Screen
 }
 
@@ -171,7 +171,8 @@ fun AppRoot(
                 }
                 screen is Screen.Route -> {
                     val route = screen as Screen.Route
-                    BackHandler { screen = Screen.Search() }
+                    val back = { screen = if (route.fromHome) Screen.Home else Screen.Search() }
+                    BackHandler(onBack = back)
                     // key: find the route again whenever the start or destination changes.
                     androidx.compose.runtime.key(route) {
                         RouteScreen(
@@ -180,12 +181,12 @@ fun AppRoot(
                             destination = route.destination,
                             routeRepository = routeRepository,
                             autoConditions = settings.autoConditions,
-                            onBack = { screen = Screen.Search() },
+                            onBack = back,
                             onPickStart = { screen = Screen.Search(startFor = route) },
                             onSwap = { from ->
                                 val fromPlace = route.start
                                     ?: Place("here", from.label, "", from.point.lat, from.point.lon, null)
-                                screen = Screen.Route(destination = fromPlace, start = route.destination)
+                                screen = Screen.Route(destination = fromPlace, start = route.destination, fromHome = route.fromHome)
                             },
                             onStart = { result, type -> screen = Screen.Guide(route, result, type) },
                             modifier = modifier,
@@ -212,7 +213,7 @@ fun AppRoot(
                     placeRepository = placeRepository,
                     onOpenSearch = { screen = Screen.Search() },
                     onOpenSettings = { screen = Screen.Settings },
-                    onPlaceSelected = { place -> screen = Screen.Route(place) },
+                    onPlaceSelected = { place -> screen = Screen.Route(place, fromHome = true) },
                     modifier = modifier,
                 )
             }
