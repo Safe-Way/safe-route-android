@@ -78,8 +78,8 @@ import com.kakao.vectormap.camera.CameraUpdateFactory
 
 private val Ink = Color(0xFF17211B)
 
-/** Below this zoom (about a whole district on screen) the map shows no facility tags. */
-private const val MIN_TAG_ZOOM = 15
+/** Zoomed out past the walking view (one step out from it already) the map shows no facility tags. */
+private const val MIN_TAG_ZOOM = 17
 
 /** Same scale as the guide screen: nearby streets with buildings in 3D, one step closer than the default 16. */
 private const val WALK_ZOOM = 17
