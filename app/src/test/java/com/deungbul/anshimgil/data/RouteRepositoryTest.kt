@@ -105,4 +105,14 @@ class RouteRepositoryTest {
         // Switched on in daytime
         assertEquals("on", RouteRequest(origin, destination, UserMode.GENERAL, conditionsOn = setOf("night")).toJson().getString("night"))
     }
+
+    @Test
+    fun weatherNotes_showOnlyWhatTheServerGot() {
+        val all = JSONObject("""{"night":false,"rain":true,"heat":false,"cold":false,"tempC":12.4,"dustBad":true,"weatherAvailable":true,"dustAvailable":true}""")
+        assertEquals(listOf("비", "12°C", "미세먼지 나쁨"), weatherNotes(all))
+        val none = JSONObject("""{"rain":true,"tempC":12.4,"dustBad":true,"weatherAvailable":false,"dustAvailable":false}""")
+        assertTrue(weatherNotes(none).isEmpty())
+        // Older servers send no weather fields
+        assertTrue(weatherNotes(JSONObject("""{"night":true}""")).isEmpty())
+    }
 }

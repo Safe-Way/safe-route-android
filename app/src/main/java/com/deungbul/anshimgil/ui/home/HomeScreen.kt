@@ -124,7 +124,8 @@ fun HomeScreen(
                 else -> null
             }
         } catch (e: ApiException) {
-            e.message
+            // Kept short and distinct from the shortcut buttons' message, which may show at the same time.
+            if (e.code == "NETWORK") "지도 시설을 불러오지 못했어요 (인터넷 연결 확인)" else e.message
         }
     }
 

@@ -34,6 +34,8 @@ data class RouteResult(
     val explanation: Explanation,
     val facilities: List<Facility>,
     val dataQuality: DataQuality,
+    /** Weather and air shown for information, e.g. "비", "12°C", "미세먼지 나쁨"; empty when the server could not get them. */
+    val weather: List<String> = emptyList(),
 ) {
     fun route(type: RouteType): RouteOption? = routes.firstOrNull { it.type == type }
 
