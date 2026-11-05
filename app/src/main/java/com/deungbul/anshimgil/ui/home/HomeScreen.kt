@@ -65,6 +65,9 @@ import com.kakao.vectormap.camera.CameraUpdateFactory
 
 private val Ink = Color(0xFF17211B)
 
+/** Same scale as the guide screen: nearby streets with buildings in 3D, one step closer than the default 16. */
+private const val WALK_ZOOM = 17
+
 /** One-tap shortcuts: the server's `kind`, button text and icon. */
 private val NEARBY = listOf(
     Triple("store", "편의점", Icons.Filled.Store),
@@ -99,6 +102,7 @@ fun HomeScreen(
     // The phone's position, kept up to date so the location button moves at once and the dot follows.
     var hasPermission by remember { mutableStateOf(hasLocationPermission(context)) }
     var here by remember { mutableStateOf(lastKnownLocation(context)) }
+    val startCenter = remember { chooseOrigin(here).point.let { LatLng.from(it.lat, it.lon) } }
     var me by remember { mutableStateOf<Label?>(null) }
     var locating by remember { mutableStateOf(false) }
     if (hasPermission) LocationUpdates(context) { here = it }
@@ -106,7 +110,7 @@ fun HomeScreen(
     var centerOnFix by remember { mutableStateOf(false) }
 
     fun centerOn(p: LatLon) {
-        map?.moveCamera(CameraUpdateFactory.newCenterPosition(LatLng.from(p.lat, p.lon), 16))
+        map?.moveCamera(CameraUpdateFactory.newCenterPosition(LatLng.from(p.lat, p.lon), WALK_ZOOM))
     }
 
     fun locate() {
@@ -193,6 +197,9 @@ fun HomeScreen(
     Box(modifier = modifier.fillMaxSize()) {
         KakaoMapView(
             modifier = Modifier.fillMaxSize(),
+            // Open where the phone already is (in Gwangju), close enough to see the streets around.
+            center = startCenter,
+            zoomLevel = WALK_ZOOM,
             onMapReady = { map = it },
             onMapError = { error = "지도를 불러오지 못했어요. 키와 키 해시 등록을 확인해 주세요.\n(${it.message})" },
         )

@@ -13,6 +13,7 @@ import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.MapLayers
 import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.RouteType
+import com.deungbul.anshimgil.data.distanceMeters
 import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.LatLng
 import com.kakao.vectormap.camera.CameraUpdateFactory
@@ -116,6 +117,35 @@ fun KakaoMap.showRoutes(context: Context, result: RouteResult, selected: RouteTy
 
     val points = result.routes.flatMap { it.path }.map { it.toLatLng() }.toTypedArray()
     if (points.isNotEmpty()) moveCamera(CameraUpdateFactory.fitMapPoints(points, (48 * density).toInt()))
+}
+
+/**
+ * When there is no route (start and end too close or too far): the start as a blue dot and each place
+ * as a tag, with the camera on [focus] (the start and the places worth walking to). Clears any old route.
+ */
+fun KakaoMap.showPoints(context: Context, start: LatLon, places: List<Pair<LatLon, String>>, focus: List<LatLon>) {
+    showLayers(context, MapLayers(emptyList(), zones = emptyList()))
+    routeLineManager?.layer?.removeAll()
+    val density = context.resources.displayMetrics.density
+    addMyLocation(context, start)
+    places.forEachIndexed { i, (point, name) ->
+        // The first place is the one to go to; others (the far destination) are drawn gray.
+        val color = if (i == 0) 0xFFB42318.toInt() else GRAY
+        labelManager?.layer?.addLabel(
+            LabelOptions.from(point.toLatLng())
+                .setStyles(LabelStyles.from(LabelStyle.from(pillBitmap(name.take(12), color, density)).setAnchorPoint(0.5f, 1f).setApplyDpScale(false)))
+                .setRank(if (i == 0) 8L else 6L),
+        )
+    }
+    val points = (listOf(start) + focus).map { it.toLatLng() }
+    val spread = points.maxOf { a -> points.maxOf { b -> distanceMeters(a.latitude, a.longitude, b.latitude, b.longitude) } }
+    if (spread < 150) {
+        // fitMapPoints would zoom in all the way on two points a few meters apart.
+        val mid = LatLng.from(points.map { it.latitude }.average(), points.map { it.longitude }.average())
+        moveCamera(CameraUpdateFactory.newCenterPosition(mid, 18))
+    } else {
+        moveCamera(CameraUpdateFactory.fitMapPoints(points.toTypedArray(), (64 * density).toInt()))
+    }
 }
 
 /** The phone's position as a blue dot above everything else; move it later with `Label.moveTo`. */

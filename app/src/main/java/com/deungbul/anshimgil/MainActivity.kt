@@ -180,6 +180,7 @@ fun AppRoot(
                             startPlace = route.start,
                             destination = route.destination,
                             routeRepository = routeRepository,
+                            placeRepository = placeRepository,
                             autoConditions = settings.autoConditions,
                             onBack = back,
                             onPickStart = { screen = Screen.Search(startFor = route) },
@@ -188,6 +189,7 @@ fun AppRoot(
                                     ?: Place("here", from.label, "", from.point.lat, from.point.lon, null)
                                 screen = Screen.Route(destination = fromPlace, start = route.destination, fromHome = route.fromHome)
                             },
+                            onChangeDestination = { place -> screen = route.copy(destination = place) },
                             onStart = { result, type -> screen = Screen.Guide(route, result, type) },
                             modifier = modifier,
                         )
