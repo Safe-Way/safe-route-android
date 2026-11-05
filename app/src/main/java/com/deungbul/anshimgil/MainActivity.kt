@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.deungbul.anshimgil.data.AppSettings
+import com.deungbul.anshimgil.data.FacilityRepository
 import com.deungbul.anshimgil.data.ModeRepository
 import com.deungbul.anshimgil.data.Place
 import com.deungbul.anshimgil.data.PlaceRepository
@@ -50,6 +51,7 @@ class MainActivity : ComponentActivity() {
         val modeRepository = ModeRepository(applicationContext)
         val savedPlaces = SavedPlacesRepository(applicationContext)
         val placeRepository = PlaceRepository.create()
+        val facilityRepository = FacilityRepository.create()
         val routeRepository = RouteRepository.create()
         val settingsRepository = SettingsRepository(applicationContext)
         setContent {
@@ -58,7 +60,7 @@ class MainActivity : ComponentActivity() {
                 ScaledText(settings.textSize) {
                     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                         AppRoot(
-                            modeRepository, savedPlaces, placeRepository, routeRepository,
+                            modeRepository, savedPlaces, placeRepository, facilityRepository, routeRepository,
                             settingsRepository, settings, Modifier.padding(innerPadding),
                         )
                     }
@@ -101,6 +103,7 @@ fun AppRoot(
     modeRepository: ModeRepository,
     savedPlaces: SavedPlacesRepository,
     placeRepository: PlaceRepository,
+    facilityRepository: FacilityRepository,
     routeRepository: RouteRepository,
     settingsRepository: SettingsRepository,
     settings: AppSettings,
@@ -205,6 +208,7 @@ fun AppRoot(
                 else -> HomeScreen(
                     mode = mode,
                     extraMapItems = settings.extraMapItems,
+                    facilityRepository = facilityRepository,
                     placeRepository = placeRepository,
                     onOpenSearch = { screen = Screen.Search() },
                     onOpenSettings = { screen = Screen.Settings },

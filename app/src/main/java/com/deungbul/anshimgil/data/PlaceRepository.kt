@@ -7,6 +7,12 @@ interface PlaceRepository {
     /** Up to 10 places, nearest first when [lat]/[lon] are given. Throws [ApiException]. */
     suspend fun search(query: String, lat: Double?, lon: Double?): List<Place>
 
+    /**
+     * Up to 5 places of [kind] within 1 km, open ones first (server `kind`, e.g. "toilet").
+     * The mode narrows them, e.g. wheelchair keeps only accessible toilets. Throws [ApiException].
+     */
+    suspend fun nearby(kind: String, mode: UserMode, lat: Double, lon: Double): NearbyResult
+
     companion object {
         fun create(): PlaceRepository = if (ServerApi.isConfigured) ServerPlaceRepository() else FakePlaceRepository()
     }
@@ -18,6 +24,20 @@ class ServerPlaceRepository : PlaceRepository {
         val places = json.optJSONArray("places") ?: return emptyList()
         return (0 until places.length()).map { Place.fromJson(places.getJSONObject(it)) }
     }
+
+    override suspend fun nearby(kind: String, mode: UserMode, lat: Double, lon: Double): NearbyResult =
+        parseNearby(ServerApi.get("/api/places/nearby", mapOf("lat" to lat, "lon" to lon, "kind" to kind, "mode" to mode.key)))
+}
+
+/** [message] is the server's own words for an empty result, e.g. "1km 안에 이 시설이 없어요". */
+data class NearbyResult(val places: List<Place>, val message: String?)
+
+internal fun parseNearby(json: org.json.JSONObject): NearbyResult {
+    val places = json.optJSONArray("places")
+    return NearbyResult(
+        places = if (places == null) emptyList() else (0 until places.length()).map { Place.fromJson(places.getJSONObject(it)) },
+        message = json.optString("message").takeUnless { json.isNull("message") || it.isBlank() },
+    )
 }
 
 /** Example places around Chosun University for building screens without the server. */
@@ -30,6 +50,13 @@ class FakePlaceRepository : PlaceRepository {
         Place("ex-5", "전남대학교병원", "광주 동구 제봉로 42", 35.1430, 126.9215, null),
         Place("ex-6", "충장로", "광주 동구 충장로", 35.1490, 126.9150, null),
     )
+
+    /** Example data has no facility types, so this searches names for the kind's Korean word. */
+    override suspend fun nearby(kind: String, mode: UserMode, lat: Double, lon: Double): NearbyResult {
+        val word = mapOf("store" to "편의점", "police" to "파출소", "toilet" to "화장실")[kind] ?: kind
+        val found = runCatching { search(word, lat, lon) }.getOrDefault(emptyList()).take(5)
+        return NearbyResult(found, if (found.isEmpty()) "예시 데이터에는 가까운 $word 이(가) 없어요" else null)
+    }
 
     override suspend fun search(query: String, lat: Double?, lon: Double?): List<Place> {
         delay(200)
