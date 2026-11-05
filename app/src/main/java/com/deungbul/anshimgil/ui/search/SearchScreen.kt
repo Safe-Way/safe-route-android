@@ -52,6 +52,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,7 +64,9 @@ import com.deungbul.anshimgil.data.Favorite
 import com.deungbul.anshimgil.data.Place
 import com.deungbul.anshimgil.data.PlaceRepository
 import com.deungbul.anshimgil.data.SavedPlacesRepository
-import com.deungbul.anshimgil.map.CHOSUN_UNIV
+import com.deungbul.anshimgil.data.LatLon
+import com.deungbul.anshimgil.data.chooseOrigin
+import com.deungbul.anshimgil.location.currentLocation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -102,9 +105,13 @@ fun SearchScreen(
     val recents by savedPlaces.recents.collectAsStateWithLifecycle(initialValue = emptyList())
     val scope = rememberCoroutineScope()
     val focus = remember { FocusRequester() }
+    val context = LocalContext.current
+    // Distances are measured from here: the phone in Gwangju, otherwise the demo point (same rule as routing).
+    var here by remember { mutableStateOf<LatLon?>(null) }
 
     LaunchedEffect(Unit) { focus.requestFocus() }
-    LaunchedEffect(query) {
+    LaunchedEffect(Unit) { here = chooseOrigin(currentLocation(context, timeoutMs = 3_000)).point }
+    LaunchedEffect(query, here) {
         val text = query.trim()
         if (text.length < 2) {
             results = Results.Idle
@@ -112,8 +119,10 @@ fun SearchScreen(
         }
         delay(300)
         results = Results.Loading
+        // Wait for the position so the distances are not from the wrong place.
+        val from = here ?: return@LaunchedEffect
         results = try {
-            Results.Done(placeRepository.search(text, CHOSUN_UNIV.latitude, CHOSUN_UNIV.longitude))
+            Results.Done(placeRepository.search(text, from.lat, from.lon))
         } catch (e: ApiException) {
             Results.Failed(e.message)
         }
