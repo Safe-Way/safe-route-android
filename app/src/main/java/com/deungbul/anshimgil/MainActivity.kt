@@ -48,7 +48,12 @@ import com.deungbul.anshimgil.ui.mode.SetupChatScreen
 import com.deungbul.anshimgil.data.SetupAssistant
 import com.deungbul.anshimgil.data.AppAssistant
 import com.deungbul.anshimgil.data.AssistantAction
+import androidx.compose.material.icons.filled.AutoAwesome
 import com.deungbul.anshimgil.data.AssistantContext
+import com.deungbul.anshimgil.data.tripWeather
+import com.deungbul.anshimgil.data.tripRecord
+import com.deungbul.anshimgil.data.TripConsent
+import com.deungbul.anshimgil.data.TripLogRepository
 import androidx.compose.ui.unit.dp
 import com.deungbul.anshimgil.ui.assistant.AssistantChat
 import com.deungbul.anshimgil.ui.guide.TransitGuideScreen
@@ -78,8 +83,11 @@ class MainActivity : ComponentActivity() {
         val routeRepository = RouteRepository.create()
         val settingsRepository = SettingsRepository(applicationContext)
         val walkSpeedRepository = WalkSpeedRepository(applicationContext)
+        val tripLog = TripLogRepository(applicationContext, guestId = { walkSpeedRepository.guestId() })
         // Walks that could not be sent last time (offline, server not ready) go now.
         lifecycleScope.launch { runCatching { walkSpeedRepository.uploadPending() } }
+        // Trips kept while the server had no way in yet.
+        lifecycleScope.launch { runCatching { tripLog.uploadPending() } }
         // The mode next to the clock while the app is in front; taken away in onStop.
         lifecycleScope.launch {
             repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
@@ -108,6 +116,7 @@ class MainActivity : ComponentActivity() {
                         AppRoot(
                             modeRepository, savedPlaces, placeRepository, facilityRepository, routeRepository,
                             settingsRepository, settings, walkSpeedRepository, Modifier.padding(innerPadding),
+                            tripLog = tripLog,
                         )
                     }
                 }
@@ -167,6 +176,7 @@ fun AppRoot(
     settings: AppSettings,
     walkSpeedRepository: WalkSpeedRepository,
     modifier: Modifier = Modifier,
+    tripLog: TripLogRepository? = null,
 ) {
     val savedFlow = remember(modeRepository) { modeRepository.mode.map { SavedMode.Ready(it) } }
     val saved by savedFlow.collectAsStateWithLifecycle(initialValue = SavedMode.Loading)
@@ -204,6 +214,26 @@ fun AppRoot(
     var sosOnHome by remember { mutableStateOf(false) }
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
     val scope = rememberCoroutineScope()
+    // 이동 기록: asked once, after the first finished guidance.
+    val tripConsent by (tripLog?.consent ?: kotlinx.coroutines.flow.flowOf(TripConsent.NO)).collectAsStateWithLifecycle(initialValue = TripConsent.NO)
+    val tripsWaiting by (tripLog?.pendingCount ?: kotlinx.coroutines.flow.flowOf(0)).collectAsStateWithLifecycle(initialValue = 0)
+    var askTripConsent by remember { mutableStateOf(false) }
+    // When the current guidance started, for the trip record.
+    var guideStartedAt by remember { mutableStateOf(java.time.LocalDateTime.now()) }
+    LaunchedEffect(screen) {
+        if (screen is Screen.Guide || screen is Screen.TransitGuide) guideStartedAt = java.time.LocalDateTime.now()
+    }
+    /** At the end of a guidance: keep the trip (when the walker said yes), or ask the first time. */
+    fun finishTrip(destination: Place, transit: Boolean, result: RouteResult?, mode: UserMode) {
+        val log = tripLog ?: return
+        when (tripConsent) {
+            TripConsent.UNASKED -> askTripConsent = true
+            TripConsent.YES -> scope.launch {
+                runCatching { log.record(tripRecord(destination, guideStartedAt, transit, mode, tripWeather(result))) }
+            }
+            TripConsent.NO -> Unit
+        }
+    }
 
     when (val state = saved) {
         SavedMode.Loading -> Box(modifier.fillMaxSize())
@@ -317,6 +347,10 @@ fun AppRoot(
                         onSosButtonChange = { scope.launch { settingsRepository.setSosButton(it) } },
                         onResetToDefaults = { scope.launch { settingsRepository.resetToDefaults() } },
                         modifier = modifier,
+                        tripConsent = tripConsent == TripConsent.YES,
+                        tripsWaiting = tripsWaiting,
+                        onTripConsentChange = { on -> scope.launch { tripLog?.setConsent(if (on) TripConsent.YES else TripConsent.NO) } },
+                        onClearTrips = { tripLog?.clearAll() ?: true },
                     )
                 }
                 screen is Screen.Search -> {
@@ -384,7 +418,7 @@ fun AppRoot(
                         showSos = settings.sosButton,
                         routeRepository = routeRepository,
                         walkSpeedRepository = walkSpeedRepository,
-                        onFinish = { screen = Screen.Home },
+                        onFinish = { finishTrip(guide.route.destination, transit = true, result = null, mode = mode); screen = Screen.Home },
                         modifier = modifier,
                     )
                     if (assistantOverGuide) {
@@ -410,7 +444,7 @@ fun AppRoot(
                         showSos = settings.sosButton,
                         routeRepository = routeRepository,
                         walkSpeedRepository = walkSpeedRepository,
-                        onFinish = { screen = Screen.Home },
+                        onFinish = { finishTrip(guide.route.destination, transit = false, result = guide.result, mode = mode); screen = Screen.Home },
                         modifier = modifier,
                     )
                     if (assistantOverGuide) {
@@ -442,4 +476,36 @@ fun AppRoot(
             }
         }
     }
+    if (askTripConsent) {
+        TripConsentDialog(
+            onYes = {
+                askTripConsent = false
+                scope.launch { tripLog?.setConsent(TripConsent.YES) }
+            },
+            onNo = {
+                askTripConsent = false
+                scope.launch { tripLog?.setConsent(TripConsent.NO) }
+            },
+        )
+    }
+}
+
+/** Asked once after the first finished guidance: may the app keep where and when the walker goes? */
+@Composable
+private fun TripConsentDialog(onYes: () -> Unit, onNo: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onNo,
+        icon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.AutoAwesome, contentDescription = null) },
+        title = { androidx.compose.material3.Text("자주 가는 길을 기억할까요?") },
+        text = {
+            androidx.compose.material3.Text(
+                "기억해 두면 AI 비서가 \"8시 반에 문화전당 가시죠?\"처럼 먼저 길을 알려 드려요.\n\n" +
+                    "· 저장하는 것: 도착한 곳(약 100m 범위), 출발 시각, 걸었는지 탔는지, 그날 날씨\n" +
+                    "· 출발한 곳과 걸은 길은 저장하지 않아요\n" +
+                    "· 설정에서 언제든 끄거나 모두 지울 수 있어요",
+            )
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = onYes) { androidx.compose.material3.Text("좋아요") } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onNo) { androidx.compose.material3.Text("괜찮아요") } },
+    )
 }

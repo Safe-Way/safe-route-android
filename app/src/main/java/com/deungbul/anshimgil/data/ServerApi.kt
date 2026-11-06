@@ -25,6 +25,9 @@ object ServerApi {
 
     suspend fun post(path: String, body: JSONObject): JSONObject = request("POST", path, body)
 
+    suspend fun delete(path: String, query: Map<String, Any?> = emptyMap()): JSONObject =
+        request("DELETE", path + queryString(query), body = null)
+
     /** A file sent in a multipart form, e.g. a photo. */
     class Part(val name: String, val fileName: String, val contentType: String, val bytes: ByteArray)
 
