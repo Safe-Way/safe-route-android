@@ -57,6 +57,10 @@ import com.deungbul.anshimgil.data.MapHintSource
 import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.location.currentLocation
 import kotlinx.coroutines.flow.first
+import androidx.compose.runtime.LaunchedEffect
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.lifecycle.repeatOnLifecycle
 import com.deungbul.anshimgil.ui.assistant.AssistantScreen
 import com.deungbul.anshimgil.ui.theme.SeipjidoTheme
 import kotlinx.coroutines.flow.map
@@ -75,7 +79,27 @@ class MainActivity : ComponentActivity() {
         val walkSpeedRepository = WalkSpeedRepository(applicationContext)
         // Walks that could not be sent last time (offline, server not ready) go now.
         lifecycleScope.launch { runCatching { walkSpeedRepository.uploadPending() } }
+        // The mode next to the clock while the app is in front; taken away in onStop.
+        lifecycleScope.launch {
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                modeRepository.mode.collect { mode -> if (mode != null) ModeStatus.show(this@MainActivity, mode) else ModeStatus.hide(this@MainActivity) }
+            }
+        }
         setContent {
+            // Asked once (Android 13+), after a mode is chosen, for the mode icon next to the clock.
+            val notifyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                if (granted) lifecycleScope.launch { modeRepository.mode.first()?.let { ModeStatus.show(this@MainActivity, it) } }
+            }
+            val hasMode by modeRepository.mode.map { it != null }.collectAsStateWithLifecycle(initialValue = false)
+            LaunchedEffect(hasMode) {
+                val prefs = getSharedPreferences("app", MODE_PRIVATE)
+                if (hasMode && android.os.Build.VERSION.SDK_INT >= 33 && !ModeStatus.canShow(this@MainActivity) &&
+                    !prefs.getBoolean("askedNotify", false)
+                ) {
+                    prefs.edit().putBoolean("askedNotify", true).apply()
+                    notifyPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
             val settings by settingsRepository.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
             SeipjidoTheme {
                 ScaledText(settings.textSize) {
@@ -88,6 +112,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        ModeStatus.hide(this)
     }
 }
 
