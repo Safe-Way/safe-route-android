@@ -156,6 +156,8 @@ fun AppRoot(
     var reportPrefill by remember { mutableStateOf<AssistantAction.OpenReport?>(null) }
     // AI 비서 opened from its bubble on the map starts with that line.
     var assistantOpening by remember { mutableStateOf<String?>(null) }
+    // Opened from the map's microphone button, so it listens at once.
+    var assistantListen by remember { mutableStateOf(false) }
     val mapHints = remember {
         MapHintSource(
             EventRepository.create(),
@@ -217,6 +219,7 @@ fun AppRoot(
                     BackHandler { screen = Screen.Home }
                     AssistantScreen(
                         opening = assistantOpening,
+                        listenAtStart = assistantListen,
                         assistant = appAssistant,
                         context = AssistantContext(mode, settings, where = { currentLocation(appContext, 4_000) }),
                         placeRepository = placeRepository,
@@ -368,9 +371,9 @@ fun AppRoot(
                     guardians = settings.guardians,
                     showSos = settings.sosButton,
                     modifier = modifier,
-                    onOpenAssistant = { busesOnHome = false; assistantOpening = null; screen = Screen.Assistant },
+                    onOpenAssistant = { busesOnHome = false; assistantOpening = null; assistantListen = true; screen = Screen.Assistant },
                     hintSource = mapHints,
-                    onAskAssistant = { line -> busesOnHome = false; assistantOpening = line; screen = Screen.Assistant },
+                    onAskAssistant = { line -> busesOnHome = false; assistantOpening = line; assistantListen = false; screen = Screen.Assistant },
                     startWithBuses = busesOnHome,
                     onBusesShown = { busesOnHome = false },
                     startWithSos = sosOnHome,

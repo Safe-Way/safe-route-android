@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalPolice
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Store
@@ -331,50 +332,6 @@ fun HomeScreen(
                     }
                 }
             }
-            val style = mode.style()
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Surface(shape = RoundedCornerShape(16.dp), color = style.accent, contentColor = Color.White) {
-                    Text(
-                        "${style.label} 모드",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    )
-                }
-                // 내 주변 정류장 (FR-51): the nearest stops and the buses coming, low-floor ones marked.
-                Surface(
-                    onClick = { showBuses = true; picked = null },
-                    shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 3.dp,
-                ) {
-                    Text(
-                        "가까운 버스",
-                        fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2F5BB7),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    )
-                }
-                // AI 비서 (말로 하기): say what you want ("근처 화장실로 안내해 줘", "글씨가 안 보여").
-                Surface(
-                    onClick = onOpenAssistant,
-                    shape = RoundedCornerShape(16.dp), color = Color(0xFF1F6B42), contentColor = Color.White, shadowElevation = 3.dp,
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Text(" AI 비서", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-            hint?.let { h ->
-                HintBubble(
-                    h,
-                    onOpen = {
-                        ShownHints.mark(h.key)
-                        hint = null
-                        val place = h.place
-                        if (place != null) onPlaceSelected(place) else onAskAssistant(h.text)
-                    },
-                    onDismiss = { ShownHints.mark(h.key); hint = null },
-                )
-            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NEARBY.forEach { (query, label, icon) ->
                     NearbyButton(
@@ -383,6 +340,19 @@ fun HomeScreen(
                         onClick = { goToNearest(query, label) },
                         modifier = Modifier.weight(1f),
                     )
+                }
+            }
+            // 불편 신고: a small icon on the right, under the nearby buttons (team, 11/6).
+            Surface(
+                onClick = onOpenReport,
+                shape = RoundedCornerShape(14.dp),
+                color = Color.White,
+                shadowElevation = 4.dp,
+                modifier = Modifier.align(Alignment.End).size(56.dp),
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Icon(Icons.Filled.Campaign, contentDescription = "불편 신고", tint = Color(0xFFB45309), modifier = Modifier.size(24.dp))
+                    Text("신고", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Ink)
                 }
             }
             nearbyMessage?.let {
@@ -444,20 +414,43 @@ fun HomeScreen(
 
         error?.let { MapMessage(it, Modifier.align(Alignment.BottomCenter)) }
 
-        // 불편 신고: above the SOS button when that is shown.
-        Surface(
-            onClick = onOpenReport,
-            shape = RoundedCornerShape(26.dp),
-            color = Color.White,
-            shadowElevation = 4.dp,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 16.dp, bottom = if (showSos) 116.dp else 44.dp)
-                .heightIn(min = 48.dp),
+        // AI 비서 as the map's microphone, bottom centre: tapping opens it already listening (team, 11/6).
+        // Its one-line bubble sits just above it, unless a card is open there.
+        if (!showBuses && picked == null) hint?.let { h ->
+            Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 148.dp)) {
+                HintBubble(
+                    h,
+                    onOpen = {
+                        ShownHints.mark(h.key)
+                        hint = null
+                        val place = h.place
+                        if (place != null) onPlaceSelected(place) else onAskAssistant(h.text)
+                    },
+                    onDismiss = { ShownHints.mark(h.key); hint = null },
+                )
+            }
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 36.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-                Icon(Icons.Filled.Campaign, contentDescription = null, tint = Color(0xFFB45309))
-                Text(" 불편 신고", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink)
+            Surface(
+                onClick = onOpenAssistant,
+                shape = CircleShape,
+                color = Color(0xFF1F6B42),
+                contentColor = Color.White,
+                shadowElevation = 6.dp,
+                modifier = Modifier.size(68.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.Mic, contentDescription = "AI 비서에게 말하기", modifier = Modifier.size(32.dp))
+                }
+            }
+            Surface(shape = RoundedCornerShape(10.dp), color = Color.White.copy(alpha = 0.9f), modifier = Modifier.padding(top = 4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)) {
+                    Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = Color(0xFF1F6B42), modifier = Modifier.size(13.dp))
+                    Text(" AI 비서", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1F6B42))
+                }
             }
         }
         if (showSos) SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 44.dp))
@@ -644,7 +637,7 @@ private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit)
         onClick = onOpen,
         shape = RoundedCornerShape(16.dp),
         // See-through so the map behind stays visible; the words keep full contrast.
-        color = Color.White.copy(alpha = 0.78f),
+        color = Color.White.copy(alpha = 0.88f),
         border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF1F6B42).copy(alpha = 0.7f)),
         shadowElevation = 0.dp,
         modifier = Modifier.fillMaxWidth(),

@@ -99,6 +99,8 @@ fun AssistantScreen(
     modifier: Modifier = Modifier,
     /** The line AI 비서 opens with, when it came from its bubble on the map; otherwise the greeting. */
     opening: String? = null,
+    /** Opened from the map's microphone button: start listening at once. */
+    listenAtStart: Boolean = false,
 ) {
     val android = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -181,6 +183,8 @@ fun AssistantScreen(
             say("이 휴대폰은 음성 입력을 쓸 수 없어요. 글로 써 주세요.")
         }
     }
+
+    LaunchedEffect(Unit) { if (listenAtStart) listen() }
 
     LaunchedEffect(lines.size, thinking) { listState.animateScrollToItem(maxOf(0, lines.size)) }
 
