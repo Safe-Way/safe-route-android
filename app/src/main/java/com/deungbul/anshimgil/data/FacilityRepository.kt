@@ -216,6 +216,24 @@ fun stationExits(station: Facility, facilities: List<Facility>): List<String> {
         }
 }
 
+/** The area a child protection zone covers around its school, as the route engine counts it. */
+private const val SCHOOL_ZONE_RADIUS_M = 300.0
+
+/** A circle of [SCHOOL_ZONE_RADIUS_M] around a school, for the route map (the server says to draw it so). */
+fun schoolZoneCircle(lat: Double, lon: Double): Zone {
+    val dLat = SCHOOL_ZONE_RADIUS_M / 111_320.0
+    val dLon = SCHOOL_ZONE_RADIUS_M / (111_320.0 * kotlin.math.cos(Math.toRadians(lat)))
+    return Zone(
+        label = "어린이 보호구역",
+        fillColor = 0x30EAB308,
+        strokeColor = 0xFFA16207,
+        points = (0 until 36).map { i ->
+            val a = Math.toRadians(i * 10.0)
+            lat + dLat * kotlin.math.sin(a) to lon + dLon * kotlin.math.cos(a)
+        },
+    )
+}
+
 /** How far the drawn child protection square reaches from the school on each side. */
 private const val SCHOOL_ZONE_HALF_M = 100.0
 

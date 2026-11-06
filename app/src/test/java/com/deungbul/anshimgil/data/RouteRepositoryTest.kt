@@ -63,7 +63,8 @@ class RouteRepositoryTest {
         // CCTV is on both routes, the guard house only on the safe one
         assertEquals(listOf(FacilityKind.CCTV, FacilityKind.GUARD_HOUSE), result.facilitiesOn(RouteType.SAFE).map { it.kind })
         assertEquals(listOf(FacilityKind.CCTV), result.facilitiesOn(RouteType.SHORTEST).map { it.kind })
-        assertFalse(result.dataQuality.ok)
+        // Only part of the route lacks data (campus paths), so no notice.
+        assertTrue(result.dataQuality.ok)
         assertEquals("이 지역은 안전 데이터가 부족합니다", result.dataQuality.message)
     }
 
@@ -85,6 +86,56 @@ class RouteRepositoryTest {
         assertTrue(result.explanation.items.isEmpty())
         assertTrue(result.dataQuality.ok)
         assertNull(result.dataQuality.message)
+    }
+
+    @Test
+    fun parseRouteResult_readsRestSchoolCoveredAndNotes() {
+        val json = JSONObject(
+            """
+            {"conditions":{"night":false,"nightSource":"auto"},
+             "routes":[
+               {"kind":"shortest","distanceM":1000,"durationMin":15,"geometry":[[126.91,35.14],[126.92,35.15]],
+                "counts":{"light":80,"help":5,"rest":12,"school":3},"covered":{"school":623,"help":1027}},
+               {"kind":"safe","distanceM":1250,"durationMin":19,"geometry":[[126.91,35.14],[126.92,35.15]],
+                "counts":{"light":82,"help":4,"rest":21,"school":3},"covered":{"school":1215,"help":1392}}],
+             "explanation":{"text":"250m(4분) 더 돌지만 비상벨 +2개 (알림: 행사 구간을 지납니다)","summary":"250m(4분) 더 돌지만 비상벨 +2개",
+                "notes":[{"level":"info","kind":"event","text":"행사 구간을 지납니다"},{"level":"warn","kind":"stairs","text":"계단을 지납니다"}]},
+             "facilities":[
+               {"type":"SCHOOL_ZONE","lat":35.14,"lon":126.91,"on":"both"},
+               {"type":"SHELTER","lat":35.14,"lon":126.91,"on":"safe"},
+               {"type":"TOILET","lat":35.14,"lon":126.91,"on":"safe"}],
+             "dataQuality":{"status":"OK"}}
+            """.trimIndent(),
+        )
+        val child = parseRouteResult(json, UserMode.CHILD)
+        assertEquals("250m(4분) 더 돌지만 비상벨 +2개", child.explanation.summary)
+        assertEquals(
+            listOf(RouteNote(false, "event", "행사 구간을 지납니다"), RouteNote(true, "stairs", "계단을 지납니다")),
+            child.explanation.notes,
+        )
+        assertTrue(CompareItem("쉼 곳", 12, 21, "곳", "rest") in child.explanation.items)
+        assertTrue(CompareItem("어린이보호구역", 3, 3, "곳", "school") in child.explanation.items)
+        assertTrue(CompareItem("보호구역 안을 걷는 길", 623, 1215, "m", "covered.school") in child.explanation.items)
+        assertEquals(mapOf("school" to 1215, "help" to 1392), child.route(RouteType.SAFE)!!.covered)
+        // Children see protection zones, not shelters or toilets; seniors the other way round.
+        assertEquals(listOf(FacilityKind.SCHOOL_ZONE), child.facilities.map { it.kind })
+        val senior = parseRouteResult(json, UserMode.SENIOR)
+        assertEquals(listOf(FacilityKind.HEAT_SHELTER, FacilityKind.TOILET), senior.facilities.map { it.kind })
+        assertEquals("쉼터", senior.facilities.first().label)
+    }
+
+    @Test
+    fun parseRouteResult_noDataShowsNotice() {
+        val json = JSONObject("""{"routes":[],"dataQuality":{"status":"NO_DATA","message":"이 지역은 안전 데이터가 부족합니다"}}""")
+        assertFalse(parseRouteResult(json).dataQuality.ok)
+    }
+
+    @Test
+    fun parseRouteResult_oldServerTextIsSummary() {
+        val json = JSONObject("""{"routes":[],"explanation":{"text":"가장 짧은 길로 갑니다"}}""")
+        val result = parseRouteResult(json)
+        assertEquals("가장 짧은 길로 갑니다", result.explanation.summary)
+        assertTrue(result.explanation.notes.isEmpty())
     }
 
     @Test

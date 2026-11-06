@@ -10,8 +10,13 @@ data class RouteOption(
     val distanceM: Int,
     val durationMin: Int,
     val path: List<LatLon>,
-    /** Facilities along the route by group: light, cctv, bell, help. */
+    /** Facilities along the route by group: light, cctv, bell, help, rest (shelters and toilets open now), school. */
     val counts: Map<String, Int> = emptyMap(),
+    /**
+     * Meters walked within reach of each thing this mode and time weighs, e.g. child by day
+     * {"school": 1215, "help": 1392}; empty when nothing is weighed (adult or wheelchair by day).
+     */
+    val covered: Map<String, Int> = emptyMap(),
     /** Which side the pavement is on along stretches beside a road (OSM sidewalk tag). */
     val sidewalks: List<Sidewalk> = emptyList(),
 )
@@ -40,7 +45,14 @@ data class Condition(val key: String, val label: String, val on: Boolean)
 /** One row of "shortest → safe", e.g. CCTV 3대 → 9대. [key] is the server's count key ("light", "cctv", …). */
 data class CompareItem(val label: String, val shortest: Int, val safe: Int, val unit: String, val key: String = "")
 
-data class Explanation(val summary: String, val items: List<CompareItem>)
+/**
+ * [summary] is the server's one-line reason ("24m(1분) 더 돌지만 쉼 곳 +1곳"); [notes] are warnings and notices
+ * shown under it, such as stairs a senior cannot avoid or an event on the way.
+ */
+data class Explanation(val summary: String, val items: List<CompareItem>, val notes: List<RouteNote> = emptyList())
+
+/** A warning ([warn] true) or a notice about the route, in a plain sentence. [kind] is stairs, event, unpaved, surface or snap. */
+data class RouteNote(val warn: Boolean, val kind: String, val text: String)
 
 data class DataQuality(val ok: Boolean, val message: String?)
 

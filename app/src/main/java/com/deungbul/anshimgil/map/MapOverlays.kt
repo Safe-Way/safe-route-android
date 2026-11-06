@@ -15,6 +15,7 @@ import com.deungbul.anshimgil.data.MapLayers
 import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.RouteType
 import com.deungbul.anshimgil.data.distanceMeters
+import com.deungbul.anshimgil.data.schoolZoneCircle
 import com.deungbul.anshimgil.data.TurnMark
 import com.deungbul.anshimgil.data.TransitRoute
 import com.deungbul.anshimgil.data.LegType
@@ -132,7 +133,9 @@ fun KakaoMap.showRoutes(context: Context, result: RouteResult, selected: RouteTy
     // Fit the camera first: the tags are thinned out by where they fall on screen in the final view.
     val points = result.routes.flatMap { it.path }.map { it.toLatLng() }.toTypedArray()
     if (points.isNotEmpty()) moveCamera(CameraUpdateFactory.fitMapPoints(points, (48 * density).toInt()))
-    showLayers(context, MapLayers(result.facilitiesOn(selected), zones = emptyList()))
+    val shown = result.facilitiesOn(selected)
+    val zones = shown.filter { it.kind == FacilityKind.SCHOOL_ZONE }.map { schoolZoneCircle(it.lat, it.lon) }
+    showLayers(context, MapLayers(shown, zones = zones))
 
     val path = result.route(selected)?.path ?: result.routes.firstOrNull()?.path ?: return
     labelManager?.layer?.let { labels ->
