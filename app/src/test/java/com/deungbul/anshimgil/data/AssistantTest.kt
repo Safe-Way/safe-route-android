@@ -30,6 +30,17 @@ class AssistantTest {
     }
 
     @Test
+    fun urgentWordsAskAbout112First() {
+        assertTrue(rule("넘어져서 다리가 아파요") is AssistantAction.Emergency)
+        assertTrue(rule("누가 계속 따라와요") is AssistantAction.Emergency)
+    }
+
+    @Test
+    fun saysWhatItWillDoNotWhatItDid() {
+        assertTrue(!rule("글씨가 안 보여").say.contains("했어요") && !rule("글씨가 안 보여").say.contains("바꿨어요"))
+    }
+
+    @Test
     fun unknownAsksBack() {
         assertTrue(rule("음…") is AssistantAction.Ask)
     }
@@ -57,7 +68,8 @@ class AssistantTest {
             "voiceoff" to "말소리 좀 꺼 줘", "wheel" to "휠체어 모드로 바꿔 줘", "bell" to "지도에 비상벨도 보여 줘",
             "goto" to "조선대병원 가고 싶어", "goto2" to "광주역까지 길 알려줘", "bus" to "버스 언제 와요",
             "report" to "여기 보도블록이 다 깨졌어요", "vague" to "도와줘", "howto" to "SOS는 어떻게 켜요?",
-            "danger" to "누가 따라와요 무서워요",
+            "danger" to "누가 따라와요 무서워요", "fall" to "넘어져서 무릎이 아파요", "weather" to "오늘 날씨 어때?",
+            "taxi" to "택시 불러 줘", "offtopic" to "점심 메뉴 추천해 줘", "sos" to "SOS 버튼이 안 보여요",
         )
         java.io.File(out).printWriter().use { w ->
             cases.forEach { (id, said) ->

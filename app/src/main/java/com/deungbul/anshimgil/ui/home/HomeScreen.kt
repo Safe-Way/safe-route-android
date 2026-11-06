@@ -123,8 +123,11 @@ fun HomeScreen(
     /** Open the nearby-bus card on arrival (the assistant asked for it). */
     startWithBuses: Boolean = false,
     onBusesShown: () -> Unit = {},
+    startWithSos: Boolean = false,
+    onSosShown: () -> Unit = {},
 ) {
-    var sos by remember { mutableStateOf(false) }
+    var sos by remember { mutableStateOf(startWithSos) }
+    LaunchedEffect(Unit) { if (startWithSos) onSosShown() }
     val context = LocalContext.current
     var map by remember { mutableStateOf<KakaoMap?>(null) }
     var error by remember { mutableStateOf<String?>(null) }

@@ -136,6 +136,8 @@ fun AppRoot(
     val appAssistant = remember { AppAssistant.create() }
     // The assistant asked the map to open the nearby-bus card.
     var busesOnHome by remember { mutableStateOf(false) }
+    // The assistant's 보호자에게 알리기: open SOS on the map.
+    var sosOnHome by remember { mutableStateOf(false) }
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
     val scope = rememberCoroutineScope()
 
@@ -201,6 +203,7 @@ fun AppRoot(
                         onRoute = { place -> screen = Screen.Route(place, fromHome = true) },
                         onShowBuses = { busesOnHome = true; screen = Screen.Home },
                         onOpenReport = { screen = Screen.Report },
+                        onAlertGuardian = { sosOnHome = true; screen = Screen.Home },
                         onBack = { screen = Screen.Home },
                         modifier = modifier,
                     )
@@ -310,6 +313,8 @@ fun AppRoot(
                     onOpenAssistant = { busesOnHome = false; screen = Screen.Assistant },
                     startWithBuses = busesOnHome,
                     onBusesShown = { busesOnHome = false },
+                    startWithSos = sosOnHome,
+                    onSosShown = { sosOnHome = false },
                 )
             }
         }

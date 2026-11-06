@@ -2,7 +2,9 @@ package com.deungbul.anshimgil.ui.assistant
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
 import android.speech.RecognizerIntent
+import android.speech.tts.TextToSpeech
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -23,11 +26,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,6 +60,7 @@ import com.deungbul.anshimgil.data.NEARBY_KINDS
 import com.deungbul.anshimgil.data.Place
 import com.deungbul.anshimgil.data.PlaceRepository
 import com.deungbul.anshimgil.location.phoneOrigin
+import com.deungbul.anshimgil.ui.guide.rememberTts
 import com.deungbul.anshimgil.ui.mode.Bubble
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -79,6 +87,8 @@ fun AssistantScreen(
     onRoute: (Place) -> Unit,
     onShowBuses: () -> Unit,
     onOpenReport: () -> Unit,
+    /** Go to the map and open SOS (it counts down before texting, so it can still be cancelled). */
+    onAlertGuardian: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -87,10 +97,16 @@ fun AssistantScreen(
     val lines = remember { mutableStateListOf(ChatLine(fromUser = false, text = HELLO)) }
     var choices by remember { mutableStateOf(STARTERS) }
     var thinking by remember { mutableStateOf<String?>(null) }
+    var urgent by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    fun say(text: String) { lines += ChatLine(fromUser = false, text = text) }
+    // Replies are read aloud when 음성 안내 is on.
+    val tts = rememberTts(android)
+    fun say(text: String) {
+        lines += ChatLine(fromUser = false, text = text)
+        if (context.settings.voiceGuide) tts.speak(text, TextToSpeech.QUEUE_ADD, null, "assistant")
+    }
 
     suspend fun findAndGo(find: suspend (lat: Double, lon: Double) -> Place?, missing: String) {
         thinking = "찾는 중…"
@@ -116,13 +132,15 @@ fun AssistantScreen(
         lines += ChatLine(fromUser = true, text = said)
         input = ""
         choices = emptyList()
+        urgent = false
         thinking = "생각하는 중…"
         scope.launch {
             // The greeting is the app's own, so only what the user said and the replies go out.
             val action = assistant.reply(lines.drop(1), context)
             say(action.say)
             when (action) {
-                is AssistantAction.ChangeSettings -> onChangeSettings(action)
+                is AssistantAction.ChangeSettings -> { onChangeSettings(action); say("바꿨어요. 더 바꿀 게 있으면 말해 주세요.") }
+                is AssistantAction.Emergency -> urgent = true
                 is AssistantAction.GoNearby -> findAndGo(
                     { lat, lon -> placeRepository.nearby(action.kind, context.mode, lat, lon).places.firstOrNull() },
                     "1km 안에서 ${NEARBY_KINDS[action.kind]}을(를) 찾지 못했어요.",
@@ -169,6 +187,17 @@ fun AssistantScreen(
         ) {
             items(lines) { line -> Bubble(line) }
             thinking?.let { item { Text(it, fontSize = 15.sp, color = Muted) } }
+            if (urgent) item {
+                EmergencyCard(
+                    onCall = {
+                        // Opens the dialer with 112 filled in; the person presses call.
+                        android.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:112")))
+                    },
+                    onGuardian = onAlertGuardian,
+                    onPolice = { urgent = false; send("가까운 파출소로 안내해 줘") },
+                    onFine = { urgent = false; say("다행이에요. 필요하면 언제든 말해 주세요.") },
+                )
+            }
         }
         if (choices.isNotEmpty()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -188,6 +217,24 @@ fun AssistantScreen(
             IconButton(onClick = { send(input) }, enabled = input.isNotBlank() && thinking == null) {
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "보내기", tint = if (input.isNotBlank()) Green else Muted)
             }
+        }
+    }
+}
+
+/** 급한 말에: 112 / 보호자 / 파출소 / 괜찮아요, big enough to hit in a hurry. */
+@Composable
+private fun EmergencyCard(onCall: () -> Unit, onGuardian: () -> Unit, onPolice: () -> Unit, onFine: () -> Unit) {
+    val red = Color(0xFFB42318)
+    Surface(shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onCall, colors = ButtonDefaults.buttonColors(containerColor = red), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                Text("112에 전화", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+            Button(onClick = onGuardian, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB45309)), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                Text("보호자에게 알리기 (SOS)", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+            OutlinedButton(onClick = onPolice, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("가까운 파출소로 가기", fontSize = 16.sp) }
+            OutlinedButton(onClick = onFine, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("괜찮아요", fontSize = 16.sp) }
         }
     }
 }
