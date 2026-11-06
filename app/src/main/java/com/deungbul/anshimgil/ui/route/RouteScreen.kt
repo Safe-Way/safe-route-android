@@ -9,6 +9,7 @@ import com.deungbul.anshimgil.data.nextTrainLines
 import com.deungbul.anshimgil.data.nextBusText
 import com.deungbul.anshimgil.data.legTitle
 import com.deungbul.anshimgil.data.LegType
+import com.deungbul.anshimgil.data.CompareItem
 import com.deungbul.anshimgil.data.TransitLeg
 import com.deungbul.anshimgil.data.TransitRoute
 import com.deungbul.anshimgil.data.TransitResult
@@ -503,6 +504,18 @@ private fun RouteDetails(
         .filter { it.key.isEmpty() || it.key in criteria.counts }
         .partition { it.key.startsWith("covered.") }
     var more by rememberSaveable { mutableStateOf(false) }
+    // Only the chosen route's facts, so two sets of numbers do not mix (11/6).
+    val fast = selected == RouteType.SHORTEST && result.routes.size > 1
+    fun valueOf(item: CompareItem) = if (fast) item.shortest else item.safe
+    val fastSummary = run {
+        val s = result.route(RouteType.SAFE)
+        val f = result.route(RouteType.SHORTEST)
+        if (s == null || f == null) null else {
+            val m = (s.distanceM - f.distanceM).coerceAtLeast(0)
+            val min = (s.durationMin - f.durationMin).coerceAtLeast(0)
+            if (m > 0) "안전한 길보다 ${m}m(${min}분) 짧아요." else null
+        }
+    }
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
@@ -512,17 +525,18 @@ private fun RouteDetails(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                criteria.short, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink, lineHeight = 24.sp,
+                if (fast) "가장 빠른 길이에요." else criteria.short, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink, lineHeight = 24.sp,
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = { more = !more }) { Text(if (more) "접기" else "자세히", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
         }
         // The server's real difference, e.g. "24m(1분) 더 돌지만 쉼 곳 +1곳".
-        result.explanation.summary.takeIf { it.isNotBlank() }?.let {
+        (if (fast) fastSummary else result.explanation.summary.takeIf { it.isNotBlank() })?.let {
             Text(it, fontSize = 15.sp, color = Muted, lineHeight = 21.sp, modifier = Modifier.padding(end = 8.dp))
         }
         // Warnings and notices stay in view: stairs that could not be avoided, an event on the way.
-        result.explanation.notes.forEach { note ->
+        // The server's notes are about the safe route.
+        if (!fast) result.explanation.notes.forEach { note ->
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(end = 8.dp)) {
                 Icon(
                     if (note.warn) Icons.Filled.WarningAmber else Icons.Filled.Info,
@@ -538,20 +552,20 @@ private fun RouteDetails(
                 items.forEach { item ->
                     Row {
                         Text(item.label, fontSize = 15.sp, color = Ink, modifier = Modifier.weight(1f))
-                        Text("${item.shortest}${item.unit} → ${item.safe}${item.unit}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink)
+                        Text("${valueOf(item)}${item.unit}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink)
                     }
                 }
-                Text("가장 빠른 길 → 안전한 길로 바꾸면", fontSize = 12.sp, color = Muted)
+                Text(if (fast) "빠른 길 주변" else "안전한 길 주변", fontSize = 12.sp, color = Muted)
             }
         }
         if (more) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(end = 8.dp, bottom = 8.dp)) {
-                Text("${mode.style().label} 모드 · ${if (night) "밤" else "낮"}에 길을 고르는 기준", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Muted)
+                Text("${mode.style().label} 모드 · ${if (night) "밤" else "낮"}에 안전한 길을 고르는 기준", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Muted)
                 criteria.details.forEach { Text("· $it", fontSize = 15.sp, color = Ink, lineHeight = 21.sp) }
                 covered.forEach { item ->
                     Row(Modifier.padding(top = 4.dp)) {
                         Text(item.label, fontSize = 15.sp, color = Ink, modifier = Modifier.weight(1f))
-                        Text("${item.shortest}${item.unit} → ${item.safe}${item.unit}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink)
+                        Text("${valueOf(item)}${item.unit}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink)
                     }
                 }
             }
