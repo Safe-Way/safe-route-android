@@ -25,6 +25,49 @@ object ServerApi {
 
     suspend fun post(path: String, body: JSONObject): JSONObject = request("POST", path, body)
 
+    /** A file sent in a multipart form, e.g. a photo. */
+    class Part(val name: String, val fileName: String, val contentType: String, val bytes: ByteArray)
+
+    /** POST as multipart/form-data: text [fields] plus [files] (used for 불편 신고 with photos). */
+    suspend fun postMultipart(path: String, fields: Map<String, Any?>, files: List<Part>): JSONObject =
+        withContext(Dispatchers.IO) {
+            val boundary = "----seipjido" + System.nanoTime()
+            val body = java.io.ByteArrayOutputStream().apply {
+                fun line(text: String = "") = write((text + "\r\n").toByteArray())
+                fields.forEach { (name, value) ->
+                    if (value == null) return@forEach
+                    line("--$boundary")
+                    line("Content-Disposition: form-data; name=\"$name\"")
+                    line()
+                    line(value.toString())
+                }
+                files.forEach { f ->
+                    line("--$boundary")
+                    line("Content-Disposition: form-data; name=\"${f.name}\"; filename=\"${f.fileName}\"")
+                    line("Content-Type: ${f.contentType}")
+                    line()
+                    write(f.bytes)
+                    line()
+                }
+                line("--$boundary--")
+            }.toByteArray()
+            val connection = try {
+                (URL(baseUrl + path).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 5_000
+                    readTimeout = 30_000
+                    doOutput = true
+                    setRequestProperty("Accept", "application/json")
+                    setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+                    setFixedLengthStreamingMode(body.size)
+                    outputStream.use { it.write(body) }
+                }
+            } catch (e: IOException) {
+                throw ApiException("NETWORK", "서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.")
+            }
+            readResponse(connection)
+        }
+
     private suspend fun request(method: String, path: String, body: JSONObject?): JSONObject =
         withContext(Dispatchers.IO) {
             val connection = try {
@@ -42,6 +85,10 @@ object ServerApi {
             } catch (e: IOException) {
                 throw ApiException("NETWORK", "서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.")
             }
+            readResponse(connection)
+        }
+
+    private fun readResponse(connection: HttpURLConnection): JSONObject =
             try {
                 val ok = connection.responseCode in 200..299
                 val text = (if (ok) connection.inputStream else connection.errorStream)
@@ -59,7 +106,6 @@ object ServerApi {
             } finally {
                 connection.disconnect()
             }
-        }
 
     private fun queryString(query: Map<String, Any?>): String {
         val parts = query.filterValues { it != null }

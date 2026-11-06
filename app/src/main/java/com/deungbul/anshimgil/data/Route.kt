@@ -12,7 +12,27 @@ data class RouteOption(
     val path: List<LatLon>,
     /** Facilities along the route by group: light, cctv, bell, help. */
     val counts: Map<String, Int> = emptyMap(),
+    /** Which side the pavement is on along stretches beside a road (OSM sidewalk tag). */
+    val sidewalks: List<Sidewalk> = emptyList(),
 )
+
+enum class SidewalkSide { LEFT, RIGHT, BOTH, NONE, UNKNOWN }
+
+/** Path points [from]..[to] (indices into the route's path) run beside a road with the pavement on [side]. */
+data class Sidewalk(val from: Int, val to: Int, val side: SidewalkSide)
+
+/**
+ * What to tell the walker about the pavement where they are, given the path point they are past;
+ * null when nothing useful is known (not beside a road, or the side is not mapped).
+ */
+fun sidewalkHint(sidewalks: List<Sidewalk>, pointIndex: Int): String? =
+    when (sidewalks.firstOrNull { pointIndex >= it.from && pointIndex < it.to }?.side) {
+        SidewalkSide.LEFT -> "왼쪽 인도로 걸어요"
+        SidewalkSide.RIGHT -> "오른쪽 인도로 걸어요"
+        SidewalkSide.BOTH -> "양쪽에 인도가 있어요"
+        SidewalkSide.NONE -> "인도가 없어요. 차 조심하세요"
+        SidewalkSide.UNKNOWN, null -> null
+    }
 
 /** A detected situation such as night or rain; [on] is whether routing used it. */
 data class Condition(val key: String, val label: String, val on: Boolean)

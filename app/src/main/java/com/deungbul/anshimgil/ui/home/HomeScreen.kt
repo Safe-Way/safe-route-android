@@ -1,5 +1,9 @@
 package com.deungbul.anshimgil.ui.home
 
+import com.deungbul.anshimgil.data.busesToShow
+import com.deungbul.anshimgil.data.BusRepository
+import com.deungbul.anshimgil.data.NearbyStop
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.foundation.background
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -109,6 +113,7 @@ fun HomeScreen(
     placeRepository: PlaceRepository,
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenReport: () -> Unit,
     onPlaceSelected: (Place) -> Unit,
     guardians: List<Guardian>,
     showSos: Boolean,
@@ -124,6 +129,7 @@ fun HomeScreen(
     var mapNote by remember { mutableStateOf<String?>(null) }
     // The tapped place whose details are shown, e.g. a station's elevator exits.
     var picked by remember { mutableStateOf<Facility?>(null) }
+    var showBuses by remember { mutableStateOf(false) }
     // What the map shows now, so a station's card can list its exits.
     var shownFacilities by remember { mutableStateOf<List<Facility>>(emptyList()) }
     var zoom by remember { mutableIntStateOf(WALK_ZOOM) }
@@ -212,7 +218,7 @@ fun HomeScreen(
             moved.visibleBbox()?.let { bbox = it }
         }
         m.setOnLabelClickListener { _, _, label ->
-            (label.tag as? Facility)?.let { picked = it }
+            (label.tag as? Facility)?.let { picked = it; showBuses = false }
             true
         }
     }
@@ -293,13 +299,26 @@ fun HomeScreen(
                 }
             }
             val style = mode.style()
-            Surface(shape = RoundedCornerShape(16.dp), color = style.accent, contentColor = Color.White) {
-                Text(
-                    "${style.label} 모드",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = RoundedCornerShape(16.dp), color = style.accent, contentColor = Color.White) {
+                    Text(
+                        "${style.label} 모드",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                }
+                // 내 주변 정류장 (FR-51): the nearest stops and the buses coming, low-floor ones marked.
+                Surface(
+                    onClick = { showBuses = true; picked = null },
+                    shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 3.dp,
+                ) {
+                    Text(
+                        "가까운 버스",
+                        fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2F5BB7),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NEARBY.forEach { (query, label, icon) ->
@@ -340,7 +359,7 @@ fun HomeScreen(
                 color = Color.White.copy(alpha = 0.85f),
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = if (showSos) 88.dp else 12.dp, bottom = 12.dp),
+                    .padding(start = 12.dp, bottom = 12.dp),
             ) {
                 Text(
                     note,
@@ -351,6 +370,14 @@ fun HomeScreen(
             }
         }
 
+        if (showBuses) {
+            NearbyBusCard(
+                at = here?.let { chooseOrigin(it).point },
+                mode = mode,
+                onClose = { showBuses = false },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 112.dp),
+            )
+        }
         picked?.let { place ->
             PlaceDetailCard(
                 place,
@@ -362,6 +389,22 @@ fun HomeScreen(
 
         error?.let { MapMessage(it, Modifier.align(Alignment.BottomCenter)) }
 
+        // 불편 신고: above the SOS button when that is shown.
+        Surface(
+            onClick = onOpenReport,
+            shape = RoundedCornerShape(26.dp),
+            color = Color.White,
+            shadowElevation = 4.dp,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 16.dp, bottom = if (showSos) 116.dp else 44.dp)
+                .heightIn(min = 48.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                Icon(Icons.Filled.Campaign, contentDescription = null, tint = Color(0xFFB45309))
+                Text(" 불편 신고", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink)
+            }
+        }
         if (showSos) SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 44.dp))
         if (sos) SosOverlay(guardians, here = { here }, onClose = { sos = false }, onAddGuardian = onOpenSettings)
     }
@@ -470,6 +513,62 @@ private fun PlaceDetailCard(place: Facility, exits: List<String>, onClose: () ->
                         fontWeight = if (withElevator) FontWeight.Bold else FontWeight.Normal,
                         color = if (withElevator) Color(0xFF1F6B42) else Color(0xFF5E6A62),
                     )
+                }
+            }
+        }
+    }
+}
+
+/** The nearest bus stops with the buses coming to each (soonest first; low-floor first for seniors and wheelchair users). */
+@Composable
+private fun NearbyBusCard(at: LatLon?, mode: UserMode, onClose: () -> Unit, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    var stops by remember { mutableStateOf<List<NearbyStop>?>(null) }
+    var failed by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(at) {
+        val from = at ?: phoneOrigin(context).point
+        try {
+            stops = BusRepository.nearby(from).filter { it.buses.isNotEmpty() }.take(4)
+        } catch (e: ApiException) {
+            failed = e.message
+        }
+    }
+    Surface(shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 6.dp, modifier = modifier.fillMaxWidth()) {
+        Column(
+            Modifier
+                .heightIn(max = 420.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 14.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("가까운 정류장", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Ink, modifier = Modifier.weight(1f).padding(top = 8.dp))
+                IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Ink) }
+            }
+            val list = stops
+            when {
+                failed != null -> Text(failed!!, fontSize = 15.sp, color = Color(0xFFB42318))
+                list == null -> Text("곧 오는 버스를 찾는 중…", fontSize = 15.sp, color = Color(0xFF5E6A62))
+                list.isEmpty() -> Text("가까운 정류장에 곧 오는 버스가 없어요", fontSize = 15.sp, color = Color(0xFF5E6A62))
+                else -> list.forEach { stop ->
+                    Column(Modifier.padding(top = 8.dp, end = 12.dp)) {
+                        Text(
+                            "${stop.name} · ${stop.distanceM}m" + (stop.towards?.let { "  ($it 방면)" } ?: ""),
+                            fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink,
+                        )
+                        busesToShow(stop.buses, mode).take(4).forEach { b ->
+                            val whenText = when (val m = b.inMin) { null -> "시간 모름"; 0 -> "곧 도착"; else -> "${m}분 뒤" }
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("${b.line}번", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2F5BB7))
+                                Text(whenText + (b.stopsAway?.takeIf { it > 0 }?.let { " (${it}정거장 전)" } ?: ""), fontSize = 15.sp, color = Ink)
+                                if (b.lowFloor) {
+                                    Text(
+                                        "저상", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White,
+                                        modifier = Modifier.background(Color(0xFF1F6B42), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 1.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
