@@ -1,5 +1,8 @@
 package com.deungbul.anshimgil.data
 
+import kotlin.math.cos
+import kotlin.math.roundToInt
+
 /** A point on the ground. */
 data class LatLon(val lat: Double, val lon: Double)
 
@@ -121,4 +124,93 @@ fun autoNightReason(result: RouteResult, now: java.time.LocalTime): String? {
         result.sunset != null && !now.isBefore(result.sunset.minusMinutes(EVENING_BEFORE_SUNSET_MIN)) -> "저녁이라"
         else -> null
     }
+}
+
+
+/** How near the start or the end the route must already pass for the loop after it to be cut. */
+const val END_DETOUR_NEAR_M = 15.0
+
+/** The loop must be at least this much longer than going straight across, or it is left alone. */
+private const val END_DETOUR_MIN_SAVING_M = 10.0
+
+/**
+ * The route without the loops at either end: the server joins the start and the end to the nearest road,
+ * which for a bus stop can be the road beside the pavement the walker is on, so the line went 28 m past
+ * the stop and came back up the other side (11/6). When the route already passes within
+ * [END_DETOUR_NEAR_M] of the end (or the start), it goes straight there from that point instead.
+ * Distance and time are shortened by what was cut; sidewalk stretches are moved to the new point numbers.
+ */
+fun RouteOption.withoutEndDetours(): RouteOption {
+    if (path.size < 3) return this
+    var points = path
+    var sidewalks = sidewalks
+    var cut = 0.0
+
+    // The end: the first segment that comes near the end with a long way still to go.
+    run {
+        val end = points.last()
+        val after = suffixLengths(points)
+        for (j in 0 until points.size - 2) {
+            val c = closestOnSegment(end, points[j], points[j + 1])
+            val straight = metersBetween(c, end)
+            val remaining = metersBetween(points[j], c).let { after[j] - it }
+            if (straight <= END_DETOUR_NEAR_M && remaining > straight + END_DETOUR_MIN_SAVING_M) {
+                cut += remaining - straight
+                points = points.take(j + 1) + listOf(c, end)
+                val last = points.lastIndex
+                sidewalks = sidewalks.mapNotNull { w -> if (w.from >= last) null else w.copy(to = minOf(w.to, last)) }
+                break
+            }
+        }
+    }
+    // The start: the last segment that comes near the start, after a walk away from it.
+    run {
+        val start = points.first()
+        val before = prefixLengths(points)
+        for (j in points.size - 2 downTo 1) {
+            val c = closestOnSegment(start, points[j], points[j + 1])
+            val straight = metersBetween(start, c)
+            val walked = before[j] + metersBetween(points[j], c)
+            if (straight <= END_DETOUR_NEAR_M && walked > straight + END_DETOUR_MIN_SAVING_M) {
+                cut += walked - straight
+                points = listOf(start, c) + points.drop(j + 1)
+                val shift = j - 1 // old index k (> j) is now k - shift
+                sidewalks = sidewalks.mapNotNull { w ->
+                    val to = w.to - shift
+                    if (to <= 1) null else w.copy(from = maxOf(1, w.from - shift), to = to)
+                }
+                break
+            }
+        }
+    }
+    if (cut <= 0.0) return this
+    val meters = (distanceM - cut.roundToInt()).coerceAtLeast(1)
+    val minutes = if (distanceM > 0) (durationMin * meters.toDouble() / distanceM).roundToInt().coerceAtLeast(1) else durationMin
+    return copy(path = points, distanceM = meters, durationMin = minutes, sidewalks = sidewalks)
+}
+
+/** Meters from each point to the end of [points]. */
+private fun suffixLengths(points: List<LatLon>): DoubleArray {
+    val out = DoubleArray(points.size)
+    for (i in points.size - 2 downTo 0) out[i] = out[i + 1] + metersBetween(points[i], points[i + 1])
+    return out
+}
+
+/** Meters from the start of [points] to each point. */
+private fun prefixLengths(points: List<LatLon>): DoubleArray {
+    val out = DoubleArray(points.size)
+    for (i in 1 until points.size) out[i] = out[i - 1] + metersBetween(points[i - 1], points[i])
+    return out
+}
+
+/** The point of segment [a]–[b] nearest [p] (flat-earth, fine over a few hundred meters). */
+private fun closestOnSegment(p: LatLon, a: LatLon, b: LatLon): LatLon {
+    val k = cos(Math.toRadians(a.lat))
+    val ax = a.lon * k; val ay = a.lat
+    val bx = b.lon * k; val by = b.lat
+    val px = p.lon * k; val py = p.lat
+    val dx = bx - ax; val dy = by - ay
+    val len2 = dx * dx + dy * dy
+    val t = if (len2 == 0.0) 0.0 else (((px - ax) * dx + (py - ay) * dy) / len2).coerceIn(0.0, 1.0)
+    return LatLon(a.lat + (b.lat - a.lat) * t, a.lon + (b.lon - a.lon) * t)
 }
