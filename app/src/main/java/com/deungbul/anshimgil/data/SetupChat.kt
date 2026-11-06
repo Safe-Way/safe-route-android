@@ -37,7 +37,8 @@ sealed interface SetupReply {
 }
 
 interface SetupAssistant {
-    suspend fun reply(history: List<ChatLine>): SetupReply
+    /** [current] is what was picked so far, so a follow-up ("다른 것도 추가돼?") changes it instead of starting over. */
+    suspend fun reply(history: List<ChatLine>, current: SetupPick? = null): SetupReply
 
     companion object {
         fun create(): SetupAssistant =
@@ -79,7 +80,7 @@ private fun modeLabel(mode: UserMode) = when (mode) {
  * Asks once if it cannot tell who walks; otherwise picks.
  */
 object RuleSetupAssistant : SetupAssistant {
-    override suspend fun reply(history: List<ChatLine>): SetupReply {
+    override suspend fun reply(history: List<ChatLine>, current: SetupPick?): SetupReply {
         val said = history.filter { it.fromUser }.joinToString(" ") { it.text }
         val mode = modeFrom(said)
             ?: return if (history.count { it.fromUser } >= 2) {
@@ -137,12 +138,12 @@ object RuleSetupAssistant : SetupAssistant {
  * or with the app's own setting values. Falls back to [fallback] on any failure.
  */
 class GeminiSetupAssistant(private val fallback: SetupAssistant) : SetupAssistant {
-    override suspend fun reply(history: List<ChatLine>): SetupReply =
-        runCatching { ask(history) }.getOrNull() ?: fallback.reply(history)
+    override suspend fun reply(history: List<ChatLine>, current: SetupPick?): SetupReply =
+        runCatching { ask(history, current) }.getOrNull() ?: fallback.reply(history, current)
 
-    private suspend fun ask(history: List<ChatLine>): SetupReply? = withContext(Dispatchers.IO) {
+    private suspend fun ask(history: List<ChatLine>, current: SetupPick?): SetupReply? = withContext(Dispatchers.IO) {
         val url = URL("https://generativelanguage.googleapis.com/v1beta/models/${BuildConfig.GEMINI_MODEL}:generateContent")
-        val body = geminiRequest(history).toString().toByteArray()
+        val body = geminiRequest(history, current).toString().toByteArray()
         val connection = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 8_000
@@ -167,12 +168,15 @@ class GeminiSetupAssistant(private val fallback: SetupAssistant) : SetupAssistan
 private val SETUP_INSTRUCTION = """
 너는 '세잎지도' 걷기 길안내 앱의 처음 설정 도우미야. 사용자가 누가 어떻게 걷는지 한국어로 말하면 앱 설정을 골라.
 모드: CHILD(어린이), SENIOR(어르신·다리가 불편하거나 천천히 걷는 사람), DISABLED(휠체어·보행기), GENERAL(그 밖의 사람).
-누가 걷는지 모르면 한 번만 짧게 되물어(type=ask, 고를 답 2~4개). 두 번째 답부터는 꼭 설정을 골라(type=pick).
-reason은 존댓말 한두 문장으로, 왜 그렇게 골랐는지 사용자에게 말하듯 써. 이름·전화번호를 묻지 마.
-extraMapItems에는 모드에 더하면 좋은 것만: ${SETUP_MAP_ITEMS.keys.joinToString(", ")}.
+누가 걷는지 모르면 한 번만 짧게 되물어(type=ask, 고를 답 2~4개). 알면 바로 설정을 골라(type=pick).
+이미 고른 설정이 있고 사용자가 더 바꾸거나 더하고 싶다고 하면, 그 설정을 바탕으로 바꿔서 다시 pick 해.
+무엇을 더할지 말하지 않았으면 "무엇을 더 볼까요?"처럼 되묻고 고를 답에 지도 항목 이름을 줘.
+모든 칸을 채워. pick이면 reason에 왜 그렇게 골랐는지, question은 빈 글자, choices는 빈 목록. ask이면 question에 되물을 말, choices에 고를 답, 설정 칸은 지금 짐작한 값, reason은 빈 글자.
+question과 reason은 존댓말 한국어 한두 문장(80자 안쪽)으로만 써. 한자나 다른 언어는 쓰지 마. 이름·전화번호는 묻지 마.
+extraMapItems에는 모드에 더하면 좋은 것만: ${SETUP_MAP_ITEMS.entries.joinToString(", ") { "${it.key}(${it.value})" }}.
 """.trimIndent()
 
-internal fun geminiRequest(history: List<ChatLine>): JSONObject {
+internal fun geminiRequest(history: List<ChatLine>, current: SetupPick? = null): JSONObject {
     val contents = JSONArray()
     history.forEach { line ->
         contents.put(
@@ -197,13 +201,20 @@ internal fun geminiRequest(history: List<ChatLine>): JSONObject {
                 .put("extraMapItems", JSONObject().put("type", "ARRAY").put("items", str(*SETUP_MAP_ITEMS.keys.toTypedArray())))
                 .put("reason", str()),
         )
-        .put("required", JSONArray(listOf("type")))
+        // Everything required: a small model otherwise leaves out the sentence (reason) quite often.
+        .put("required", JSONArray(listOf("type", "question", "choices", "mode", "textSize", "voiceGuide", "sosButton", "extraMapItems", "reason")))
+        .put("propertyOrdering", JSONArray(listOf("type", "mode", "textSize", "voiceGuide", "sosButton", "extraMapItems", "reason", "question", "choices")))
+    val instruction = SETUP_INSTRUCTION + (current?.let {
+        "\n지금까지 고른 설정: mode=${it.mode.name}, textSize=${it.textSize.name}, voiceGuide=${it.voiceGuide}, " +
+            "sosButton=${it.sosButton}, extraMapItems=${it.extraMapItems.joinToString(",").ifEmpty { "없음" }}"
+    } ?: "")
     return JSONObject()
-        .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", SETUP_INSTRUCTION))))
+        .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", instruction))))
         .put("contents", contents)
         .put(
             "generationConfig",
-            JSONObject().put("responseMimeType", "application/json").put("responseSchema", schema).put("temperature", 0.2),
+            JSONObject().put("responseMimeType", "application/json").put("responseSchema", schema)
+                .put("temperature", 0.2).put("maxOutputTokens", 400),
         )
 }
 
@@ -215,9 +226,9 @@ internal fun parseGeminiReply(response: JSONObject): SetupReply? {
     val j = runCatching { JSONObject(text) }.getOrNull() ?: return null
     return when (j.optString("type")) {
         "ask" -> {
-            val question = j.optString("question").takeIf { it.isNotBlank() } ?: return null
+            val question = j.optString("question").takeIf { looksLikeKorean(it) } ?: return null
             val choices = j.optJSONArray("choices")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
-            SetupReply.Ask(question, choices.filter { it.isNotBlank() }.take(4))
+            SetupReply.Ask(question, choices.filter { it.isNotBlank() && looksLikeKorean(it) }.take(4))
         }
         "pick" -> {
             val mode = runCatching { UserMode.valueOf(j.optString("mode")) }.getOrNull() ?: return null
@@ -226,9 +237,24 @@ internal fun parseGeminiReply(response: JSONObject): SetupReply? {
                 .filter { it in SETUP_MAP_ITEMS }.toSet()
             SetupReply.Pick(
                 SetupPick(mode, size, j.optBoolean("voiceGuide", true), j.optBoolean("sosButton", false), extras),
-                j.optString("reason").ifBlank { "말씀하신 내용에 맞춰 설정했어요." },
+                j.optString("reason").takeIf { looksLikeKorean(it) } ?: "말씀하신 내용에 맞춰 설정했어요.",
             )
         }
         else -> null
     }
+}
+
+/**
+ * Whether a model's sentence is plain Korean the app can show: no Chinese characters or other scripts
+ * slipped in, not one word repeated over and over (small models sometimes go off the rails like that).
+ */
+internal fun looksLikeKorean(text: String): Boolean {
+    val t = text.trim()
+    if (t.isEmpty() || t.length > 200) return false
+    val letters = t.filter { it.isLetter() }
+    if (letters.isEmpty()) return false
+    val hangul = letters.count { it in '\uAC00'..'\uD7A3' || it in '\u3131'..'\u318E' }
+    if (hangul * 10 < letters.length * 7) return false
+    val words = t.split(Regex("\\s+")).filter { it.isNotBlank() }
+    return words.size < 4 || words.groupingBy { it }.eachCount().values.max() * 2 <= words.size
 }

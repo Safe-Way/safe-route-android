@@ -79,6 +79,8 @@ fun SetupChatScreen(
     val lines = remember { mutableStateListOf(ChatLine(fromUser = false, text = FIRST_QUESTION)) }
     var choices by remember { mutableStateOf(emptyList<String>()) }
     var picked by remember { mutableStateOf<SetupPick?>(null) }
+    // The last settings picked, kept while the user asks for more so a follow-up builds on them.
+    var lastPick by remember { mutableStateOf<SetupPick?>(null) }
     var thinking by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -89,11 +91,12 @@ fun SetupChatScreen(
         lines += ChatLine(fromUser = true, text = said)
         input = ""
         choices = emptyList()
+        val before = picked ?: lastPick
         picked = null
         thinking = true
         scope.launch {
             // The opening question is the app's own, so only what the user said and the replies go out.
-            when (val reply = assistant.reply(lines.drop(1))) {
+            when (val reply = assistant.reply(lines.drop(1), before)) {
                 is SetupReply.Ask -> {
                     lines += ChatLine(fromUser = false, text = reply.question)
                     choices = reply.choices
@@ -101,6 +104,7 @@ fun SetupChatScreen(
                 is SetupReply.Pick -> {
                     lines += ChatLine(fromUser = false, text = reply.reason)
                     picked = reply.pick
+                    lastPick = reply.pick
                 }
             }
             thinking = false

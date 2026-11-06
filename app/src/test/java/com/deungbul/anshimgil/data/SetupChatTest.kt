@@ -48,4 +48,12 @@ class SetupChatTest {
         assertNull(parseGeminiReply(gemini("""{"type":"pick","mode":"ROBOT"}""")))
         assertTrue(parseGeminiReply(gemini("""{"type":"ask","question":"누가 걸으세요?","choices":["저요","부모님"]}""")) is SetupReply.Ask)
     }
+
+    @Test
+    fun garbledRepliesAreDropped() {
+        assertTrue(looksLikeKorean("다리가 불편하신 어르신이 편안하게 걸으실 수 있도록 맞췄어요."))
+        assertTrue(!looksLikeKorean("刀傳效析 刀傳 刀傳 刀傳 刀傳 刀傳 刀傳 刀傳 刀傳"))
+        assertTrue(!looksLikeKorean("좋아요 좋아요 좋아요 좋아요 좋아요 좋아요"))
+        assertNull(parseGeminiReply(gemini("""{"type":"ask","question":"刀傳效析 刀傳 刀傳 刀傳"}""")))
+    }
 }
