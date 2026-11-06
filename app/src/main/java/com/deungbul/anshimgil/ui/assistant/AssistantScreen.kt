@@ -149,6 +149,7 @@ fun AssistantScreen(
                     { lat, lon -> placeRepository.search(action.query, lat, lon).firstOrNull() },
                     "'${action.query}'을(를) 찾지 못했어요. 이름을 조금 다르게 말해 주세요.",
                 )
+                is AssistantAction.GoPlace -> { delay(1200); onRoute(action.place) }
                 is AssistantAction.ShowBuses -> { delay(500); onShowBuses() }
                 is AssistantAction.OpenReport -> { delay(500); onOpenReport() }
                 is AssistantAction.Ask -> choices = action.choices

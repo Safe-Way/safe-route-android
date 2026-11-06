@@ -48,6 +48,9 @@ import com.deungbul.anshimgil.ui.mode.SetupChatScreen
 import com.deungbul.anshimgil.data.SetupAssistant
 import com.deungbul.anshimgil.data.AppAssistant
 import com.deungbul.anshimgil.data.AssistantContext
+import com.deungbul.anshimgil.data.LatLon
+import com.deungbul.anshimgil.location.currentLocation
+import kotlinx.coroutines.flow.first
 import com.deungbul.anshimgil.ui.assistant.AssistantScreen
 import com.deungbul.anshimgil.ui.theme.SeipjidoTheme
 import kotlinx.coroutines.flow.map
@@ -133,7 +136,15 @@ fun AppRoot(
     // 말로 맞추기 open on top of the mode picker.
     var talking by rememberSaveable { mutableStateOf(false) }
     val setupAssistant = remember { SetupAssistant.create() }
-    val appAssistant = remember { AppAssistant.create() }
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    val appAssistant = remember {
+        AppAssistant.create(
+            guestId = { walkSpeedRepository.guestId() },
+            favorites = {
+                savedPlaces.favorites.first().mapNotNull { f -> f.place?.let { f.name to LatLon(it.lat, it.lon) } }
+            },
+        )
+    }
     // The assistant asked the map to open the nearby-bus card.
     var busesOnHome by remember { mutableStateOf(false) }
     // The assistant's 보호자에게 알리기: open SOS on the map.
@@ -188,7 +199,7 @@ fun AppRoot(
                     BackHandler { screen = Screen.Home }
                     AssistantScreen(
                         assistant = appAssistant,
-                        context = AssistantContext(mode, settings),
+                        context = AssistantContext(mode, settings, where = { currentLocation(appContext, 4_000) }),
                         placeRepository = placeRepository,
                         onChangeSettings = { change ->
                             scope.launch {
