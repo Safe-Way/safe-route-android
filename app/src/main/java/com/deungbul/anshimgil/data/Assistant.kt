@@ -14,7 +14,11 @@ import java.net.URL
  * "근처 화장실로 안내해 줘", "조선대병원 가고 싶어") and the app does it: change a setting, find the
  * nearest place of a kind, search a place, show buses, or open the report screen. Gemini picks the
  * action (in a fixed shape); the app's own word rules do it when there is no key or Gemini fails.
- * Only the words are sent, never the position.
+ * Only the words are sent to Gemini, never the position.
+ *
+ * With the team server configured, the server's assistant (`POST /api/assistant`) answers first: it
+ * recommends walking or the bus with reasons, finds places and keeps the conversation. Settings, buses,
+ * reports and anything urgent stay on the phone, since the app's settings live here.
  */
 
 /** Nearby place kinds the server knows (`/api/places/nearby`), with their names. */
@@ -41,6 +45,9 @@ sealed interface AssistantAction {
     /** Search for a place by name and route there. */
     data class GoTo(override val say: String, val query: String) : AssistantAction
 
+    /** Route to a place the server already found (its recommendation or a nearby place). */
+    data class GoPlace(override val say: String, val place: Place) : AssistantAction
+
     data class ShowBuses(override val say: String) : AssistantAction
     data class OpenReport(override val say: String) : AssistantAction
 
@@ -55,14 +62,25 @@ sealed interface AssistantAction {
 }
 
 /** What the assistant knows about the app right now, so "글씨 더 크게" builds on the current setting. */
-data class AssistantContext(val mode: UserMode, val settings: AppSettings)
+data class AssistantContext(
+    val mode: UserMode,
+    val settings: AppSettings,
+    /** The phone's position when there is a real fix; asked only by the server assistant. */
+    val where: suspend () -> LatLon? = { null },
+)
 
 interface AppAssistant {
     suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction
 
     companion object {
-        fun create(): AppAssistant =
-            if (BuildConfig.GEMINI_API_KEY.isNotBlank()) GeminiAppAssistant(RuleAppAssistant) else RuleAppAssistant
+        /** [guestId] and [favorites] go to the server assistant only (favorites hold home, which only the phone knows). */
+        fun create(
+            guestId: suspend () -> String? = { null },
+            favorites: suspend () -> List<Pair<String, LatLon>> = { emptyList() },
+        ): AppAssistant {
+            val local = if (BuildConfig.GEMINI_API_KEY.isNotBlank()) GeminiAppAssistant(RuleAppAssistant) else RuleAppAssistant
+            return if (ServerApi.isConfigured) ServerAppAssistant(local, guestId, favorites) else local
+        }
     }
 }
 
@@ -94,6 +112,141 @@ object RuleAppAssistant : AppAssistant {
             )
         }
     }
+}
+
+/** Actions the phone does itself; the server assistant is not asked about these. */
+private fun AssistantAction.staysOnPhone(): Boolean = this is AssistantAction.Emergency ||
+    this is AssistantAction.ChangeSettings || this is AssistantAction.ShowBuses ||
+    this is AssistantAction.OpenReport || this is AssistantAction.GoNearby
+
+/** Server tools that save settings on the server, which the app does not read; the phone does these. */
+private val SERVER_SETTING_TOOLS = setOf("update_my_info", "set_map_layers")
+
+/**
+ * The team server's assistant first; the phone's own assistant ([local]) when the server fails or the
+ * request is one the phone handles ([staysOnPhone]). Keeps the server's conversationId and the
+ * buttons it offered, so tapping one sends its value back as `choice`.
+ */
+class ServerAppAssistant(
+    private val local: AppAssistant,
+    private val guestId: suspend () -> String?,
+    private val favorites: suspend () -> List<Pair<String, LatLon>>,
+) : AppAssistant {
+    private var conversationId: String? = null
+    private var offered: Map<String, String> = emptyMap()
+
+    override suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction {
+        // The phone's word rules first: they need no network and catch anything urgent.
+        val rule = RuleAppAssistant.reply(history, context)
+        if (rule.staysOnPhone()) return rule
+        if (history.count { it.fromUser } <= 1) {
+            conversationId = null
+            offered = emptyMap()
+        }
+        val said = history.lastOrNull { it.fromUser }?.text.orEmpty()
+        val body = serverAssistantRequest(
+            guestId = runCatching { guestId() }.getOrNull(),
+            text = said,
+            mode = context.mode,
+            where = runCatching { context.where() }.getOrNull(),
+            now = java.time.LocalDateTime.now(),
+            conversationId = conversationId,
+            choice = offered[said],
+            favorites = runCatching { favorites() }.getOrDefault(emptyList()),
+        )
+        val json = try {
+            ServerApi.post("/api/assistant", body)
+        } catch (e: ApiException) {
+            return local.reply(history, context)
+        } catch (e: IOException) {
+            return local.reply(history, context)
+        }
+        val reply = parseServerAssistantReply(json) ?: return local.reply(history, context)
+        // The server keeps its own profile, which the app never fills in: it would ask a new phone how the
+        // walker gets around although the app knows the mode, and would save settings the app does not read.
+        if (reply.setupQuestion || reply.tools.any { it in SERVER_SETTING_TOOLS }) return local.reply(history, context)
+        conversationId = reply.conversationId
+        offered = reply.choices.associate { it.second to it.first }
+        return reply.action
+    }
+}
+
+/** The server's reply turned into an app action, with what is needed to carry the conversation on. */
+internal data class ServerAssistantReply(
+    val action: AssistantAction,
+    val conversationId: String?,
+    /** (value, label) of each button offered. */
+    val choices: List<Pair<String, String>>,
+    val tools: List<String>,
+    /** The server asking a phone it does not know yet how the walker gets around (its first-time setup). */
+    val setupQuestion: Boolean = false,
+)
+
+/** Button values of the server's first-time setup question ("걸어서, 지팡이, 휠체어, 유모차"). */
+private val SETUP_CHOICES = setOf("walk", "cane", "wheelchair", "stroller")
+
+/** The body for `POST /api/assistant`. */
+internal fun serverAssistantRequest(
+    guestId: String?,
+    text: String,
+    mode: UserMode,
+    where: LatLon?,
+    now: java.time.LocalDateTime,
+    conversationId: String?,
+    choice: String?,
+    favorites: List<Pair<String, LatLon>>,
+): JSONObject = JSONObject()
+    .put("guestId", guestId ?: JSONObject.NULL)
+    .put("text", text)
+    // Not read by the server yet (it asks instead); sent so it can use the app's mode once it does.
+    .put("mode", mode.key)
+    .put("lat", where?.lat ?: JSONObject.NULL)
+    .put("lon", where?.lon ?: JSONObject.NULL)
+    .put("now", now.withSecond(0).withNano(0).toString().take(16))
+    .put("conversationId", conversationId ?: JSONObject.NULL)
+    .put("choice", choice ?: JSONObject.NULL)
+    .put("favorites", JSONArray(favorites.map { (name, p) -> JSONObject().put("name", name).put("lat", p.lat).put("lon", p.lon) }))
+
+/**
+ * Reads `POST /api/assistant`'s answer: a recommended trip or a found place becomes [AssistantAction.GoPlace],
+ * a question with buttons [AssistantAction.Ask], anything else [AssistantAction.Answer]. Null without words to say.
+ */
+internal fun parseServerAssistantReply(json: JSONObject): ServerAssistantReply? {
+    fun JSONObject.text(key: String): String? = optString(key).takeIf { !isNull(key) && it.isNotBlank() }
+    var say = json.text("say") ?: return null
+    val ask = json.text("ask")
+    val choicesJson = json.optJSONArray("choices")
+    val choices = (0 until (choicesJson?.length() ?: 0)).mapNotNull { i ->
+        val c = choicesJson!!.optJSONObject(i) ?: return@mapNotNull null
+        val label = c.text("label") ?: return@mapNotNull null
+        (c.text("value") ?: label) to label
+    }
+    val toolsJson = json.optJSONArray("tools")
+    val tools = (0 until (toolsJson?.length() ?: 0)).map { toolsJson!!.optString(it) }
+
+    val destination = json.optJSONObject("pick")?.optJSONObject("request")?.optJSONObject("destination")
+    val spot = json.optJSONObject("place")
+    val place = when {
+        destination != null && destination.has("lat") && destination.has("lon") -> Place(
+            id = null, name = destination.text("name") ?: "목적지", address = "",
+            lat = destination.getDouble("lat"), lon = destination.getDouble("lon"), distanceM = null,
+        )
+        spot != null && spot.has("lat") && spot.has("lon") -> Place(
+            id = null, name = spot.text("name") ?: "찾은 곳", address = "",
+            lat = spot.getDouble("lat"), lon = spot.getDouble("lon"),
+            distanceM = if (spot.isNull("distanceM") || !spot.has("distanceM")) null else spot.optInt("distanceM"),
+        )
+        else -> null
+    }
+    if (ask != null && !say.contains(ask)) say = "$say\n$ask"
+    val action = when {
+        // A question waits for the walker, even when a place came with it.
+        ask != null || choices.isNotEmpty() -> AssistantAction.Ask(say, choices.map { it.second })
+        place != null -> AssistantAction.GoPlace(say, place)
+        else -> AssistantAction.Answer(say)
+    }
+    val setup = "get_my_info" in tools && place == null && choices.any { it.first in SETUP_CHOICES }
+    return ServerAssistantReply(action, json.text("conversationId"), choices, tools, setup)
 }
 
 /** Gemini picks the action in a fixed JSON shape; anything unusable falls back to the rules. */
