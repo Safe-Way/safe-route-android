@@ -90,7 +90,7 @@ internal fun parseRouteResult(json: JSONObject): RouteResult {
     val items = if (shortest == null || safe == null) emptyList() else COUNT_GROUPS.mapNotNull { (key, label, unit) ->
         val a = shortest.counts[key] ?: 0
         val b = safe.counts[key] ?: 0
-        if (a == 0 && b == 0) null else CompareItem(label, a, b, unit)
+        if (a == 0 && b == 0) null else CompareItem(label, a, b, unit, key)
     }
     val explanation = Explanation(summary = json.optJSONObject("explanation")?.optString("text").orEmpty(), items = items)
 

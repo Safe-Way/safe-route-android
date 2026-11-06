@@ -13,6 +13,9 @@ val localProperties = Properties().apply {
 val kakaoNativeAppKey: String = localProperties.getProperty("KAKAO_NATIVE_APP_KEY", "")
 // e.g. http://10.0.2.2:8080 for a server on this computer seen from the emulator. Blank = example data.
 val serverBaseUrl: String = localProperties.getProperty("SERVER_BASE_URL", "")
+// Gemini (free tier) for the 말로 맞추기 setup chat; empty means the app's own rules answer instead.
+val geminiApiKey: String = localProperties.getProperty("GEMINI_API_KEY", "")
+val geminiModel: String = localProperties.getProperty("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 android {
     namespace = "com.deungbul.anshimgil"
@@ -31,6 +34,8 @@ android {
 
         buildConfigField("String", "KAKAO_NATIVE_APP_KEY", "\"$kakaoNativeAppKey\"")
         buildConfigField("String", "SERVER_BASE_URL", "\"$serverBaseUrl\"")
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+        buildConfigField("String", "GEMINI_MODEL", "\"$geminiModel\"")
     }
 
     buildTypes {

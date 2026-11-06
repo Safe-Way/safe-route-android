@@ -525,7 +525,7 @@ private fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun rememberTts(context: Context): TextToSpeech {
+internal fun rememberTts(context: Context): TextToSpeech {
     val tts = remember {
         lateinit var engine: TextToSpeech
         engine = TextToSpeech(context.applicationContext) { status ->
