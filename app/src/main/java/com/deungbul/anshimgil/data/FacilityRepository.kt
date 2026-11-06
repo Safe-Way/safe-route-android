@@ -189,9 +189,9 @@ internal fun parsePois(json: JSONObject, shown: Set<FacilityKind>, mode: UserMod
                 (kind == FacilityKind.SUBWAY || kind == FacilityKind.SUBWAY_ENTRANCE),
         )
     }
-    // The server gives each child protection zone as the school's point, so the zone is drawn as a
-    // square around it: an approximate area, not the legal boundary.
-    val zones = facilities.filter { it.kind == FacilityKind.SCHOOL_ZONE }.map { schoolZoneAround(it.lat, it.lon) }
+    // The server gives each child protection zone as the school's point, so the zone is drawn as the same
+    // 300 m circle as on the route map and in guidance: an approximate area, not the legal boundary.
+    val zones = facilities.filter { it.kind == FacilityKind.SCHOOL_ZONE }.map { schoolZoneCircle(it.lat, it.lon) }
     return FacilityPage(MapLayers(facilities, zones = zones), truncated = json.optBoolean("truncated"))
 }
 
@@ -219,7 +219,7 @@ fun stationExits(station: Facility, facilities: List<Facility>): List<String> {
 /** The area a child protection zone covers around its school, as the route engine counts it. */
 private const val SCHOOL_ZONE_RADIUS_M = 300.0
 
-/** A circle of [SCHOOL_ZONE_RADIUS_M] around a school, for the route map (the server says to draw it so). */
+/** A circle of [SCHOOL_ZONE_RADIUS_M] around a school, the same on every map (the server says to draw it so). */
 fun schoolZoneCircle(lat: Double, lon: Double): Zone {
     val dLat = SCHOOL_ZONE_RADIUS_M / 111_320.0
     val dLon = SCHOOL_ZONE_RADIUS_M / (111_320.0 * kotlin.math.cos(Math.toRadians(lat)))
@@ -234,17 +234,3 @@ fun schoolZoneCircle(lat: Double, lon: Double): Zone {
     )
 }
 
-/** How far the drawn child protection square reaches from the school on each side. */
-private const val SCHOOL_ZONE_HALF_M = 100.0
-
-/** An orange square around a school, standing for its child protection zone. */
-internal fun schoolZoneAround(lat: Double, lon: Double): Zone {
-    val dLat = SCHOOL_ZONE_HALF_M / 111_320.0
-    val dLon = SCHOOL_ZONE_HALF_M / (111_320.0 * kotlin.math.cos(Math.toRadians(lat)))
-    return Zone(
-        label = "어린이 보호구역",
-        fillColor = 0x38EAB308,
-        strokeColor = 0xFFA16207,
-        points = listOf(lat + dLat to lon - dLon, lat + dLat to lon + dLon, lat - dLat to lon + dLon, lat - dLat to lon - dLon),
-    )
-}

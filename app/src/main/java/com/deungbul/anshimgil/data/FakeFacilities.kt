@@ -26,14 +26,8 @@ object FakeFacilities {
         Facility(FacilityKind.OVERPASS, 35.1432, 126.9318),
     )
 
-    private val childZone = Zone(
-        label = "어린이 보호구역",
-        fillColor = 0x38EAB308,
-        strokeColor = 0xFFA16207,
-        points = listOf(
-            35.1400 to 126.9290, 35.1400 to 126.9312, 35.1384 to 126.9312, 35.1384 to 126.9290,
-        ),
-    )
+    // Same 300 m circle as the server's zones.
+    private val childZone = schoolZoneCircle(35.1392, 126.9301)
 
     /** [extras] are the items the user added in settings (see [optionalMapItems]). */
     fun layersFor(mode: UserMode, extras: Set<String> = emptySet()): MapLayers {

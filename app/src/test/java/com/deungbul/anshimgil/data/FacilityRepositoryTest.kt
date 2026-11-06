@@ -135,7 +135,9 @@ class FacilityRepositoryTest {
         val json = JSONObject("""{"pois":[{"kind":"school_zone","sub":"초등학교","name":"서석초등학교","lat":35.1475,"lon":126.9255}],"truncated":false}""")
         val page = parsePois(json, UserMode.CHILD.shownKinds(emptySet()), UserMode.CHILD)
         val zone = page.layers.zones.single()
-        assertEquals(4, zone.points.size)
-        assertTrue(zone.points.all { (lat, lon) -> kotlin.math.abs(lat - 35.1475) < 0.002 && kotlin.math.abs(lon - 126.9255) < 0.002 })
+        // The same 300 m circle as the route map and guidance draw.
+        assertEquals(schoolZoneCircle(35.1475, 126.9255), zone)
+        assertTrue(zone.points.size > 8)
+        assertTrue(zone.points.all { p -> metersBetween(LatLon(35.1475, 126.9255), LatLon(p.first, p.second)) in 295.0..305.0 })
     }
 }
