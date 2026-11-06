@@ -47,6 +47,7 @@ import com.deungbul.anshimgil.ui.mode.ModeSelectScreen
 import com.deungbul.anshimgil.ui.mode.SetupChatScreen
 import com.deungbul.anshimgil.data.SetupAssistant
 import com.deungbul.anshimgil.data.AppAssistant
+import com.deungbul.anshimgil.data.AssistantAction
 import com.deungbul.anshimgil.data.AssistantContext
 import com.deungbul.anshimgil.ui.guide.TransitGuideScreen
 import com.deungbul.anshimgil.data.TransitRoute
@@ -117,7 +118,8 @@ private sealed interface Screen {
     /** 말로 하기 on the map screen. */
     data object Assistant : Screen
     /** [start] null means the phone's position. [fromHome]: opened from a home shortcut, so back returns home. */
-    data class Route(val destination: Place, val start: Place? = null, val fromHome: Boolean = false) : Screen
+    /** [transit] opens on the 대중교통 tab (AI 비서 recommended the bus or subway). */
+    data class Route(val destination: Place, val start: Place? = null, val fromHome: Boolean = false, val transit: Boolean = false) : Screen
     data class Guide(val route: Route, val result: RouteResult, val type: RouteType) : Screen
     data class TransitGuide(val route: Route, val transit: TransitRoute) : Screen
 }
@@ -145,13 +147,13 @@ fun AppRoot(
     val appAssistant = remember {
         AppAssistant.create(
             guestId = { walkSpeedRepository.guestId() },
-            favorites = {
-                savedPlaces.favorites.first().mapNotNull { f -> f.place?.let { f.name to LatLon(it.lat, it.lon) } }
-            },
+            favorites = { savedPlaces.favorites.first() },
         )
     }
     // The assistant asked the map to open the nearby-bus card.
     var busesOnHome by remember { mutableStateOf(false) }
+    // 불편 신고 filled in by AI 비서 ("여기 공사 중이라 못 지나가").
+    var reportPrefill by remember { mutableStateOf<AssistantAction.OpenReport?>(null) }
     // AI 비서 opened from its bubble on the map starts with that line.
     var assistantOpening by remember { mutableStateOf<String?>(null) }
     val mapHints = remember {
@@ -229,8 +231,9 @@ fun AppRoot(
                             }
                         },
                         onRoute = { place -> screen = Screen.Route(place, fromHome = true) },
+                        onRouteByTransit = { place -> screen = Screen.Route(place, fromHome = true, transit = true) },
                         onShowBuses = { busesOnHome = true; screen = Screen.Home },
-                        onOpenReport = { screen = Screen.Report },
+                        onOpenReport = { r -> reportPrefill = r; screen = Screen.Report },
                         onAlertGuardian = { sosOnHome = true; screen = Screen.Home },
                         onBack = { screen = Screen.Home },
                         modifier = modifier,
@@ -238,7 +241,14 @@ fun AppRoot(
                 }
                 screen == Screen.Report -> {
                     BackHandler { screen = Screen.Home }
-                    ReportScreen(mode = mode, onBack = { screen = Screen.Home }, modifier = modifier)
+                    val prefill = reportPrefill
+                    ReportScreen(
+                        mode = mode,
+                        onBack = { reportPrefill = null; screen = Screen.Home },
+                        modifier = modifier,
+                        initialType = prefill?.type,
+                        initialMemo = prefill?.memo.orEmpty(),
+                    )
                 }
                 screen == Screen.Settings -> {
                     BackHandler { screen = Screen.Home }
@@ -288,6 +298,7 @@ fun AppRoot(
                     androidx.compose.runtime.key(route) {
                         RouteScreen(
                             mode = mode,
+                            startWithTransit = route.transit,
                             startPlace = route.start,
                             destination = route.destination,
                             routeRepository = routeRepository,
@@ -352,7 +363,7 @@ fun AppRoot(
                     placeRepository = placeRepository,
                     onOpenSearch = { screen = Screen.Search() },
                     onOpenSettings = { screen = Screen.Settings },
-                    onOpenReport = { screen = Screen.Report },
+                    onOpenReport = { reportPrefill = null; screen = Screen.Report },
                     onPlaceSelected = { place -> screen = Screen.Route(place, fromHome = true) },
                     guardians = settings.guardians,
                     showSos = settings.sosButton,

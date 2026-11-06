@@ -45,11 +45,15 @@ sealed interface AssistantAction {
     /** Search for a place by name and route there. */
     data class GoTo(override val say: String, val query: String) : AssistantAction
 
-    /** Route to a place the server already found (its recommendation or a nearby place). */
-    data class GoPlace(override val say: String, val place: Place) : AssistantAction
+    /**
+     * Route to a place the server already found (its recommendation or a nearby place) or a saved place.
+     * [transit] opens the 대중교통 tab, when the recommendation was the bus or subway.
+     */
+    data class GoPlace(override val say: String, val place: Place, val transit: Boolean = false) : AssistantAction
 
     data class ShowBuses(override val say: String) : AssistantAction
-    data class OpenReport(override val say: String) : AssistantAction
+    /** Open 불편 신고 filled in from what was said: the kind of problem when it is clear, and the words as the memo. */
+    data class OpenReport(override val say: String, val type: ReportType? = null, val memo: String = "") : AssistantAction
 
     /** Ask back, with ready answers. */
     data class Ask(override val say: String, val choices: List<String>) : AssistantAction
@@ -73,13 +77,20 @@ interface AppAssistant {
     suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction
 
     companion object {
-        /** [guestId] and [favorites] go to the server assistant only (favorites hold home, which only the phone knows). */
+        /**
+         * [guestId] goes to the server assistant only; [favorites] (자주 가는 곳) are matched on the phone and
+         * the saved ones also go to the server (they hold home, which only the phone knows).
+         */
         fun create(
             guestId: suspend () -> String? = { null },
-            favorites: suspend () -> List<Pair<String, LatLon>> = { emptyList() },
+            favorites: suspend () -> List<Favorite> = { emptyList() },
         ): AppAssistant {
             val local = if (BuildConfig.GEMINI_API_KEY.isNotBlank()) GeminiAppAssistant(RuleAppAssistant) else RuleAppAssistant
-            return if (ServerApi.isConfigured) ServerAppAssistant(local, guestId, favorites) else local
+            val saved: suspend () -> List<Pair<String, LatLon>> = {
+                favorites().mapNotNull { f -> f.place?.let { f.name to LatLon(it.lat, it.lon) } }
+            }
+            val inner = if (ServerApi.isConfigured) ServerAppAssistant(local, guestId, saved) else local
+            return FavoriteAppAssistant(inner, favorites)
         }
     }
 }
@@ -105,12 +116,91 @@ object RuleAppAssistant : AppAssistant {
             has("음성", "소리", "읽어") && has("켜", "들려") -> AssistantAction.ChangeSettings("음성 안내를 켤게요.", voiceGuide = true)
             has("휠체어") -> AssistantAction.ChangeSettings("장애인(휠체어) 모드로 바꿀게요.", mode = UserMode.DISABLED)
             has("버스") -> AssistantAction.ShowBuses("가까운 정류장에 곧 오는 버스를 보여 드릴게요.")
-            has("신고", "망가", "부서", "공사", "막혀") -> AssistantAction.OpenReport("불편 신고 화면을 열게요.")
+            reportTypeIn(said) != null || has("신고", "불편") -> reportAction(said)
             else -> AssistantAction.Ask(
                 "무엇을 도와드릴까요?",
                 listOf("근처 화장실로 안내해 줘", "글씨 크게 해 줘", "가까운 버스 보여 줘", "가까운 편의점"),
             )
         }
+    }
+}
+
+/** Words for each kind of problem on the way, for 불편 신고 by voice. */
+private val REPORT_WORDS = listOf(
+    ReportType.CONSTRUCTION to listOf("공사"),
+    ReportType.STEEP to listOf("경사", "비탈", "가팔"),
+    ReportType.CURB to listOf("턱"),
+    ReportType.BROKEN to listOf("깨졌", "깨진", "파손", "부서", "망가", "패인", "파였", "움푹", "들떴", "보도블록"),
+    ReportType.OBSTACLE to listOf("막혀", "막고", "막혔", "못 지나", "못지나", "쓰레기", "킥보드"),
+)
+
+/** The kind of problem [said] describes, e.g. 공사 in "여기 공사 중이라 못 지나가"; null when it is not clear. */
+fun reportTypeIn(said: String): ReportType? {
+    val s = said.replace(" ", "")
+    return REPORT_WORDS.firstOrNull { (_, words) -> words.any { s.contains(it.replace(" ", "")) } }?.first
+}
+
+/** Opens 불편 신고 with the kind and the walker's words filled in; they still check it and press 보내기. */
+fun reportAction(said: String, say: String? = null): AssistantAction.OpenReport {
+    val type = reportTypeIn(said)
+    val words = say ?: if (type != null) {
+        "'${type.label}' 신고를 지금 위치로 채워 둘게요. 사진을 붙이고 보내기를 누르면 신고돼요."
+    } else {
+        "불편 신고 화면을 열게요. 어떤 불편인지 고르고 보내기를 누르면 신고돼요."
+    }
+    // Just "신고할래" is not worth keeping as a memo.
+    val memo = if (said.replace(" ", "").length > 6) said.trim().take(REPORT_MAX_MEMO) else ""
+    return AssistantAction.OpenReport(words, type, memo)
+}
+
+/** Other words for a saved place's name: "회사" for 직장, "우리 집" for 집. */
+private val FAVORITE_SYNONYMS = mapOf("직장" to listOf("회사", "일터"), "학교" to listOf("학원"))
+
+/**
+ * The saved place (자주 가는 곳) [said] is about, e.g. 집 in "집에 가자" or 직장 in "회사 가는 길".
+ * The name must stand as a word, so "국밥집" is not 집.
+ */
+fun favoriteIn(said: String, favorites: List<Favorite>): Favorite? = favorites.firstOrNull { f ->
+    (listOf(f.name) + FAVORITE_SYNONYMS[f.name].orEmpty()).any { name ->
+        Regex("""(^|\s|우리)${Regex.escape(name)}(\s|$|에|으로|로|까지|가|이|은|는|을|를|쪽|방향)""").containsMatchIn(said.trim())
+    }
+}
+
+/** "집이", "학교가": the subject particle for [word]. */
+internal fun withSubject(word: String): String = word + if (hasBatchim(word)) "이" else "가"
+
+/** "집으로", "학교로": the direction particle for [word] (ㄹ takes 로). */
+internal fun withDirection(word: String): String {
+    val last = word.lastOrNull() ?: return word
+    val code = last.code - 0xAC00
+    return word + if (code in 0..11171 && code % 28 != 0 && code % 28 != 8) "으로" else "로"
+}
+
+private fun hasBatchim(word: String): Boolean {
+    val code = (word.lastOrNull()?.code ?: return false) - 0xAC00
+    return code in 0..11171 && code % 28 != 0
+}
+
+/**
+ * Saved places first: "집에 가자" goes home even when the server is down (the phone's own assistant would
+ * search the map for a place called 집), and a place not saved yet gets told so instead of a search.
+ */
+class FavoriteAppAssistant(
+    private val inner: AppAssistant,
+    private val favorites: suspend () -> List<Favorite>,
+) : AppAssistant {
+    override suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction {
+        val said = history.lastOrNull { it.fromUser }?.text.orEmpty()
+        val rule = RuleAppAssistant.reply(history, context)
+        if (rule is AssistantAction.Emergency) return rule
+        val favorite = runCatching { favoriteIn(said, favorites()) }.getOrNull() ?: return inner.reply(history, context)
+        val place = favorite.place ?: return AssistantAction.Answer(
+            "${withSubject(favorite.name)} 아직 등록되지 않았어요. 설정의 '자주 가는 곳'에서 등록하면 바로 안내해 드릴게요.",
+        )
+        val answer = inner.reply(history, context)
+        // The server's recommendation (walk or transit, with its reason) when it gave one; otherwise straight there.
+        return answer as? AssistantAction.GoPlace
+            ?: AssistantAction.GoPlace("${withDirection(favorite.name)} 길을 찾을게요.", place.copy(name = favorite.name))
     }
 }
 
@@ -242,7 +332,7 @@ internal fun parseServerAssistantReply(json: JSONObject): ServerAssistantReply? 
     val action = when {
         // A question waits for the walker, even when a place came with it.
         ask != null || choices.isNotEmpty() -> AssistantAction.Ask(say, choices.map { it.second })
-        place != null -> AssistantAction.GoPlace(say, place)
+        place != null -> AssistantAction.GoPlace(say, place, transit = json.optJSONObject("pick")?.optString("type") == "transit")
         else -> AssistantAction.Answer(say)
     }
     val setup = "get_my_info" in tools && place == null && choices.any { it.first in SETUP_CHOICES }
@@ -251,8 +341,11 @@ internal fun parseServerAssistantReply(json: JSONObject): ServerAssistantReply? 
 
 /** Gemini picks the action in a fixed JSON shape; anything unusable falls back to the rules. */
 class GeminiAppAssistant(private val fallback: AppAssistant) : AppAssistant {
-    override suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction =
-        runCatching { ask(history, context) }.getOrNull() ?: fallback.reply(history, context)
+    override suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction {
+        val action = runCatching { ask(history, context) }.getOrNull() ?: return fallback.reply(history, context)
+        // Gemini says "report" without the kind; fill it in from the words.
+        return if (action is AssistantAction.OpenReport) reportAction(history.lastOrNull { it.fromUser }?.text.orEmpty()) else action
+    }
 
     private suspend fun ask(history: List<ChatLine>, context: AssistantContext): AssistantAction? = withContext(Dispatchers.IO) {
         val url = URL("https://generativelanguage.googleapis.com/v1beta/models/${BuildConfig.GEMINI_MODEL}:generateContent")

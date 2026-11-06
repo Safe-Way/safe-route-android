@@ -164,4 +164,92 @@ class AssistantTest {
         val assistant = ServerAppAssistant(RuleAppAssistant, { "g" }, { emptyList() })
         assertTrue(assistant.reply(listOf(ChatLine(true, "넘어졌어요")), now) is AssistantAction.Emergency)
     }
+
+    // --- saved places (자주 가는 곳) ---
+
+    private val home = Favorite("집", Place(null, "우리집 주소", "", 35.1395, 126.9245, null), builtIn = true)
+    private val school = Favorite("학교", null, builtIn = true)
+    private val work = Favorite("직장", Place(null, "회사", "", 35.15, 126.91, null), builtIn = true)
+    private val saved = listOf(home, school, work)
+
+    @Test
+    fun savedPlaceNamesAreHeardAsWords() {
+        assertEquals(home, favoriteIn("집에 가자", saved))
+        assertEquals(home, favoriteIn("우리집 가는 길", saved))
+        assertEquals(home, favoriteIn("집", saved))
+        assertEquals(work, favoriteIn("회사 가는 길 알려줘", saved))
+        assertEquals(school, favoriteIn("학교까지 얼마나 걸려", saved))
+        assertNull(favoriteIn("근처 국밥집 가고 싶어", saved))
+        assertNull(favoriteIn("편의점 어디야", saved))
+    }
+
+    @Test
+    fun koreanParticles() {
+        assertEquals("집이", withSubject("집"))
+        assertEquals("학교가", withSubject("학교"))
+        assertEquals("집으로", withDirection("집"))
+        assertEquals("학교로", withDirection("학교"))
+        assertEquals("서울로", withDirection("서울"))
+    }
+
+    private fun favoriteAssistant(inner: AssistantAction) =
+        FavoriteAppAssistant(object : AppAssistant {
+            override suspend fun reply(history: List<ChatLine>, context: AssistantContext) = inner
+        }, { saved })
+
+    @Test
+    fun savedPlaceGoesThereWhenTheServerCannot() = runBlocking {
+        // The phone's own assistant would search the map for "집"
+        val go = favoriteAssistant(AssistantAction.GoTo("집을 찾아볼게요.", "집")).reply(listOf(ChatLine(true, "집에 가자")), now)
+        go as AssistantAction.GoPlace
+        assertEquals("집", go.place.name)
+        assertEquals(35.1395, go.place.lat, 1e-9)
+        assertEquals("집으로 길을 찾을게요.", go.say)
+    }
+
+    @Test
+    fun serverRecommendationForASavedPlaceIsKept() = runBlocking {
+        val server = AssistantAction.GoPlace("집까지 지하철로 15분이에요.", home.place!!.copy(name = "집"), transit = true)
+        assertEquals(server, favoriteAssistant(server).reply(listOf(ChatLine(true, "집에 가자")), now))
+    }
+
+    @Test
+    fun placeNotSavedYetIsToldNotSearched() = runBlocking {
+        val answer = favoriteAssistant(AssistantAction.GoTo("", "학교")).reply(listOf(ChatLine(true, "학교 가자")), now)
+        assertEquals(AssistantAction.Answer("학교가 아직 등록되지 않았어요. 설정의 '자주 가는 곳'에서 등록하면 바로 안내해 드릴게요."), answer)
+    }
+
+    @Test
+    fun serverTransitPickOpensTheTransitTab() {
+        val json = JSONObject(
+            """{"say":"집까지 지하철 광주 1호선으로 15분 걸려요.","pick":{"type":"transit","summary":"","minutes":15,"route":null,
+               "request":{"destination":{"lat":35.1395,"lon":126.9245,"name":"집"}}},"tools":["recommend_trip"]}""",
+        )
+        assertTrue((parseServerAssistantReply(json)!!.action as AssistantAction.GoPlace).transit)
+    }
+
+    // --- 불편 신고 by voice ---
+
+    @Test
+    fun reportKindIsHeard() {
+        assertEquals(ReportType.CONSTRUCTION, reportTypeIn("여기 공사 중이라 못 지나가"))
+        assertEquals(ReportType.BROKEN, reportTypeIn("보도블록이 깨졌어"))
+        assertEquals(ReportType.STEEP, reportTypeIn("길이 너무 가팔라요"))
+        assertEquals(ReportType.CURB, reportTypeIn("턱이 높아서 휠체어가 못 올라가"))
+        assertEquals(ReportType.OBSTACLE, reportTypeIn("킥보드가 길을 막고 있어"))
+        assertNull(reportTypeIn("신고하고 싶어"))
+        assertNull(reportTypeIn("주차장 가자"))
+    }
+
+    @Test
+    fun reportOpensFilledIn() {
+        val r = rule("여기 공사 중이라 못 지나가") as AssistantAction.OpenReport
+        assertEquals(ReportType.CONSTRUCTION, r.type)
+        assertEquals("여기 공사 중이라 못 지나가", r.memo)
+        assertTrue(r.say.startsWith("'공사' 신고를 지금 위치로 채워 둘게요."))
+        // Just asking to report: open it empty, without a memo
+        val plain = rule("신고할래") as AssistantAction.OpenReport
+        assertNull(plain.type)
+        assertEquals("", plain.memo)
+    }
 }

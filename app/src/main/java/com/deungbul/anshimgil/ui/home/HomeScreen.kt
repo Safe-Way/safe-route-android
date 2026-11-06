@@ -643,9 +643,10 @@ private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit)
     Surface(
         onClick = onOpen,
         shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF1F6B42)),
-        shadowElevation = 4.dp,
+        // See-through so the map behind stays visible; the words keep full contrast.
+        color = Color.White.copy(alpha = 0.78f),
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF1F6B42).copy(alpha = 0.7f)),
+        shadowElevation = 0.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 2.dp)) {

@@ -147,6 +147,8 @@ fun RouteScreen(
     modifier: Modifier = Modifier,
     /** 대중교통 tab: guide the chosen transit route step by step. */
     onStartTransit: (TransitRoute) -> Unit = {},
+    /** Open on the 대중교통 tab. */
+    startWithTransit: Boolean = false,
 ) {
     val context = LocalContext.current
     var conditionsOff by rememberSaveable { mutableStateOf(if (autoConditions) emptySet() else ALL_CONDITION_KEYS) }
@@ -257,7 +259,7 @@ fun RouteScreen(
     }
     // 걸어서 / 대중교통 tabs. Transit is asked for only when its tab is opened (the server's ODsay
     // lookups are limited per day) and kept while the screen is open.
-    var transitTab by rememberSaveable { mutableStateOf(false) }
+    var transitTab by rememberSaveable { mutableStateOf(startWithTransit) }
     var transit by remember { mutableStateOf<TransitState?>(null) }
     var transitSelected by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(transitTab, origin) {

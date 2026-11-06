@@ -60,6 +60,10 @@ import com.deungbul.anshimgil.data.NEARBY_KINDS
 import com.deungbul.anshimgil.data.Place
 import com.deungbul.anshimgil.data.PlaceRepository
 import com.deungbul.anshimgil.location.phoneOrigin
+import androidx.compose.foundation.layout.Box
+import com.deungbul.anshimgil.map.addMyLocation
+import com.deungbul.anshimgil.map.KakaoMapView
+import com.deungbul.anshimgil.location.lastKnownLocation
 import com.deungbul.anshimgil.ui.guide.rememberTts
 import com.deungbul.anshimgil.ui.mode.Bubble
 import kotlinx.coroutines.delay
@@ -85,8 +89,10 @@ fun AssistantScreen(
     placeRepository: PlaceRepository,
     onChangeSettings: (AssistantAction.ChangeSettings) -> Unit,
     onRoute: (Place) -> Unit,
+    /** Like [onRoute], opening on the 대중교통 tab. */
+    onRouteByTransit: (Place) -> Unit = onRoute,
     onShowBuses: () -> Unit,
-    onOpenReport: () -> Unit,
+    onOpenReport: (AssistantAction.OpenReport) -> Unit,
     /** Go to the map and open SOS (it counts down before texting, so it can still be cancelled). */
     onAlertGuardian: () -> Unit,
     onBack: () -> Unit,
@@ -151,9 +157,9 @@ fun AssistantScreen(
                     { lat, lon -> placeRepository.search(action.query, lat, lon).firstOrNull() },
                     "'${action.query}'을(를) 찾지 못했어요. 이름을 조금 다르게 말해 주세요.",
                 )
-                is AssistantAction.GoPlace -> { delay(1200); onRoute(action.place) }
+                is AssistantAction.GoPlace -> { delay(1200); if (action.transit) onRouteByTransit(action.place) else onRoute(action.place) }
                 is AssistantAction.ShowBuses -> { delay(500); onShowBuses() }
-                is AssistantAction.OpenReport -> { delay(500); onOpenReport() }
+                is AssistantAction.OpenReport -> { delay(1200); onOpenReport(action) }
                 is AssistantAction.Ask -> choices = action.choices
                 is AssistantAction.Answer -> Unit
             }
@@ -178,7 +184,20 @@ fun AssistantScreen(
 
     LaunchedEffect(lines.size, thinking) { listState.animateScrollToItem(maxOf(0, lines.size)) }
 
-    Column(modifier.fillMaxSize().background(Color(0xFFF7F8F5)).imePadding()) {
+    // The map around the walker shows faintly behind the chat, so they keep their bearings.
+    val here = remember { lastKnownLocation(android) }
+    Box(modifier.fillMaxSize().background(Color(0xFFF7F8F5))) {
+    if (here != null) {
+        KakaoMapView(
+            modifier = Modifier.fillMaxSize(),
+            center = com.kakao.vectormap.LatLng.from(here.lat, here.lon),
+            zoomLevel = 16,
+            onMapReady = { map -> map.addMyLocation(android, here) },
+        )
+        // A white veil over the map keeps the words easy to read.
+        Box(Modifier.fillMaxSize().background(Color(0xFFF7F8F5).copy(alpha = 0.72f)))
+    }
+    Column(Modifier.fillMaxSize().imePadding()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 4.dp)) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "지도로 돌아가기", tint = Ink) }
             Text("AI 비서", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Ink)
@@ -204,7 +223,11 @@ fun AssistantScreen(
         }
         if (choices.isNotEmpty()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 16.dp)) {
-                choices.forEach { c -> SuggestionChip(onClick = { send(c) }, label = { Text(c, fontSize = 16.sp) }, modifier = Modifier.heightIn(min = 44.dp)) }
+                choices.forEach { c -> SuggestionChip(
+                        onClick = { send(c) }, label = { Text(c, fontSize = 16.sp, color = Ink) },
+                        colors = androidx.compose.material3.SuggestionChipDefaults.suggestionChipColors(containerColor = Color.White),
+                        modifier = Modifier.heightIn(min = 44.dp),
+                    ) }
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(12.dp)) {
@@ -221,6 +244,7 @@ fun AssistantScreen(
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "보내기", tint = if (input.isNotBlank()) Green else Muted)
             }
         }
+    }
     }
 }
 

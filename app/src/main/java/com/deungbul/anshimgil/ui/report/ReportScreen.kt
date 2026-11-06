@@ -78,11 +78,18 @@ private val Green = Color(0xFF1F6B42)
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ReportScreen(mode: UserMode, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun ReportScreen(
+    mode: UserMode,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** Filled in by AI 비서 from what the walker said; they still check it and press 보내기. */
+    initialType: ReportType? = null,
+    initialMemo: String = "",
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var type by remember { mutableStateOf<ReportType?>(null) }
-    var memo by remember { mutableStateOf("") }
+    var type by remember { mutableStateOf(initialType) }
+    var memo by remember { mutableStateOf(initialMemo) }
     val photos = remember { mutableStateListOf<ByteArray>() }
     var where by remember { mutableStateOf<Origin?>(null) }
     var sending by remember { mutableStateOf(false) }
