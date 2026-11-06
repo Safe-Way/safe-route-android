@@ -91,6 +91,7 @@ fun ModeSelectScreen(
     initial: UserMode?,
     onStart: (UserMode) -> Unit,
     modifier: Modifier = Modifier,
+    onTalk: (() -> Unit)? = null,
 ) {
     var selected by rememberSaveable { mutableStateOf(initial) }
 
@@ -110,6 +111,21 @@ fun ModeSelectScreen(
                 "그림을 한 번 눌러 주세요.\n나중에 언제든 바꿀 수 있어요.",
                 fontSize = 17.sp, color = Muted, lineHeight = 26.sp,
             )
+        }
+
+        // 말로 맞추기: say who walks and how, and the settings are picked from that.
+        onTalk?.let { talk ->
+            Surface(
+                onClick = talk,
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFFE8F1EA),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("말로 맞추기", fontSize = 19.sp, fontWeight = FontWeight.Black, color = Color(0xFF1F6B42))
+                    Text("\"우리 엄마가 70대인데 다리가 좀 불편해요\"처럼 말하면 알아서 맞춰 드려요", fontSize = 15.sp, color = Muted, lineHeight = 22.sp)
+                }
+            }
         }
 
         Column(

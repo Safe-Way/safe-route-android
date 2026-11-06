@@ -44,6 +44,8 @@ import com.deungbul.anshimgil.ui.search.SearchScreen
 import com.deungbul.anshimgil.ui.common.MapMessage
 import com.deungbul.anshimgil.ui.home.HomeScreen
 import com.deungbul.anshimgil.ui.mode.ModeSelectScreen
+import com.deungbul.anshimgil.ui.mode.SetupChatScreen
+import com.deungbul.anshimgil.data.SetupAssistant
 import com.deungbul.anshimgil.ui.theme.SeipjidoTheme
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -122,6 +124,9 @@ fun AppRoot(
     val savedFlow = remember(modeRepository) { modeRepository.mode.map { SavedMode.Ready(it) } }
     val saved by savedFlow.collectAsStateWithLifecycle(initialValue = SavedMode.Loading)
     var changingMode by rememberSaveable { mutableStateOf(false) }
+    // 말로 맞추기 open on top of the mode picker.
+    var talking by rememberSaveable { mutableStateOf(false) }
+    val setupAssistant = remember { SetupAssistant.create() }
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
     val scope = rememberCoroutineScope()
 
@@ -130,6 +135,26 @@ fun AppRoot(
         is SavedMode.Ready -> {
             val mode = state.mode
             when {
+                (mode == null || changingMode) && talking -> {
+                    BackHandler { talking = false }
+                    SetupChatScreen(
+                        assistant = setupAssistant,
+                        onApply = { pick ->
+                            scope.launch {
+                                modeRepository.save(pick.mode)
+                                settingsRepository.setTextSize(pick.textSize)
+                                settingsRepository.setVoiceGuide(pick.voiceGuide)
+                                settingsRepository.setSosButton(pick.sosButton)
+                                pick.extraMapItems.forEach { settingsRepository.setExtraMapItem(it, true) }
+                                talking = false
+                                changingMode = false
+                                screen = Screen.Home
+                            }
+                        },
+                        onBack = { talking = false },
+                        modifier = modifier,
+                    )
+                }
                 mode == null || changingMode -> {
                     if (mode != null) BackHandler { changingMode = false }
                     ModeSelectScreen(
@@ -143,6 +168,7 @@ fun AppRoot(
                             }
                         },
                         modifier = modifier,
+                        onTalk = { talking = true },
                     )
                 }
                 BuildConfig.KAKAO_NATIVE_APP_KEY.isBlank() ->
