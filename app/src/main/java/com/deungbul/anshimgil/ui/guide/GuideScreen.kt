@@ -99,6 +99,7 @@ import com.deungbul.anshimgil.location.hasLocationPermission
 import com.deungbul.anshimgil.data.Guidance
 import com.deungbul.anshimgil.data.GuidanceState
 import com.deungbul.anshimgil.data.LatLon
+import com.deungbul.anshimgil.ui.mode.ModeBadge
 import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.RouteType
 import com.deungbul.anshimgil.data.Turn
@@ -406,6 +407,8 @@ fun GuideScreen(
                 )
             }
             if (showSos) SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp))
+            // The mode on the instruction card's top left corner.
+            ModeBadge(mode, Modifier.align(Alignment.TopStart).padding(start = 4.dp, top = 4.dp))
             onOpenAssistant?.let { open ->
                 Surface(
                     onClick = open,

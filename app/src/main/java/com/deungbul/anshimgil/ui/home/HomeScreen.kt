@@ -11,6 +11,7 @@ import com.deungbul.anshimgil.data.nextTrainLines
 import com.deungbul.anshimgil.data.matchStation
 import com.deungbul.anshimgil.data.SubwayTrains
 import com.deungbul.anshimgil.ui.safety.SosOverlay
+import com.deungbul.anshimgil.ui.mode.ModeBadge
 import com.deungbul.anshimgil.ui.safety.SosButton
 import com.deungbul.anshimgil.data.Guardian
 import com.deungbul.anshimgil.data.MapLayers
@@ -361,6 +362,9 @@ fun HomeScreen(
                 }
             }
         }
+
+        // The mode as a tiny icon in the gap under the status bar, left side (map only).
+        ModeBadge(mode, Modifier.align(Alignment.TopStart).padding(start = 20.dp))
 
         // The phone's position when it is known and in Gwangju, otherwise the demo area.
         Surface(

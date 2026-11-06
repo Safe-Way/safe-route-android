@@ -50,7 +50,6 @@ import com.deungbul.anshimgil.data.AppAssistant
 import com.deungbul.anshimgil.data.AssistantAction
 import com.deungbul.anshimgil.data.AssistantContext
 import androidx.compose.ui.unit.dp
-import com.deungbul.anshimgil.ui.mode.ModeBadge
 import com.deungbul.anshimgil.ui.assistant.AssistantChat
 import com.deungbul.anshimgil.ui.guide.TransitGuideScreen
 import com.deungbul.anshimgil.data.TransitRoute
@@ -106,23 +105,10 @@ class MainActivity : ComponentActivity() {
             SeipjidoTheme {
                 ScaledText(settings.textSize) {
                     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                        val currentMode by modeRepository.mode.collectAsStateWithLifecycle(initialValue = null)
-                        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-                            AppRoot(
-                                modeRepository, savedPlaces, placeRepository, facilityRepository, routeRepository,
-                                settingsRepository, settings, walkSpeedRepository, Modifier.padding(innerPadding),
-                            )
-                            // The mode just under "SKT 2:28", on every screen.
-                            currentMode?.let { m ->
-                                ModeBadge(
-                                    m,
-                                    Modifier
-                                        .align(androidx.compose.ui.Alignment.TopStart)
-                                        .padding(innerPadding)
-                                        .padding(start = 20.dp),
-                                )
-                            }
-                        }
+                        AppRoot(
+                            modeRepository, savedPlaces, placeRepository, facilityRepository, routeRepository,
+                            settingsRepository, settings, walkSpeedRepository, Modifier.padding(innerPadding),
+                        )
                     }
                 }
             }

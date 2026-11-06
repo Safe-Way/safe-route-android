@@ -245,8 +245,8 @@ private fun ModeSelectScreenPreview() {
 
 
 /**
- * The mode as a tiny icon under the status bar on the left, on every screen once a mode is chosen,
- * guidance included (team, 11/6). It does not depend on the phone showing notification icons.
+ * The mode as a tiny icon: under the status bar on the left of the map, and on the instruction card's
+ * corner during walking guidance (11/6). It does not depend on the phone showing notification icons.
  */
 @Composable
 fun ModeBadge(mode: UserMode, modifier: Modifier = Modifier) {

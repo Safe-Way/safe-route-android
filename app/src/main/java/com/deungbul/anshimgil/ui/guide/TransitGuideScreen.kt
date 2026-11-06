@@ -126,8 +126,7 @@ private fun StepStrip(legs: List<TransitLeg>, step: Int) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().background(Color(0xFFEFF4FB)).horizontalScroll(rememberScrollState())
-            // Starts right of the mode icon that sits over the top left corner.
-            .padding(start = 44.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
         legs.forEachIndexed { i, l ->
             if (i > 0) Text("  →  ", fontSize = 14.sp, color = Muted)
