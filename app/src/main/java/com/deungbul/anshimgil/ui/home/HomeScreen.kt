@@ -33,7 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalPolice
-import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Store
@@ -328,14 +328,14 @@ fun HomeScreen(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     )
                 }
-                // 말로 하기: say what you want ("근처 화장실로 안내해 줘", "글씨가 안 보여").
+                // AI 비서 (말로 하기): say what you want ("근처 화장실로 안내해 줘", "글씨가 안 보여").
                 Surface(
                     onClick = onOpenAssistant,
                     shape = RoundedCornerShape(16.dp), color = Color(0xFF1F6B42), contentColor = Color.White, shadowElevation = 3.dp,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                        Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Text(" 말로 하기", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text(" AI 비서", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

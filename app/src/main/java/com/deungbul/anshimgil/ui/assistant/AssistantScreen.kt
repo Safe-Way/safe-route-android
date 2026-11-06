@@ -179,7 +179,7 @@ fun AssistantScreen(
     Column(modifier.fillMaxSize().background(Color(0xFFF7F8F5)).imePadding()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 4.dp)) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "지도로 돌아가기", tint = Ink) }
-            Text("말로 하기", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Ink)
+            Text("AI 비서", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Ink)
         }
         LazyColumn(
             state = listState,
