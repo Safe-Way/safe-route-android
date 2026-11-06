@@ -4,7 +4,8 @@ package com.deungbul.anshimgil.data
  * Why this route: what the route engine weighs for each mode, by day and by night (the team's
  * criteria table, 2026-11-04). [RouteCriteria.short] is the one line shown under the routes;
  * [RouteCriteria.details] opens with 자세히. [RouteCriteria.counts] says which of the server's
- * counts mean something for this mode and time (no street-light count in the daytime, say).
+ * counts mean something for this mode and time (no street-light count in the daytime, say); a
+ * "covered." key is the meters walked within reach of that thing.
  */
 
 data class RouteCriteria(val short: String, val details: List<String>, val counts: Set<String>)
@@ -35,7 +36,7 @@ fun routeCriteria(mode: UserMode, night: Boolean): RouteCriteria = when (mode) {
                 "2순위 도움 시설: 길에서 150m 안에 도움 시설이 있는지 봐요.",
                 HELP_WORDS,
             ),
-            setOf("help"),
+            setOf("school", "help", "covered.school", "covered.help"),
         )
     } else {
         RouteCriteria(
@@ -59,7 +60,7 @@ fun routeCriteria(mode: UserMode, night: Boolean): RouteCriteria = when (mode) {
                 "쉴 곳: 길에서 120m 안에 지금 쓸 수 있는 쉼터가 있는 길을 골라요.",
                 "가로등·CCTV는 낮에는 기준으로 쓰지 않아요.",
             ),
-            emptySet(),
+            setOf("rest", "covered.rest"),
         )
     } else {
         RouteCriteria(

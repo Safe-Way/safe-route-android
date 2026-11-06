@@ -9,7 +9,7 @@ class RouteCriteriaTest {
     fun seniorDaytimeTalksAboutStairsAndRestNotLights() {
         val c = routeCriteria(UserMode.SENIOR, night = false)
         assertTrue(c.short.contains("계단") && c.short.contains("쉴 곳"))
-        assertTrue(c.counts.isEmpty())
+        assertEquals(setOf("rest", "covered.rest"), c.counts)
     }
 
     @Test
@@ -25,6 +25,6 @@ class RouteCriteriaTest {
     fun childDaytimeUsesSchoolZoneAndHelp() {
         val c = routeCriteria(UserMode.CHILD, night = false)
         assertTrue(c.details.first().contains("어린이보호구역"))
-        assertEquals(setOf("help"), c.counts)
+        assertEquals(setOf("school", "help", "covered.school", "covered.help"), c.counts)
     }
 }

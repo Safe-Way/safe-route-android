@@ -39,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -482,7 +483,9 @@ private fun RouteDetails(
     // Why this route, in one line; 자세히 opens what the route engine weighs for this mode and time.
     val night = result.conditions.any { it.key == "night" && it.on }
     val criteria = routeCriteria(mode, night)
-    val items = result.explanation.items.filter { it.key.isEmpty() || it.key in criteria.counts }
+    val (covered, items) = result.explanation.items
+        .filter { it.key.isEmpty() || it.key in criteria.counts }
+        .partition { it.key.startsWith("covered.") }
     var more by rememberSaveable { mutableStateOf(false) }
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -497,6 +500,22 @@ private fun RouteDetails(
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = { more = !more }) { Text(if (more) "접기" else "자세히", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+        }
+        // The server's real difference, e.g. "24m(1분) 더 돌지만 쉼 곳 +1곳".
+        result.explanation.summary.takeIf { it.isNotBlank() }?.let {
+            Text(it, fontSize = 15.sp, color = Muted, lineHeight = 21.sp, modifier = Modifier.padding(end = 8.dp))
+        }
+        // Warnings and notices stay in view: stairs that could not be avoided, an event on the way.
+        result.explanation.notes.forEach { note ->
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(end = 8.dp)) {
+                Icon(
+                    if (note.warn) Icons.Filled.WarningAmber else Icons.Filled.Info,
+                    contentDescription = if (note.warn) "주의" else "알림",
+                    tint = if (note.warn) Color(0xFFB45309) else Color(0xFF2F5BB7),
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(note.text, fontSize = 15.sp, color = if (note.warn) Color(0xFF7A5310) else Ink, lineHeight = 21.sp)
+            }
         }
         if (items.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(end = 8.dp)) {
@@ -513,6 +532,12 @@ private fun RouteDetails(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(end = 8.dp, bottom = 8.dp)) {
                 Text("${mode.style().label} 모드 · ${if (night) "밤" else "낮"}에 길을 고르는 기준", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Muted)
                 criteria.details.forEach { Text("· $it", fontSize = 15.sp, color = Ink, lineHeight = 21.sp) }
+                covered.forEach { item ->
+                    Row(Modifier.padding(top = 4.dp)) {
+                        Text(item.label, fontSize = 15.sp, color = Ink, modifier = Modifier.weight(1f))
+                        Text("${item.shortest}${item.unit} → ${item.safe}${item.unit}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink)
+                    }
+                }
             }
         } else if (items.isEmpty()) {
             Spacer(Modifier.height(4.dp))

@@ -18,7 +18,7 @@ interface RouteRepository {
 /** Talks to `POST /api/route` (requirements 8.3, server Safe-Way/safe-route#33). */
 class ServerRouteRepository : RouteRepository {
     override suspend fun findRoutes(request: RouteRequest): RouteResult =
-        parseRouteResult(ServerApi.post("/api/route", request.toJson()))
+        parseRouteResult(ServerApi.post("/api/route", request.toJson()), request.mode)
 }
 
 internal fun RouteRequest.toJson(): JSONObject = JSONObject()
@@ -33,6 +33,15 @@ private val COUNT_GROUPS = listOf(
     Triple("cctv", "CCTV", "대"),
     Triple("bell", "비상벨", "개"),
     Triple("help", "도움 지점", "곳"),
+    Triple("rest", "쉼 곳", "곳"),
+    Triple("school", "어린이보호구역", "곳"),
+)
+
+/** Rows for `covered`: meters walked within reach of what the mode weighs. Keyed "covered.rest" and so on. */
+private val COVERED_GROUPS = listOf(
+    "school" to "보호구역 안을 걷는 길",
+    "help" to "도움 시설 가까이 걷는 길",
+    "rest" to "쉼 곳 가까이 걷는 길",
 )
 
 /** Server facility types the map shows. Street and security lights are too many to tag, so they are left out. */
@@ -42,9 +51,23 @@ private val FACILITY_TYPES = mapOf(
     "POLICE" to FacilityKind.POLICE,
     "CONVENIENCE_STORE" to FacilityKind.CONVENIENCE_STORE,
     "CHILD_SAFETY_HOUSE" to FacilityKind.GUARD_HOUSE,
+    "SHELTER" to FacilityKind.HEAT_SHELTER,
+    "TOILET" to FacilityKind.TOILET,
+    "SCHOOL_ZONE" to FacilityKind.SCHOOL_ZONE,
 )
 
-internal fun parseRouteResult(json: JSONObject): RouteResult {
+/**
+ * Shelters and toilets (open now) matter to seniors, protection zones to children by day (the team's criteria);
+ * other modes and times leave them off the route map.
+ */
+private fun FacilityKind.shownOnRouteFor(mode: UserMode?, night: Boolean): Boolean = when (this) {
+    FacilityKind.HEAT_SHELTER, FacilityKind.TOILET -> mode == null || mode == UserMode.SENIOR
+    FacilityKind.SCHOOL_ZONE -> mode == null || (mode == UserMode.CHILD && !night)
+    else -> true
+}
+
+/** [mode] picks which mode-specific facilities to keep; null keeps them all. */
+internal fun parseRouteResult(json: JSONObject, mode: UserMode? = null): RouteResult {
     fun JSONArray?.objects(): List<JSONObject> = if (this == null) emptyList() else (0 until length()).map { getJSONObject(it) }
     fun JSONObject?.ints(): Map<String, Int> = this?.keys()?.asSequence()?.associateWith { optInt(it) }.orEmpty()
 
@@ -70,6 +93,7 @@ internal fun parseRouteResult(json: JSONObject): RouteResult {
                 geometry.getJSONArray(i).let { LatLon(it.getDouble(1), it.getDouble(0)) }
             },
             counts = route.optJSONObject("counts").ints(),
+            covered = route.optJSONObject("covered").ints(),
             sidewalks = route.optJSONArray("sidewalks").objects().map { w ->
                 Sidewalk(
                     from = w.optInt("from"),
@@ -91,18 +115,32 @@ internal fun parseRouteResult(json: JSONObject): RouteResult {
         val a = shortest.counts[key] ?: 0
         val b = safe.counts[key] ?: 0
         if (a == 0 && b == 0) null else CompareItem(label, a, b, unit, key)
+    } + if (shortest == null || safe == null) emptyList() else COVERED_GROUPS.mapNotNull { (key, label) ->
+        val a = shortest.covered[key]
+        val b = safe.covered[key]
+        if (a == null || b == null || (a == 0 && b == 0)) null else CompareItem(label, a, b, "m", "covered.$key")
     }
-    val explanation = Explanation(summary = json.optJSONObject("explanation")?.optString("text").orEmpty(), items = items)
+    val explanationJson = json.optJSONObject("explanation")
+    val explanation = Explanation(
+        // Older servers only sent text, which carries the notes in brackets.
+        summary = explanationJson?.optString("summary")?.takeIf { it.isNotBlank() } ?: explanationJson?.optString("text").orEmpty(),
+        items = items,
+        notes = explanationJson?.optJSONArray("notes").objects().mapNotNull { n ->
+            val text = n.optString("text").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            RouteNote(warn = n.optString("level") == "warn", kind = n.optString("kind"), text = text)
+        },
+    )
 
     val facilities = json.optJSONArray("facilities").objects().mapNotNull { f ->
-        val kind = FACILITY_TYPES[f.optString("type")] ?: return@mapNotNull null
+        val kind = FACILITY_TYPES[f.optString("type")]?.takeIf { it.shownOnRouteFor(mode, night) } ?: return@mapNotNull null
         // "on" says which route it lies along: safe, shortest or both.
         val route = when (f.optString("on")) {
             "safe" -> RouteType.SAFE
             "shortest" -> RouteType.SHORTEST
             else -> null
         }
-        Facility(kind, f.getDouble("lat"), f.getDouble("lon"), route)
+        // The server's SHELTER is any shelter open now (heat or cold), so it is labelled plainly.
+        Facility(kind, f.getDouble("lat"), f.getDouble("lon"), route, text = if (f.optString("type") == "SHELTER") "쉼터" else null)
     }
     val quality = json.optJSONObject("dataQuality")
     return RouteResult(
@@ -114,7 +152,9 @@ internal fun parseRouteResult(json: JSONObject): RouteResult {
         facilities = facilities,
         weather = weather,
         dataQuality = DataQuality(
-            ok = (quality?.optString("status") ?: "OK") == "OK",
+            // PARTIAL (some of the route has no data) comes up on any campus path, so only a route with
+            // no data at all gets the notice (team chat, 11/6).
+            ok = quality?.optString("status") != "NO_DATA",
             message = quality?.optString("message")?.takeUnless { quality.isNull("message") || it.isBlank() },
         ),
     )
