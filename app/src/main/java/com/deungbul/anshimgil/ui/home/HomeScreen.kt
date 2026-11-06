@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.home
 
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.foundation.background
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -109,6 +110,7 @@ fun HomeScreen(
     placeRepository: PlaceRepository,
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenReport: () -> Unit,
     onPlaceSelected: (Place) -> Unit,
     guardians: List<Guardian>,
     showSos: Boolean,
@@ -340,7 +342,7 @@ fun HomeScreen(
                 color = Color.White.copy(alpha = 0.85f),
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = if (showSos) 88.dp else 12.dp, bottom = 12.dp),
+                    .padding(start = 12.dp, bottom = 12.dp),
             ) {
                 Text(
                     note,
@@ -362,6 +364,22 @@ fun HomeScreen(
 
         error?.let { MapMessage(it, Modifier.align(Alignment.BottomCenter)) }
 
+        // 불편 신고: above the SOS button when that is shown.
+        Surface(
+            onClick = onOpenReport,
+            shape = RoundedCornerShape(26.dp),
+            color = Color.White,
+            shadowElevation = 4.dp,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 16.dp, bottom = if (showSos) 116.dp else 44.dp)
+                .heightIn(min = 48.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                Icon(Icons.Filled.Campaign, contentDescription = null, tint = Color(0xFFB45309))
+                Text(" 불편 신고", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink)
+            }
+        }
         if (showSos) SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 44.dp))
         if (sos) SosOverlay(guardians, here = { here }, onClose = { sos = false }, onAddGuardian = onOpenSettings)
     }

@@ -39,6 +39,7 @@ import com.deungbul.anshimgil.data.UserMode
 import com.deungbul.anshimgil.data.WalkSpeedRepository
 import com.deungbul.anshimgil.data.personalSpeed
 import com.deungbul.anshimgil.ui.settings.SettingsScreen
+import com.deungbul.anshimgil.ui.report.ReportScreen
 import com.deungbul.anshimgil.ui.search.SearchScreen
 import com.deungbul.anshimgil.ui.common.MapMessage
 import com.deungbul.anshimgil.ui.home.HomeScreen
@@ -98,6 +99,8 @@ private sealed interface Screen {
     /** [startFor] is set while choosing a new start for that route. */
     data class Search(val startFor: Route? = null) : Screen
     data object Settings : Screen
+    /** 불편 신고 (FR-49). */
+    data object Report : Screen
     /** [start] null means the phone's position. [fromHome]: opened from a home shortcut, so back returns home. */
     data class Route(val destination: Place, val start: Place? = null, val fromHome: Boolean = false) : Screen
     data class Guide(val route: Route, val result: RouteResult, val type: RouteType) : Screen
@@ -144,6 +147,10 @@ fun AppRoot(
                 }
                 BuildConfig.KAKAO_NATIVE_APP_KEY.isBlank() ->
                     MapMessage("local.properties에 KAKAO_NATIVE_APP_KEY를 넣고 다시 빌드해 주세요.", modifier)
+                screen == Screen.Report -> {
+                    BackHandler { screen = Screen.Home }
+                    ReportScreen(mode = mode, onBack = { screen = Screen.Home }, modifier = modifier)
+                }
                 screen == Screen.Settings -> {
                     BackHandler { screen = Screen.Home }
                     SettingsScreen(
@@ -237,6 +244,7 @@ fun AppRoot(
                     placeRepository = placeRepository,
                     onOpenSearch = { screen = Screen.Search() },
                     onOpenSettings = { screen = Screen.Settings },
+                    onOpenReport = { screen = Screen.Report },
                     onPlaceSelected = { place -> screen = Screen.Route(place, fromHome = true) },
                     guardians = settings.guardians,
                     showSos = settings.sosButton,
