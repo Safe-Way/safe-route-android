@@ -163,7 +163,8 @@ fun AssistantScreen(
         // A question about the place just found ("그곳 몇 층이야") is answered from what the app knows of it.
         chat.lastPlace?.let { place ->
             placeDetailAnswer(said, place)?.let { answer ->
-                say(answer)
+                say(answer.text)
+                if (answer.showOnMap) scope.launch { delay(1500); onRoute(place) }
                 return
             }
         }

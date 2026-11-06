@@ -175,15 +175,24 @@ private val PLACE_DETAIL_WORDS = listOf("몇층", "층에", "몇 층", "주소",
  * or "이마트24조대글로벌점 몇층이야". Says the address and, honestly, that the floor is not in the map data.
  * Null when [said] is about something else.
  */
-fun placeDetailAnswer(said: String, place: Place): String? {
+fun placeDetailAnswer(said: String, place: Place): PlaceAnswer? {
     val s = said.replace(" ", "")
     val aboutIt = PLACE_BACK_WORDS.any { s.contains(it) } || s.contains(place.name.replace(" ", ""))
-    val asksWhere = PLACE_DETAIL_WORDS.any { s.contains(it.replace(" ", "")) }
+    val cannotFind = CANNOT_FIND_WORDS.any { s.contains(it) }
+    val asksWhere = cannotFind || PLACE_DETAIL_WORDS.any { s.contains(it.replace(" ", "")) }
     if (!aboutIt || !asksWhere) return null
     val address = place.address.takeIf { it.isNotBlank() }?.let { " 주소는 $it 이에요." }.orEmpty()
-    val floor = if (s.contains("층")) " 몇 층인지는 지도 자료에 없어서 알려 드릴 수 없어요. 가까이 가면 간판을 확인해 주세요." else ""
-    return "${place.name}${address}$floor".trim()
+    val floor = if (s.contains("층")) " 몇 층인지는 지도 자료에 없어서 알려 드릴 수 없어요." else ""
+    // Cannot see the building: show where it is and walk them there.
+    val then = if (cannotFind) " 지도에서 위치를 보여 드리고 길을 안내할게요." else if (floor.isNotEmpty()) " 가까이 가면 간판을 확인해 주세요." else ""
+    return PlaceAnswer("${place.name}${address}$floor$then".trim(), showOnMap = cannotFind)
 }
+
+/** What AI 비서 says about the place just found, and whether to open its route on the map. */
+data class PlaceAnswer(val text: String, val showOnMap: Boolean)
+
+/** "안 보여", "못 찾겠어": the walker cannot see or find the place. Not text size (that needs 글씨·화면). */
+private val CANNOT_FIND_WORDS = listOf("안보여", "안보이", "못찾", "모르겠", "어딨", "어디있", "어디야")
 
 /** Other words for a saved place's name: "회사" for 직장, "우리 집" for 집. */
 private val FAVORITE_SYNONYMS = mapOf("직장" to listOf("회사", "일터"), "학교" to listOf("학원"))

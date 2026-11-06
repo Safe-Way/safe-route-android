@@ -268,10 +268,15 @@ class AssistantTest {
     fun questionAboutThePlaceJustFound() {
         val store = Place("1", "이마트24조대글로벌점", "광주 동구 필문대로 309", 35.14, 126.93, 120)
         val a = placeDetailAnswer("그곳 몇층에있어", store)!!
-        assertTrue(a, a.startsWith("이마트24조대글로벌점 주소는 광주 동구 필문대로 309 이에요."))
-        assertTrue(a.contains("몇 층인지는 지도 자료에 없어서"))
-        assertTrue(placeDetailAnswer("이마트24조대글로벌점 몇층에있어 안보여", store) != null)
-        assertTrue(placeDetailAnswer("거기 주소 알려줘", store)!!.contains("필문대로"))
+        assertTrue(a.text, a.text.startsWith("이마트24조대글로벌점 주소는 광주 동구 필문대로 309 이에요."))
+        assertTrue(a.text.contains("몇 층인지는 지도 자료에 없어서"))
+        assertTrue(!a.showOnMap)
+        // "안 보여" here means the building cannot be seen: show it on the map and guide there.
+        val lost = placeDetailAnswer("이마트24조대글로벌점 몇층에있어 안보여", store)!!
+        assertTrue(lost.showOnMap)
+        assertTrue(lost.text, lost.text.endsWith("지도에서 위치를 보여 드리고 길을 안내할게요."))
+        assertTrue(placeDetailAnswer("거기 못 찾겠어", store)!!.showOnMap)
+        assertTrue(placeDetailAnswer("거기 주소 알려줘", store)!!.text.contains("필문대로"))
         assertNull(placeDetailAnswer("가까운 화장실", store))
         assertNull(placeDetailAnswer("글씨 크게 해 줘", store))
     }
