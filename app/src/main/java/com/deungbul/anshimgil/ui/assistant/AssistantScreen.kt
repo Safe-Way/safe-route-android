@@ -57,6 +57,7 @@ import com.deungbul.anshimgil.data.ApiException
 import com.deungbul.anshimgil.data.AppAssistant
 import com.deungbul.anshimgil.data.AssistantAction
 import com.deungbul.anshimgil.data.AssistantContext
+import com.deungbul.anshimgil.data.placeDetailAnswer
 import com.deungbul.anshimgil.data.ChatLine
 import com.deungbul.anshimgil.data.NEARBY_KINDS
 import com.deungbul.anshimgil.data.Place
@@ -146,6 +147,7 @@ fun AssistantScreen(
             say(missing)
             return
         }
+        chat.lastPlace = place
         say("${place.name}(으)로 길을 찾았어요.")
         delay(600)
         onRoute(place)
@@ -158,6 +160,13 @@ fun AssistantScreen(
         input = ""
         choices = emptyList()
         urgent = false
+        // A question about the place just found ("그곳 몇 층이야") is answered from what the app knows of it.
+        chat.lastPlace?.let { place ->
+            placeDetailAnswer(said, place)?.let { answer ->
+                say(answer)
+                return
+            }
+        }
         thinking = "생각하는 중…"
         scope.launch {
             // The greeting is the app's own, so only what the user said and the replies go out.
@@ -174,7 +183,7 @@ fun AssistantScreen(
                     { lat, lon -> placeRepository.search(action.query, lat, lon).firstOrNull() },
                     "'${action.query}'을(를) 찾지 못했어요. 이름을 조금 다르게 말해 주세요.",
                 )
-                is AssistantAction.GoPlace -> { delay(1200); if (action.transit) onRouteByTransit(action.place) else onRoute(action.place) }
+                is AssistantAction.GoPlace -> { chat.lastPlace = action.place; delay(1200); if (action.transit) onRouteByTransit(action.place) else onRoute(action.place) }
                 is AssistantAction.ShowBuses -> { delay(500); onShowBuses() }
                 is AssistantAction.OpenReport -> { delay(1200); onOpenReport(action) }
                 is AssistantAction.Ask -> choices = action.choices
@@ -305,4 +314,6 @@ private fun EmergencyCard(onCall: () -> Unit, onGuardian: () -> Unit, onPolice: 
 class AssistantChat {
     val lines = mutableStateListOf<ChatLine>()
     var choices by mutableStateOf<List<String>>(emptyList())
+    /** The place found last, so "그곳 몇 층이야" is about it. */
+    var lastPlace by mutableStateOf<Place?>(null)
 }

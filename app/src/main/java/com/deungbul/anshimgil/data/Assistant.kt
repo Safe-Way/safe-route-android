@@ -109,7 +109,9 @@ object RuleAppAssistant : AppAssistant {
             if (wantsGo || s.length <= name.length + 3) return AssistantAction.GoNearby("가까운 ${name}으로 길을 찾을게요.", kind)
         }
         return when {
-            has("안보여", "안 보여", "작아", "크게") && has("글", "글씨", "글자", "안보여", "작아") ->
+            // Only about the words on screen: "글씨가 안 보여", "화면이 잘 안 보여", or just "잘 안 보여".
+            // "편의점이 안 보여" is about a place, not the text size.
+            textTooSmall(s) ->
                 AssistantAction.ChangeSettings("글씨를 크게 바꿀게요.", textSize = TextSize.LARGE)
             has("글씨", "글자") && has("작게", "커", "너무 커") -> AssistantAction.ChangeSettings("글씨를 작게 바꿀게요.", textSize = TextSize.SMALL)
             has("음성", "소리", "말소리") && has("꺼", "끄", "시끄") -> AssistantAction.ChangeSettings("음성 안내를 끌게요.", voiceGuide = false)
@@ -151,6 +153,36 @@ fun reportAction(said: String, say: String? = null): AssistantAction.OpenReport 
     // Just "신고할래" is not worth keeping as a memo.
     val memo = if (said.replace(" ", "").length > 6) said.trim().take(REPORT_MAX_MEMO) else ""
     return AssistantAction.OpenReport(words, type, memo)
+}
+
+/** Whether [s] (spaces removed) says the text is too small to read. */
+internal fun textTooSmall(s: String): Boolean {
+    val aboutText = listOf("글씨", "글자", "화면", "글이").any { s.contains(it) }
+    val cannotSee = listOf("안보여", "작아", "크게", "흐려", "안보이").any { s.contains(it) }
+    // A bare "(잘) 안 보여(요)" with nothing else is about the screen too.
+    val bare = s.matches(Regex("""(잘)?안보여(요)?[.!?]*"""))
+    return (aboutText && cannotSee) || bare
+}
+
+/** Words that point back at the place just found: "그곳", "거기", "그 가게". */
+private val PLACE_BACK_WORDS = listOf("그곳", "거기", "그가게", "그편의점", "그화장실", "그건물", "그데", "저기")
+
+/** Questions about where exactly a place is, which the map data can partly answer. */
+private val PLACE_DETAIL_WORDS = listOf("몇층", "층에", "몇 층", "주소", "어디에있", "어디있", "위치", "어디야", "어디에요", "건물")
+
+/**
+ * An answer about [place] (the one just found) when [said] asks where exactly it is, e.g. "그곳 몇층에 있어"
+ * or "이마트24조대글로벌점 몇층이야". Says the address and, honestly, that the floor is not in the map data.
+ * Null when [said] is about something else.
+ */
+fun placeDetailAnswer(said: String, place: Place): String? {
+    val s = said.replace(" ", "")
+    val aboutIt = PLACE_BACK_WORDS.any { s.contains(it) } || s.contains(place.name.replace(" ", ""))
+    val asksWhere = PLACE_DETAIL_WORDS.any { s.contains(it.replace(" ", "")) }
+    if (!aboutIt || !asksWhere) return null
+    val address = place.address.takeIf { it.isNotBlank() }?.let { " 주소는 $it 이에요." }.orEmpty()
+    val floor = if (s.contains("층")) " 몇 층인지는 지도 자료에 없어서 알려 드릴 수 없어요. 가까이 가면 간판을 확인해 주세요." else ""
+    return "${place.name}${address}$floor".trim()
 }
 
 /** Other words for a saved place's name: "회사" for 직장, "우리 집" for 집. */

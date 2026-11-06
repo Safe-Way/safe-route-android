@@ -252,4 +252,27 @@ class AssistantTest {
         assertNull(plain.type)
         assertEquals("", plain.memo)
     }
+
+    // --- 11/6 phone test: "…몇층에있어 안보여" changed the text size ---
+
+    @Test
+    fun cannotFindAPlaceIsNotTextSize() {
+        assertTrue(rule("이마트24조대글로벌점 몇층에있어 안보여") !is AssistantAction.ChangeSettings)
+        assertTrue(rule("편의점이 안 보여") !is AssistantAction.ChangeSettings)
+        assertEquals(TextSize.LARGE, (rule("글씨가 잘 안 보여요") as AssistantAction.ChangeSettings).textSize)
+        assertEquals(TextSize.LARGE, (rule("화면이 잘 안 보여") as AssistantAction.ChangeSettings).textSize)
+        assertEquals(TextSize.LARGE, (rule("잘 안 보여요") as AssistantAction.ChangeSettings).textSize)
+    }
+
+    @Test
+    fun questionAboutThePlaceJustFound() {
+        val store = Place("1", "이마트24조대글로벌점", "광주 동구 필문대로 309", 35.14, 126.93, 120)
+        val a = placeDetailAnswer("그곳 몇층에있어", store)!!
+        assertTrue(a, a.startsWith("이마트24조대글로벌점 주소는 광주 동구 필문대로 309 이에요."))
+        assertTrue(a.contains("몇 층인지는 지도 자료에 없어서"))
+        assertTrue(placeDetailAnswer("이마트24조대글로벌점 몇층에있어 안보여", store) != null)
+        assertTrue(placeDetailAnswer("거기 주소 알려줘", store)!!.contains("필문대로"))
+        assertNull(placeDetailAnswer("가까운 화장실", store))
+        assertNull(placeDetailAnswer("글씨 크게 해 줘", store))
+    }
 }
