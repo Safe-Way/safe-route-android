@@ -33,7 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalPolice
-import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Store
@@ -44,6 +44,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import com.deungbul.anshimgil.data.ShownHints
+import com.deungbul.anshimgil.data.MapHintSource
+import com.deungbul.anshimgil.data.MapHint
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -125,6 +128,10 @@ fun HomeScreen(
     onBusesShown: () -> Unit = {},
     startWithSos: Boolean = false,
     onSosShown: () -> Unit = {},
+    /** Where the AI 비서 bubble comes from; null shows none. */
+    hintSource: MapHintSource? = null,
+    /** Open AI 비서 carrying on from a bubble's line. */
+    onAskAssistant: (String) -> Unit = {},
 ) {
     var sos by remember { mutableStateOf(startWithSos) }
     LaunchedEffect(Unit) { if (startWithSos) onSosShown() }
@@ -143,6 +150,7 @@ fun HomeScreen(
     var shownFacilities by remember { mutableStateOf<List<Facility>>(emptyList()) }
     var zoom by remember { mutableIntStateOf(WALK_ZOOM) }
     val scope = rememberCoroutineScope()
+    var hint by remember { mutableStateOf<MapHint?>(null) }
 
     // The phone's position, kept up to date so the location button moves at once and the dot follows.
     var hasPermission by remember { mutableStateOf(hasLocationPermission(context)) }
@@ -182,6 +190,19 @@ fun HomeScreen(
         locate()
     }
 
+    // The AI 비서 bubble: once the position is known, at most one line from real data; gone after a while.
+    val hereKnown = here != null
+    LaunchedEffect(hintSource, hereKnown) {
+        val source = hintSource ?: return@LaunchedEffect
+        val at = here ?: return@LaunchedEffect
+        val found = source.next(mode, at) ?: return@LaunchedEffect
+        hint = found
+        delay(HINT_SHOW_MS)
+        if (hint == found) {
+            ShownHints.mark(found.key)
+            hint = null
+        }
+    }
     LaunchedEffect(map, here) {
         val m = map ?: return@LaunchedEffect
         val p = here ?: return@LaunchedEffect
@@ -328,16 +349,28 @@ fun HomeScreen(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     )
                 }
-                // 말로 하기: say what you want ("근처 화장실로 안내해 줘", "글씨가 안 보여").
+                // AI 비서 (말로 하기): say what you want ("근처 화장실로 안내해 줘", "글씨가 안 보여").
                 Surface(
                     onClick = onOpenAssistant,
                     shape = RoundedCornerShape(16.dp), color = Color(0xFF1F6B42), contentColor = Color.White, shadowElevation = 3.dp,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                        Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Text(" 말로 하기", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text(" AI 비서", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 }
+            }
+            hint?.let { h ->
+                HintBubble(
+                    h,
+                    onOpen = {
+                        ShownHints.mark(h.key)
+                        hint = null
+                        val place = h.place
+                        if (place != null) onPlaceSelected(place) else onAskAssistant(h.text)
+                    },
+                    onDismiss = { ShownHints.mark(h.key); hint = null },
+                )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NEARBY.forEach { (query, label, icon) ->
@@ -590,6 +623,38 @@ private fun NearbyBusCard(at: LatLon?, mode: UserMode, onClose: () -> Unit, modi
                     }
                 }
             }
+        }
+    }
+}
+
+
+/** How long the AI 비서 bubble stays when left alone. */
+private const val HINT_SHOW_MS = 15_000L
+
+/** One line from AI 비서 under its button; a route offer has its own button, other lines open AI 비서. */
+@Composable
+private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit) {
+    Surface(
+        onClick = onOpen,
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF1F6B42)),
+        shadowElevation = 4.dp,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 2.dp)) {
+            Icon(Icons.Filled.AutoAwesome, contentDescription = "AI 비서", tint = Color(0xFF1F6B42), modifier = Modifier.size(18.dp))
+            Text(
+                hint.text, fontSize = 15.sp, color = Ink, lineHeight = 21.sp, maxLines = 3,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(start = 8.dp),
+            )
+            if (hint.place != null) {
+                androidx.compose.material3.TextButton(onClick = onOpen) {
+                    Text("길 보기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1F6B42))
+                }
+            }
+            IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Color(0xFF5E6A62)) }
         }
     }
 }

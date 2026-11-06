@@ -91,10 +91,12 @@ fun AssistantScreen(
     onAlertGuardian: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The line AI 비서 opens with, when it came from its bubble on the map; otherwise the greeting. */
+    opening: String? = null,
 ) {
     val android = LocalContext.current
     val scope = rememberCoroutineScope()
-    val lines = remember { mutableStateListOf(ChatLine(fromUser = false, text = HELLO)) }
+    val lines = remember { mutableStateListOf(ChatLine(fromUser = false, text = opening ?: HELLO)) }
     var choices by remember { mutableStateOf(STARTERS) }
     var thinking by remember { mutableStateOf<String?>(null) }
     var urgent by remember { mutableStateOf(false) }
@@ -179,7 +181,7 @@ fun AssistantScreen(
     Column(modifier.fillMaxSize().background(Color(0xFFF7F8F5)).imePadding()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 4.dp)) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "지도로 돌아가기", tint = Ink) }
-            Text("말로 하기", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Ink)
+            Text("AI 비서", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Ink)
         }
         LazyColumn(
             state = listState,

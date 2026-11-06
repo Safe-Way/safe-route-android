@@ -48,6 +48,8 @@ import com.deungbul.anshimgil.ui.mode.SetupChatScreen
 import com.deungbul.anshimgil.data.SetupAssistant
 import com.deungbul.anshimgil.data.AppAssistant
 import com.deungbul.anshimgil.data.AssistantContext
+import com.deungbul.anshimgil.data.EventRepository
+import com.deungbul.anshimgil.data.MapHintSource
 import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.location.currentLocation
 import kotlinx.coroutines.flow.first
@@ -147,6 +149,17 @@ fun AppRoot(
     }
     // The assistant asked the map to open the nearby-bus card.
     var busesOnHome by remember { mutableStateOf(false) }
+    // AI 비서 opened from its bubble on the map starts with that line.
+    var assistantOpening by remember { mutableStateOf<String?>(null) }
+    val mapHints = remember {
+        MapHintSource(
+            EventRepository.create(),
+            guestId = { walkSpeedRepository.guestId() },
+            favorites = {
+                savedPlaces.favorites.first().mapNotNull { f -> f.place?.let { f.name to LatLon(it.lat, it.lon) } }
+            },
+        )
+    }
     // The assistant's 보호자에게 알리기: open SOS on the map.
     var sosOnHome by remember { mutableStateOf(false) }
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
@@ -198,6 +211,7 @@ fun AppRoot(
                 screen == Screen.Assistant -> {
                     BackHandler { screen = Screen.Home }
                     AssistantScreen(
+                        opening = assistantOpening,
                         assistant = appAssistant,
                         context = AssistantContext(mode, settings, where = { currentLocation(appContext, 4_000) }),
                         placeRepository = placeRepository,
@@ -321,7 +335,9 @@ fun AppRoot(
                     guardians = settings.guardians,
                     showSos = settings.sosButton,
                     modifier = modifier,
-                    onOpenAssistant = { busesOnHome = false; screen = Screen.Assistant },
+                    onOpenAssistant = { busesOnHome = false; assistantOpening = null; screen = Screen.Assistant },
+                    hintSource = mapHints,
+                    onAskAssistant = { line -> busesOnHome = false; assistantOpening = line; screen = Screen.Assistant },
                     startWithBuses = busesOnHome,
                     onBusesShown = { busesOnHome = false },
                     startWithSos = sosOnHome,
