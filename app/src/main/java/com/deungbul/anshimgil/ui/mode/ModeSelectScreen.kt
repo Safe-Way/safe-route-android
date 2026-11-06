@@ -251,14 +251,8 @@ private fun ModeSelectScreenPreview() {
 @Composable
 fun ModeBadge(mode: UserMode, modifier: Modifier = Modifier) {
     val style = mode.style()
-    androidx.compose.material3.Surface(
-        shape = CircleShape,
-        color = Color.White,
-        shadowElevation = 1.dp,
-        modifier = modifier.size(16.dp),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(style.icon, contentDescription = "${style.label} 모드", tint = style.accent, modifier = Modifier.size(12.dp))
-        }
+    // No background: just the icon in the mode's colour.
+    Box(modifier.size(16.dp), contentAlignment = Alignment.Center) {
+        Icon(style.icon, contentDescription = "${style.label} 모드", tint = style.accent, modifier = Modifier.size(14.dp))
     }
 }
