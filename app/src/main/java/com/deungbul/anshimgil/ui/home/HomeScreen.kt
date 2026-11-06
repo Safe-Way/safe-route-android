@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.home
 
+import com.deungbul.anshimgil.ui.common.AI_BUBBLE_ALPHA
 import com.deungbul.anshimgil.data.busesToShow
 import com.deungbul.anshimgil.data.BusRepository
 import com.deungbul.anshimgil.data.NearbyStop
@@ -48,6 +49,9 @@ import androidx.compose.runtime.LaunchedEffect
 import com.deungbul.anshimgil.data.ShownHints
 import com.deungbul.anshimgil.data.MapHintSource
 import com.deungbul.anshimgil.data.MapHint
+import com.deungbul.anshimgil.data.TRIP_CONSENT_NO
+import com.deungbul.anshimgil.data.TRIP_CONSENT_YES
+import com.deungbul.anshimgil.data.TRIP_CONSENT_QUESTION
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -133,6 +137,9 @@ fun HomeScreen(
     hintSource: MapHintSource? = null,
     /** Open AI 비서 carrying on from a bubble's line. */
     onAskAssistant: (String) -> Unit = {},
+    /** AI 비서 asks in its live bubble whether to keep trips; [onTripConsent] gets the answer. */
+    askTripConsent: Boolean = false,
+    onTripConsent: (Boolean) -> Unit = {},
 ) {
     var sos by remember { mutableStateOf(startWithSos) }
     LaunchedEffect(Unit) { if (startWithSos) onSosShown() }
@@ -418,7 +425,15 @@ fun HomeScreen(
         error?.let { MapMessage(it, Modifier.align(Alignment.BottomCenter)) }
 
         // AI 비서's one-line bubble sits just above its button, unless a card is open there.
-        if (!showBuses && picked == null) hint?.let { h ->
+        // "자주 가는 길을 기억해 둘까요?" comes first, in the same live bubble, with the two answers under it.
+        if (askTripConsent && !showBuses && picked == null) {
+            Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp)) {
+                AiAskBubble(
+                    TRIP_CONSENT_QUESTION,
+                    answers = listOf(TRIP_CONSENT_YES to { onTripConsent(true) }, TRIP_CONSENT_NO to { onTripConsent(false) }),
+                )
+            }
+        } else if (!showBuses && picked == null) hint?.let { h ->
             Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 148.dp)) {
                 HintBubble(
                     h,
@@ -630,9 +645,8 @@ private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit)
         onClick = onOpen,
         shape = RoundedCornerShape(16.dp),
         // See-through so the map behind stays visible; the words keep full contrast.
-        color = Color.White.copy(alpha = 0.88f),
+        color = Color.White.copy(alpha = AI_BUBBLE_ALPHA),
         border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF1F6B42).copy(alpha = 0.7f)),
-        shadowElevation = 0.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 2.dp)) {
@@ -648,6 +662,38 @@ private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit)
                 }
             }
             IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Color(0xFF5E6A62)) }
+        }
+    }
+}
+
+
+/** AI 비서 asking in its live bubble, with ready answers to tap right under the words. */
+@Composable
+private fun AiAskBubble(text: String, answers: List<Pair<String, () -> Unit>>) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White.copy(alpha = AI_BUBBLE_ALPHA),
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF1F6B42)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Icon(Icons.Filled.AutoAwesome, contentDescription = "AI 비서", tint = Color(0xFF1F6B42), modifier = Modifier.size(18.dp).padding(top = 2.dp))
+                Text(text, fontSize = 15.sp, color = Ink, lineHeight = 21.sp, modifier = Modifier.padding(start = 8.dp))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(start = 26.dp)) {
+                answers.forEachIndexed { i, (label, onClick) ->
+                    Surface(
+                        onClick = onClick,
+                        shape = RoundedCornerShape(18.dp),
+                        color = if (i == 0) Color(0xFF1F6B42) else Color.White,
+                        contentColor = if (i == 0) Color.White else Color(0xFF1F6B42),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1F6B42)),
+                    ) {
+                        Text(label, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+                    }
+                }
+            }
         }
     }
 }

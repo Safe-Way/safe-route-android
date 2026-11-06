@@ -92,12 +92,14 @@ fun TransitGuideScreen(
     modifier: Modifier = Modifier,
     /** AI 비서's microphone, on walking parts and rides alike. */
     onOpenAssistant: (() -> Unit)? = null,
+    /** Called when the last part is done (for the trip record). */
+    onArrived: () -> Unit = {},
 ) {
     val legs = remember(route) { guideLegs(route) }
     var step by rememberSaveable { mutableIntStateOf(0) }
     val leg = legs.getOrNull(step) ?: run { LaunchedEffect(Unit) { onFinish() }; return }
     val last = step == legs.lastIndex
-    fun next() = if (last) onFinish() else step++
+    fun next() = if (last) { onArrived(); onFinish() } else step++
     val nextLabel = legs.getOrNull(step + 1)?.let { n -> if (n.type == LegType.WALK) "다음: 걷기" else "다음: ${legLabel(n)} 타기" }
 
     Column(modifier.fillMaxSize().background(Color.White)) {

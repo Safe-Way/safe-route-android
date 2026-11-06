@@ -1,5 +1,7 @@
 package com.deungbul.anshimgil.ui.settings
 
+import kotlinx.coroutines.launch
+
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
@@ -85,6 +87,13 @@ fun SettingsScreen(
     onSosButtonChange: (Boolean) -> Unit,
     onResetToDefaults: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 이동 기록: whether trips are kept, how many wait to go to the server, and wiping them. */
+    tripConsent: Boolean = false,
+    /** Trips the server keeps for this phone; null when unknown. */
+    tripCount: Int? = null,
+    onTripConsentChange: (Boolean) -> Unit = {},
+    /** Returns false when the server copy could not be deleted. */
+    onClearTrips: suspend () -> Boolean = { true },
 ) {
     val context = LocalContext.current
     var addingGuardian by remember { mutableStateOf(false) }
@@ -155,6 +164,39 @@ fun SettingsScreen(
         SwitchRow("음성 안내", "걷는 동안 다음 방향을 읽어 줘요", settings.voiceGuide, onVoiceChange)
         SwitchRow("상황 자동 판단", "밤, 비, 폭염 등을 알아서 경로에 반영해요", settings.autoConditions, onAutoConditionsChange)
         SwitchRow("꺾는 곳 표시", "길안내 지도에서 크게 꺾는 곳에 ↰ ↱ 표시를 보여 줘요", settings.turnSigns, onTurnSignsChange)
+
+        SectionTitle("이동 기록")
+        SwitchRow(
+            "자주 가는 길 기억하기",
+            "도착한 곳(약 100m 범위)과 시간을 저장해서 AI 비서가 먼저 길을 알려 줘요" +
+                if (tripConsent && tripCount != null) " · 지금 ${tripCount}번 기억함" else "",
+            tripConsent,
+            onTripConsentChange,
+        )
+        val scope = androidx.compose.runtime.rememberCoroutineScope()
+        var confirmClearTrips by remember { mutableStateOf(false) }
+        LinkRow("이동 기록 모두 지우기", "서버에 남은 기록을 지워요") { confirmClearTrips = true }
+        if (confirmClearTrips) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { confirmClearTrips = false },
+                title = { Text("이동 기록을 모두 지울까요?") },
+                text = { Text("지우면 자주 가는 길 제안을 처음부터 다시 배워요.") },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        confirmClearTrips = false
+                        scope.launch {
+                            val all = onClearTrips()
+                            android.widget.Toast.makeText(
+                                context,
+                                if (all) "이동 기록을 지웠어요" else "서버에 연결하지 못해서 지우지 못했어요. 잠시 뒤 다시 해 주세요.",
+                                android.widget.Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                    }) { Text("지우기") }
+                },
+                dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmClearTrips = false }) { Text("취소") } },
+            )
+        }
 
         SectionTitle("지도에 더 보기")
         Text(
