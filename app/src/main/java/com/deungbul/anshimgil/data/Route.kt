@@ -37,8 +37,8 @@ fun sidewalkHint(sidewalks: List<Sidewalk>, pointIndex: Int): String? =
 /** A detected situation such as night or rain; [on] is whether routing used it. */
 data class Condition(val key: String, val label: String, val on: Boolean)
 
-/** One row of "shortest → safe", e.g. CCTV 3대 → 9대. */
-data class CompareItem(val label: String, val shortest: Int, val safe: Int, val unit: String)
+/** One row of "shortest → safe", e.g. CCTV 3대 → 9대. [key] is the server's count key ("light", "cctv", …). */
+data class CompareItem(val label: String, val shortest: Int, val safe: Int, val unit: String, val key: String = "")
 
 data class Explanation(val summary: String, val items: List<CompareItem>)
 

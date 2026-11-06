@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -87,6 +88,7 @@ import com.deungbul.anshimgil.data.RouteOption
 import com.deungbul.anshimgil.data.RouteRepository
 import com.deungbul.anshimgil.data.RouteRequest
 import com.deungbul.anshimgil.data.RouteResult
+import com.deungbul.anshimgil.data.routeCriteria
 import com.deungbul.anshimgil.data.RouteType
 import com.deungbul.anshimgil.data.walkMinutes
 import com.deungbul.anshimgil.data.autoNightReason
@@ -404,7 +406,7 @@ fun RouteScreen(
                                 else -> TextButton(onClick = onPickStart) { Text("출발지 바꾸기") }
                             }
                         }
-                        is RouteState.Ready -> RouteDetails(s.result.atPace(walkSpeedMPerMin), selected, onSelect = { selected = it })
+                        is RouteState.Ready -> RouteDetails(s.result.atPace(walkSpeedMPerMin), mode, selected, onSelect = { selected = it })
                     }
                 }
                 if (!transitTab) (state as? RouteState.Ready)?.let { s -> StartButton(s.result.atPace(walkSpeedMPerMin), selected, onStart = { onStart(s.result, selected) }) }
@@ -462,6 +464,7 @@ private fun LocationNotice(issue: OriginIssue, onFix: () -> Unit) {
 @Composable
 private fun RouteDetails(
     result: RouteResult,
+    mode: UserMode,
     selected: RouteType,
     onSelect: (RouteType) -> Unit,
 ) {
@@ -476,25 +479,43 @@ private fun RouteDetails(
         }
     }
 
+    // Why this route, in one line; 자세히 opens what the route engine weighs for this mode and time.
+    val night = result.conditions.any { it.key == "night" && it.on }
+    val criteria = routeCriteria(mode, night)
+    val items = result.explanation.items.filter { it.key.isEmpty() || it.key in criteria.counts }
+    var more by rememberSaveable { mutableStateOf(false) }
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFFEEF6F0), RoundedCornerShape(14.dp))
-            .padding(14.dp),
+            .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 4.dp),
     ) {
-        Text(result.explanation.summary, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink, lineHeight = 24.sp)
-        result.explanation.items.forEach { item ->
-            Row {
-                Text(item.label, fontSize = 15.sp, color = Ink, modifier = Modifier.weight(1f))
-                Text(
-                    "${item.shortest}${item.unit} → ${item.safe}${item.unit}",
-                    fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink,
-                )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                criteria.short, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink, lineHeight = 24.sp,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = { more = !more }) { Text(if (more) "접기" else "자세히", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+        }
+        if (items.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(end = 8.dp)) {
+                items.forEach { item ->
+                    Row {
+                        Text(item.label, fontSize = 15.sp, color = Ink, modifier = Modifier.weight(1f))
+                        Text("${item.shortest}${item.unit} → ${item.safe}${item.unit}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink)
+                    }
+                }
+                Text("가장 빠른 길 → 안전한 길로 바꾸면", fontSize = 12.sp, color = Muted)
             }
         }
-        if (result.explanation.items.isNotEmpty()) {
-            Text("가장 빠른 길 → 안전한 길로 바꾸면", fontSize = 12.sp, color = Muted)
+        if (more) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(end = 8.dp, bottom = 8.dp)) {
+                Text("${mode.style().label} 모드 · ${if (night) "밤" else "낮"}에 길을 고르는 기준", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Muted)
+                criteria.details.forEach { Text("· $it", fontSize = 15.sp, color = Ink, lineHeight = 21.sp) }
+            }
+        } else if (items.isEmpty()) {
+            Spacer(Modifier.height(4.dp))
         }
     }
 

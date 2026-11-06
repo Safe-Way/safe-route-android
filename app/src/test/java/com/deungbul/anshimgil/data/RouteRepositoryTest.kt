@@ -56,7 +56,7 @@ class RouteRepositoryTest {
         assertEquals("216m(3분) 더 돌지만 가로등 +33개, CCTV +22대", result.explanation.summary)
         // bell is 0 on both routes, so no row for it
         assertEquals(
-            listOf(CompareItem("가로등", 10, 43, "개"), CompareItem("CCTV", 3, 25, "대"), CompareItem("도움 지점", 1, 2, "곳")),
+            listOf(CompareItem("가로등", 10, 43, "개", "light"), CompareItem("CCTV", 3, 25, "대", "cctv"), CompareItem("도움 지점", 1, 2, "곳", "help")),
             result.explanation.items,
         )
         assertEquals(listOf(FacilityKind.CCTV, FacilityKind.GUARD_HOUSE), result.facilities.map { it.kind })
