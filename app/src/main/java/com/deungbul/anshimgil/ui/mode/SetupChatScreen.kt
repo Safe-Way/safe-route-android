@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -129,7 +131,7 @@ fun SetupChatScreen(
 
     LaunchedEffect(lines.size, picked) { listState.animateScrollToItem(maxOf(0, lines.size)) }
 
-    Column(modifier.fillMaxSize().background(Color(0xFFF7F8F5))) {
+    Column(modifier.fillMaxSize().background(Color(0xFFF7F8F5)).imePadding()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 4.dp)) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "직접 고르기로 돌아가기", tint = Ink) }
             Text("말로 맞추기", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Ink)
@@ -155,6 +157,8 @@ fun SetupChatScreen(
                 value = input,
                 onValueChange = { input = it.take(300) },
                 placeholder = { Text("여기에 쓰거나 마이크를 눌러 말해요") },
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp, color = Ink),
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Ink, unfocusedTextColor = Ink, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White),
                 modifier = Modifier.weight(1f),
             )
             IconButton(onClick = ::listen) { Icon(Icons.Filled.Mic, contentDescription = "말로 답하기", tint = Green) }
@@ -166,7 +170,7 @@ fun SetupChatScreen(
 }
 
 @Composable
-private fun Bubble(line: ChatLine) {
+internal fun Bubble(line: ChatLine) {
     Box(Modifier.fillMaxWidth(), contentAlignment = if (line.fromUser) Alignment.CenterEnd else Alignment.CenterStart) {
         Surface(
             shape = RoundedCornerShape(16.dp),

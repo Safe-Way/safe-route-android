@@ -1,0 +1,193 @@
+package com.deungbul.anshimgil.ui.assistant
+
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.deungbul.anshimgil.data.ApiException
+import com.deungbul.anshimgil.data.AppAssistant
+import com.deungbul.anshimgil.data.AssistantAction
+import com.deungbul.anshimgil.data.AssistantContext
+import com.deungbul.anshimgil.data.ChatLine
+import com.deungbul.anshimgil.data.NEARBY_KINDS
+import com.deungbul.anshimgil.data.Place
+import com.deungbul.anshimgil.data.PlaceRepository
+import com.deungbul.anshimgil.location.phoneOrigin
+import com.deungbul.anshimgil.ui.mode.Bubble
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+private val Ink = Color(0xFF17211B)
+private val Muted = Color(0xFF5E6A62)
+private val Green = Color(0xFF1F6B42)
+
+private const val HELLO = "무엇을 도와드릴까요? 편하게 말해 주세요.\n예: \"근처 화장실로 안내해 줘\", \"글씨가 안 보여\""
+private val STARTERS = listOf("근처 화장실로 안내해 줘", "글씨가 잘 안 보여", "가까운 버스 보여 줘", "가까운 편의점")
+
+/**
+ * 말로 하기: the map screen's assistant. Settings change right here ([onChangeSettings]); places are
+ * found here and opened as a route ([onRoute]); buses and reports go back to the map ([onShowBuses],
+ * [onOpenReport]).
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun AssistantScreen(
+    assistant: AppAssistant,
+    context: AssistantContext,
+    placeRepository: PlaceRepository,
+    onChangeSettings: (AssistantAction.ChangeSettings) -> Unit,
+    onRoute: (Place) -> Unit,
+    onShowBuses: () -> Unit,
+    onOpenReport: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val android = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val lines = remember { mutableStateListOf(ChatLine(fromUser = false, text = HELLO)) }
+    var choices by remember { mutableStateOf(STARTERS) }
+    var thinking by remember { mutableStateOf<String?>(null) }
+    var input by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+
+    fun say(text: String) { lines += ChatLine(fromUser = false, text = text) }
+
+    suspend fun findAndGo(find: suspend (lat: Double, lon: Double) -> Place?, missing: String) {
+        thinking = "찾는 중…"
+        val from = phoneOrigin(android).point
+        val place = try {
+            find(from.lat, from.lon)
+        } catch (e: ApiException) {
+            say(e.message ?: "지금은 찾을 수 없어요. 잠시 뒤에 다시 해 주세요.")
+            return
+        }
+        if (place == null) {
+            say(missing)
+            return
+        }
+        say("${place.name}(으)로 길을 찾았어요.")
+        delay(600)
+        onRoute(place)
+    }
+
+    fun send(text: String) {
+        val said = text.trim()
+        if (said.isEmpty() || thinking != null) return
+        lines += ChatLine(fromUser = true, text = said)
+        input = ""
+        choices = emptyList()
+        thinking = "생각하는 중…"
+        scope.launch {
+            // The greeting is the app's own, so only what the user said and the replies go out.
+            val action = assistant.reply(lines.drop(1), context)
+            say(action.say)
+            when (action) {
+                is AssistantAction.ChangeSettings -> onChangeSettings(action)
+                is AssistantAction.GoNearby -> findAndGo(
+                    { lat, lon -> placeRepository.nearby(action.kind, context.mode, lat, lon).places.firstOrNull() },
+                    "1km 안에서 ${NEARBY_KINDS[action.kind]}을(를) 찾지 못했어요.",
+                )
+                is AssistantAction.GoTo -> findAndGo(
+                    { lat, lon -> placeRepository.search(action.query, lat, lon).firstOrNull() },
+                    "'${action.query}'을(를) 찾지 못했어요. 이름을 조금 다르게 말해 주세요.",
+                )
+                is AssistantAction.ShowBuses -> { delay(500); onShowBuses() }
+                is AssistantAction.OpenReport -> { delay(500); onOpenReport() }
+                is AssistantAction.Ask -> choices = action.choices
+                is AssistantAction.Answer -> Unit
+            }
+            thinking = null
+        }
+    }
+
+    val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let(::send)
+    }
+    fun listen() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, "말씀해 주세요")
+        try {
+            speech.launch(intent)
+        } catch (e: ActivityNotFoundException) {
+            say("이 휴대폰은 음성 입력을 쓸 수 없어요. 글로 써 주세요.")
+        }
+    }
+
+    LaunchedEffect(lines.size, thinking) { listState.animateScrollToItem(maxOf(0, lines.size)) }
+
+    Column(modifier.fillMaxSize().background(Color(0xFFF7F8F5)).imePadding()) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 4.dp)) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "지도로 돌아가기", tint = Ink) }
+            Text("말로 하기", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Ink)
+        }
+        LazyColumn(
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+        ) {
+            items(lines) { line -> Bubble(line) }
+            thinking?.let { item { Text(it, fontSize = 15.sp, color = Muted) } }
+        }
+        if (choices.isNotEmpty()) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 16.dp)) {
+                choices.forEach { c -> SuggestionChip(onClick = { send(c) }, label = { Text(c, fontSize = 16.sp) }, modifier = Modifier.heightIn(min = 44.dp)) }
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+            OutlinedTextField(
+                value = input,
+                onValueChange = { input = it.take(300) },
+                placeholder = { Text("여기에 쓰거나 마이크를 눌러 말해요") },
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp, color = Ink),
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Ink, unfocusedTextColor = Ink, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White),
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = ::listen) { Icon(Icons.Filled.Mic, contentDescription = "말로 하기", tint = Green) }
+            IconButton(onClick = { send(input) }, enabled = input.isNotBlank() && thinking == null) {
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "보내기", tint = if (input.isNotBlank()) Green else Muted)
+            }
+        }
+    }
+}

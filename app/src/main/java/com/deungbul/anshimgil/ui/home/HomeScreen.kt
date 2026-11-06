@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalPolice
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Store
@@ -118,6 +119,10 @@ fun HomeScreen(
     guardians: List<Guardian>,
     showSos: Boolean,
     modifier: Modifier = Modifier,
+    onOpenAssistant: () -> Unit = {},
+    /** Open the nearby-bus card on arrival (the assistant asked for it). */
+    startWithBuses: Boolean = false,
+    onBusesShown: () -> Unit = {},
 ) {
     var sos by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -129,7 +134,8 @@ fun HomeScreen(
     var mapNote by remember { mutableStateOf<String?>(null) }
     // The tapped place whose details are shown, e.g. a station's elevator exits.
     var picked by remember { mutableStateOf<Facility?>(null) }
-    var showBuses by remember { mutableStateOf(false) }
+    var showBuses by remember { mutableStateOf(startWithBuses) }
+    LaunchedEffect(Unit) { if (startWithBuses) onBusesShown() }
     // What the map shows now, so a station's card can list its exits.
     var shownFacilities by remember { mutableStateOf<List<Facility>>(emptyList()) }
     var zoom by remember { mutableIntStateOf(WALK_ZOOM) }
@@ -318,6 +324,16 @@ fun HomeScreen(
                         fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2F5BB7),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     )
+                }
+                // 말로 하기: say what you want ("근처 화장실로 안내해 줘", "글씨가 안 보여").
+                Surface(
+                    onClick = onOpenAssistant,
+                    shape = RoundedCornerShape(16.dp), color = Color(0xFF1F6B42), contentColor = Color.White, shadowElevation = 3.dp,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                        Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text(" 말로 하기", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

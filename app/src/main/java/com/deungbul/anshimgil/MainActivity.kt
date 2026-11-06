@@ -46,6 +46,9 @@ import com.deungbul.anshimgil.ui.home.HomeScreen
 import com.deungbul.anshimgil.ui.mode.ModeSelectScreen
 import com.deungbul.anshimgil.ui.mode.SetupChatScreen
 import com.deungbul.anshimgil.data.SetupAssistant
+import com.deungbul.anshimgil.data.AppAssistant
+import com.deungbul.anshimgil.data.AssistantContext
+import com.deungbul.anshimgil.ui.assistant.AssistantScreen
 import com.deungbul.anshimgil.ui.theme.SeipjidoTheme
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -103,6 +106,9 @@ private sealed interface Screen {
     data object Settings : Screen
     /** 불편 신고 (FR-49). */
     data object Report : Screen
+
+    /** 말로 하기 on the map screen. */
+    data object Assistant : Screen
     /** [start] null means the phone's position. [fromHome]: opened from a home shortcut, so back returns home. */
     data class Route(val destination: Place, val start: Place? = null, val fromHome: Boolean = false) : Screen
     data class Guide(val route: Route, val result: RouteResult, val type: RouteType) : Screen
@@ -127,6 +133,9 @@ fun AppRoot(
     // 말로 맞추기 open on top of the mode picker.
     var talking by rememberSaveable { mutableStateOf(false) }
     val setupAssistant = remember { SetupAssistant.create() }
+    val appAssistant = remember { AppAssistant.create() }
+    // The assistant asked the map to open the nearby-bus card.
+    var busesOnHome by remember { mutableStateOf(false) }
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
     val scope = rememberCoroutineScope()
 
@@ -173,6 +182,29 @@ fun AppRoot(
                 }
                 BuildConfig.KAKAO_NATIVE_APP_KEY.isBlank() ->
                     MapMessage("local.properties에 KAKAO_NATIVE_APP_KEY를 넣고 다시 빌드해 주세요.", modifier)
+                screen == Screen.Assistant -> {
+                    BackHandler { screen = Screen.Home }
+                    AssistantScreen(
+                        assistant = appAssistant,
+                        context = AssistantContext(mode, settings),
+                        placeRepository = placeRepository,
+                        onChangeSettings = { change ->
+                            scope.launch {
+                                change.mode?.let { modeRepository.save(it) }
+                                change.textSize?.let { settingsRepository.setTextSize(it) }
+                                change.voiceGuide?.let { settingsRepository.setVoiceGuide(it) }
+                                change.sosButton?.let { settingsRepository.setSosButton(it) }
+                                change.addMapItems.forEach { settingsRepository.setExtraMapItem(it, true) }
+                                change.removeMapItems.forEach { settingsRepository.setExtraMapItem(it, false) }
+                            }
+                        },
+                        onRoute = { place -> screen = Screen.Route(place, fromHome = true) },
+                        onShowBuses = { busesOnHome = true; screen = Screen.Home },
+                        onOpenReport = { screen = Screen.Report },
+                        onBack = { screen = Screen.Home },
+                        modifier = modifier,
+                    )
+                }
                 screen == Screen.Report -> {
                     BackHandler { screen = Screen.Home }
                     ReportScreen(mode = mode, onBack = { screen = Screen.Home }, modifier = modifier)
@@ -275,6 +307,9 @@ fun AppRoot(
                     guardians = settings.guardians,
                     showSos = settings.sosButton,
                     modifier = modifier,
+                    onOpenAssistant = { busesOnHome = false; screen = Screen.Assistant },
+                    startWithBuses = busesOnHome,
+                    onBusesShown = { busesOnHome = false },
                 )
             }
         }
