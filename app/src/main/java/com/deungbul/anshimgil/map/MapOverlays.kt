@@ -16,6 +16,8 @@ import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.RouteType
 import com.deungbul.anshimgil.data.distanceMeters
 import com.deungbul.anshimgil.data.TurnMark
+import com.deungbul.anshimgil.data.TransitRoute
+import com.deungbul.anshimgil.data.LegType
 import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.LatLng
 import com.kakao.vectormap.camera.CameraUpdateFactory
@@ -394,4 +396,45 @@ internal fun pillBitmap(text: String, color: Int, density: Float, elevator: Bool
         }, white)
     }
     return bitmap
+}
+
+/**
+ * A transit route on the map: walking parts along their (safer) walking line, rides as a straight
+ * line from the stop where the walker gets on to where they get off, a tag at each boarding stop
+ * ("45번", "1호선"), and the start and destination. Fits the camera to it.
+ */
+fun KakaoMap.showTransit(context: Context, route: TransitRoute, destinationName: String) {
+    showLayers(context, MapLayers(emptyList(), zones = emptyList()))
+    val density = context.resources.displayMetrics.density
+    val lineLayer = routeLineManager?.layer ?: return
+    lineLayer.removeAll()
+    val all = mutableListOf<LatLon>()
+    route.legs.forEach { leg ->
+        val (points, color) = when (leg.type) {
+            LegType.WALK -> (leg.path.ifEmpty { listOf(leg.from.point, leg.to.point) }) to 0xFF1F6B42.toInt()
+            LegType.BUS -> listOf(leg.from.point, leg.to.point) to 0xFF2F5BB7.toInt()
+            LegType.SUBWAY -> listOf(leg.from.point, leg.to.point) to 0xFF6D28D9.toInt()
+        }
+        all += points
+        val style = RouteLineStyle.from((if (leg.type == LegType.WALK) 6f else 7f) * density, color, 1.5f * density, 0xFFFFFFFF.toInt())
+        lineLayer.addRouteLine(RouteLineOptions.from(RouteLineSegment.from(points.map { it.toLatLng() }, style)))
+        if (leg.type != LegType.WALK) {
+            val tag = if (leg.type == LegType.BUS) leg.lines.joinToString(",") { "${it}번" } else (leg.lines.firstOrNull() ?: "지하철")
+            labelManager?.layer?.addLabel(
+                LabelOptions.from(leg.from.point.toLatLng())
+                    .setStyles(LabelStyles.from(LabelStyle.from(pillBitmap(tag.take(12), color, density)).setAnchorPoint(0.5f, 1f).setApplyDpScale(false)))
+                    .setRank(20),
+            )
+        }
+    }
+    val start = route.legs.firstOrNull()?.from?.point ?: return
+    val end = route.legs.lastOrNull()?.to?.point ?: return
+    labelManager?.layer?.addLabel(
+        LabelOptions.from(start.toLatLng()).setStyles(LabelStyles.from(LabelStyle.from(dotBitmap(0xFF2F6FDB.toInt(), density)).setApplyDpScale(false))),
+    )
+    labelManager?.layer?.addLabel(
+        LabelOptions.from(end.toLatLng())
+            .setStyles(LabelStyles.from(LabelStyle.from(pillBitmap(destinationName.take(12), 0xFFB42318.toInt(), density)).setAnchorPoint(0.5f, 1f).setApplyDpScale(false))),
+    )
+    if (all.isNotEmpty()) moveCamera(CameraUpdateFactory.fitMapPoints(all.map { it.toLatLng() }.toTypedArray(), (48 * density).toInt()))
 }
