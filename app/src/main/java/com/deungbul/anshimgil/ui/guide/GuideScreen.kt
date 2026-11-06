@@ -174,6 +174,8 @@ fun GuideScreen(
     finishLabel: String? = null,
     /** AI 비서's microphone on the map; it opens over the guidance, which keeps running. */
     onOpenAssistant: (() -> Unit)? = null,
+    /** Whether the walker has reached the destination (for the trip record). */
+    onArrivedChange: (Boolean) -> Unit = {},
 ) {
     var sos by remember { mutableStateOf(false) }
     var showHelpList by remember { mutableStateOf(false) }
@@ -237,6 +239,8 @@ fun GuideScreen(
             demoProgress += DEMO_STEP_M
         }
     }
+
+    LaunchedEffect(state.arrived) { onArrivedChange(state.arrived) }
 
     val tts = rememberTts(context)
     val instruction = instructionText(state)

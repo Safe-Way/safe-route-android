@@ -89,7 +89,8 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     /** 이동 기록: whether trips are kept, how many wait to go to the server, and wiping them. */
     tripConsent: Boolean = false,
-    tripsWaiting: Int = 0,
+    /** Trips the server keeps for this phone; null when unknown. */
+    tripCount: Int? = null,
     onTripConsentChange: (Boolean) -> Unit = {},
     /** Returns false when the server copy could not be deleted. */
     onClearTrips: suspend () -> Boolean = { true },
@@ -168,13 +169,13 @@ fun SettingsScreen(
         SwitchRow(
             "자주 가는 길 기억하기",
             "도착한 곳(약 100m 범위)과 시간을 저장해서 AI 비서가 먼저 길을 알려 줘요" +
-                if (tripConsent && tripsWaiting > 0) " · 보낼 기록 ${tripsWaiting}개" else "",
+                if (tripConsent && tripCount != null) " · 지금 ${tripCount}번 기억함" else "",
             tripConsent,
             onTripConsentChange,
         )
         val scope = androidx.compose.runtime.rememberCoroutineScope()
         var confirmClearTrips by remember { mutableStateOf(false) }
-        LinkRow("이동 기록 모두 지우기", "폰과 서버에 저장된 기록을 지워요") { confirmClearTrips = true }
+        LinkRow("이동 기록 모두 지우기", "서버에 남은 기록을 지워요") { confirmClearTrips = true }
         if (confirmClearTrips) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { confirmClearTrips = false },
@@ -187,7 +188,7 @@ fun SettingsScreen(
                             val all = onClearTrips()
                             android.widget.Toast.makeText(
                                 context,
-                                if (all) "이동 기록을 지웠어요" else "폰의 기록은 지웠어요. 서버 기록은 연결되면 다시 지워 주세요.",
+                                if (all) "이동 기록을 지웠어요" else "서버에 연결하지 못해서 지우지 못했어요. 잠시 뒤 다시 해 주세요.",
                                 android.widget.Toast.LENGTH_LONG,
                             ).show()
                         }

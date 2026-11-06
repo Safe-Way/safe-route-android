@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.data
 
+import androidx.datastore.preferences.core.edit
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -81,30 +82,107 @@ fun eventHint(here: LatLon, events: List<RoadEvent>): MapHint? {
     return MapHint("event-${event.id}", "$where $what. 그쪽을 지나게 되면 미리 알려 드릴게요.")
 }
 
+/** When the app is opened: the first time today, at a time it is often opened, or neither. */
+enum class OpenMoment { FIRST_TODAY, USUAL_TIME, OTHER }
+
+/** How many earlier days opened in the same half hour make it a usual time. */
+const val USUAL_OPEN_DAYS = 3
+
 /**
- * The server assistant's own first word (`text` empty): kept only when it recommends a trip (the walker's
- * usual one at this time), never its general "어디 가실 곳이 있으세요?".
+ * Which moment [now] is, given earlier opens [history] ("2026-11-06|08:30" — the day and its half hour).
+ * Only days within the last 30 count, each day once per half hour.
  */
-internal fun habitHint(json: org.json.JSONObject, today: LocalDate): MapHint? {
-    if (json.optJSONObject("pick") == null) return null
-    val reply = parseServerAssistantReply(json) ?: return null
-    val go = reply.action as? AssistantAction.GoPlace ?: return null
-    return MapHint("habit-$today-${go.place.name}", go.say, go.place)
+fun openMoment(history: List<String>, now: LocalDateTime): OpenMoment {
+    val today = now.toLocalDate()
+    val slot = halfHour(now.toLocalTime())
+    val earlier = history.mapNotNull { line ->
+        val (d, t) = line.split('|').takeIf { it.size == 2 } ?: return@mapNotNull null
+        runCatching { LocalDate.parse(d) to t }.getOrNull()
+    }.filter { (d, _) -> d.isBefore(today) && !d.isBefore(today.minusDays(30)) }
+    val openedToday = history.any { it.startsWith("$today|") }
+    return when {
+        !openedToday -> OpenMoment.FIRST_TODAY
+        earlier.filter { it.second == slot }.map { it.first }.distinct().size >= USUAL_OPEN_DAYS -> OpenMoment.USUAL_TIME
+        else -> OpenMoment.OTHER
+    }
 }
 
-/** Picks the bubble for the map: the usual trip first, then a nearby event, then sunset. */
+/** "08:30" for any time from 8:30 to 8:59. */
+fun halfHour(t: LocalTime): String = "%02d:%02d".format(t.hour, if (t.minute < 30) 0 else 30)
+
+/** App opens kept on this phone only (never sent), to tell the first open of the day and usual times. */
+class AppOpenLog(private val context: android.content.Context) {
+    private val key = androidx.datastore.preferences.core.stringPreferencesKey("app_opens")
+
+    /** Notes this open and says which moment it is. */
+    suspend fun record(now: LocalDateTime): OpenMoment {
+        var moment = OpenMoment.OTHER
+        context.settingsDataStore.edit { prefs ->
+            val history = prefs[key].orEmpty().lines().filter { it.isNotBlank() }
+            moment = openMoment(history, now)
+            val line = "${now.toLocalDate()}|${halfHour(now.toLocalTime())}"
+            prefs[key] = (history.filter { it != line } + line).takeLast(200).joinToString("\n")
+        }
+        return moment
+    }
+}
+
+/**
+ * The bubble from the server's today suggestion (`GET /api/suggestions/today`): the usual trip at this time
+ * with its route, or else what the walker usually does in this weather, or else bad weather itself.
+ * Null when there is nothing but the general greeting.
+ */
+internal fun todayHint(json: org.json.JSONObject, today: LocalDate): MapHint? {
+    fun org.json.JSONObject.text(k: String) = optString(k).takeIf { !isNull(k) && it.isNotBlank() }
+    val habit = json.optJSONObject("habit")
+    if (habit != null) {
+        val dest = json.optJSONObject("pick")?.optJSONObject("request")?.optJSONObject("destination")
+        val name = dest?.text("name") ?: habit.text("toName") ?: return null
+        val place = Place(
+            id = null, name = name, address = "",
+            lat = dest?.optDouble("lat") ?: habit.getDouble("lat"),
+            lon = dest?.optDouble("lon") ?: habit.getDouble("lon"),
+            distanceM = null,
+        )
+        val say = json.text("say") ?: "이 시간엔 보통 ${name}에 가셨어요."
+        return MapHint("today-$today-$name", say, place)
+    }
+    val weather = json.optJSONObject("weather")
+    val word = weather?.takeIf { it.optBoolean("weatherAvailable") || it.optBoolean("dustAvailable") }?.text("word")
+    val temp = weather?.takeIf { !it.isNull("tempC") && it.has("tempC") }?.let { " (${it.optDouble("tempC").roundToInt()}°C)" }.orEmpty()
+    val now = when (word) {
+        "rain" -> "지금 비가 와요$temp. 미끄러운 길을 조심하세요."
+        "heat" -> "지금 무척 더워요$temp. 그늘과 쉼터를 챙기세요."
+        "cold" -> "지금 무척 추워요$temp. 따뜻하게 입고 나가세요."
+        "dust" -> "지금 미세먼지가 나빠요. 마스크를 챙기세요."
+        else -> null
+    }
+    val hint = json.text("weatherHint")
+    val text = listOfNotNull(now, hint).joinToString(" ").takeIf { it.isNotBlank() } ?: return null
+    return MapHint("today-$today-$word", text)
+}
+
+/** Picks the bubble for the map: today's suggestion (first open today or a usual time), then a nearby event, then sunset. */
 class MapHintSource(
     private val events: EventRepository,
     private val guestId: suspend () -> String?,
-    private val favorites: suspend () -> List<Pair<String, LatLon>>,
+    /** Records this app start; null skips today's suggestion. */
+    private val openLog: AppOpenLog? = null,
 ) {
+    // Worked out once per app start, on the first bubble.
+    private var moment: OpenMoment? = null
+
     suspend fun next(mode: UserMode, here: LatLon, now: LocalDateTime = LocalDateTime.now(KST)): MapHint? {
-        if (ServerApi.isConfigured) {
-            val habit = runCatching {
-                val body = serverAssistantRequest(guestId(), "", mode, here, now, null, null, favorites())
-                habitHint(ServerApi.post("/api/assistant", body), now.toLocalDate())
+        val m = moment ?: (openLog?.let { runCatching { it.record(now) }.getOrNull() } ?: OpenMoment.OTHER).also { moment = it }
+        if (ServerApi.isConfigured && m != OpenMoment.OTHER) {
+            val today = runCatching {
+                val guest = guestId() ?: return@runCatching null
+                todayHint(
+                    ServerApi.get("/api/suggestions/today", mapOf("guestId" to guest, "lat" to here.lat, "lon" to here.lon, "mode" to mode.key)),
+                    now.toLocalDate(),
+                )
             }.getOrNull()
-            if (habit != null && ShownHints.isNew(habit.key)) return habit
+            if (today != null && ShownHints.isNew(today.key)) return today
         }
         val event = runCatching {
             eventHint(here, events.within(Bbox(here.lon - 0.012, here.lat - 0.01, here.lon + 0.012, here.lat + 0.01)))

@@ -40,22 +40,50 @@ class MapHintsTest {
         assertNull(eventHint(here, listOf(biennale)))
     }
 
+    // --- today's suggestion (GET /api/suggestions/today), shapes from the live server 11/6 ---
+
     @Test
-    fun serverGreetingWithoutATripSaysNothing() {
-        val generic = JSONObject("""{"say":"어디 가실 곳이 있으세요? 말씀해 주시면 길을 찾아 드릴게요.","ask":"어디 가실 곳이 있으세요?","pick":null,"tools":["get_my_info"]}""")
-        assertNull(habitHint(generic, LocalDate.of(2026, 11, 6)))
+    fun greetingOnlyIsNotShown() {
+        val json = JSONObject("""{"say":"어디 가실 곳이 있으세요? 말씀해 주시면 길을 찾아 드릴게요.","habit":null,"others":[],
+            "weather":{"word":"clear","rain":false,"tempC":13.0,"weatherAvailable":true,"dustAvailable":true},"weatherHint":null,"pick":null,"because":[]}""")
+        assertNull(todayHint(json, LocalDate.of(2026, 11, 6)))
     }
 
     @Test
-    fun serverUsualTripOffersItsRoute() {
-        val json = JSONObject(
-            """{"say":"8시 반에 문화전당 가시죠? 오늘은 맑아서 걸어서 16분이에요.","ask":null,"choices":[],
-               "pick":{"type":"walk","summary":"걸어서 16분","minutes":16,"route":"safe",
-                 "request":{"origin":{"lat":35.14,"lon":126.91},"destination":{"lat":35.1467,"lon":126.9203,"name":"국립아시아문화전당"}}},
-               "tools":["get_my_info","recommend_trip"]}""",
-        )
-        val hint = habitHint(json, LocalDate.of(2026, 11, 6))!!
-        assertEquals("국립아시아문화전당", hint.place!!.name)
-        assertTrue(hint.text.startsWith("8시 반에 문화전당 가시죠?"))
+    fun usualTripWithItsRoute() {
+        val json = JSONObject("""{"say":"8시 반에 문화전당 가시죠? 오늘은 맑아서 걸어서 16분이에요.",
+            "habit":{"toName":"국립아시아문화전당","lat":35.147,"lon":126.920,"slot":"08:30","times":3,"usual":"walk"},
+            "weather":{"word":"clear","weatherAvailable":true},
+            "pick":{"type":"walk","request":{"destination":{"lat":35.1467,"lon":126.9203,"name":"국립아시아문화전당"}}}}""")
+        val hint = todayHint(json, LocalDate.of(2026, 11, 9))!!
+        assertEquals("8시 반에 문화전당 가시죠? 오늘은 맑아서 걸어서 16분이에요.", hint.text)
+        assertEquals(35.1467, hint.place!!.lat, 1e-9)
+    }
+
+    @Test
+    fun badWeatherWithWhatTheyUsuallyDo() {
+        val json = JSONObject("""{"say":"어디 가실 곳이 있으세요?","habit":null,
+            "weather":{"word":"rain","rain":true,"tempC":11.4,"weatherAvailable":true},"weatherHint":"비 오는 날엔 보통 대중교통을 타셨어요"}""")
+        assertEquals("지금 비가 와요 (11°C). 미끄러운 길을 조심하세요. 비 오는 날엔 보통 대중교통을 타셨어요", todayHint(json, LocalDate.of(2026, 11, 9))!!.text)
+    }
+
+    // --- when the app is opened ---
+
+    @Test
+    fun firstOpenOfTheDay() {
+        val history = listOf("2026-11-05|08:30", "2026-11-05|17:00")
+        assertEquals(OpenMoment.FIRST_TODAY, openMoment(history, LocalDateTime.of(2026, 11, 6, 9, 10)))
+        assertEquals(OpenMoment.OTHER, openMoment(history + "2026-11-06|09:00", LocalDateTime.of(2026, 11, 6, 13, 0)))
+    }
+
+    @Test
+    fun usualTimeAfterThreeEarlierDays() {
+        val history = listOf("2026-11-03|08:30", "2026-11-04|08:30", "2026-11-05|08:30", "2026-11-06|07:00")
+        assertEquals(OpenMoment.USUAL_TIME, openMoment(history, LocalDateTime.of(2026, 11, 6, 8, 45)))
+        // Two days are not enough, and days over a month ago do not count.
+        assertEquals(OpenMoment.OTHER, openMoment(history.drop(1), LocalDateTime.of(2026, 11, 6, 8, 45)))
+        val old = listOf("2026-09-01|08:30", "2026-09-02|08:30", "2026-09-03|08:30", "2026-11-06|07:00")
+        assertEquals(OpenMoment.OTHER, openMoment(old, LocalDateTime.of(2026, 11, 6, 8, 45)))
+        assertEquals("08:30", halfHour(java.time.LocalTime.of(8, 59)))
     }
 }

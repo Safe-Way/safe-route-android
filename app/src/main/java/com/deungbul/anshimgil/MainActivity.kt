@@ -49,9 +49,9 @@ import com.deungbul.anshimgil.data.SetupAssistant
 import com.deungbul.anshimgil.data.AppAssistant
 import com.deungbul.anshimgil.data.AssistantAction
 import androidx.compose.material.icons.filled.AutoAwesome
+import com.deungbul.anshimgil.data.AppOpenLog
 import com.deungbul.anshimgil.data.AssistantContext
 import com.deungbul.anshimgil.data.tripWeather
-import com.deungbul.anshimgil.data.tripRecord
 import com.deungbul.anshimgil.data.TripConsent
 import com.deungbul.anshimgil.data.TripLogRepository
 import androidx.compose.ui.unit.dp
@@ -86,8 +86,6 @@ class MainActivity : ComponentActivity() {
         val tripLog = TripLogRepository(applicationContext, guestId = { walkSpeedRepository.guestId() })
         // Walks that could not be sent last time (offline, server not ready) go now.
         lifecycleScope.launch { runCatching { walkSpeedRepository.uploadPending() } }
-        // Trips kept while the server had no way in yet.
-        lifecycleScope.launch { runCatching { tripLog.uploadPending() } }
         // The mode next to the clock while the app is in front; taken away in onStop.
         lifecycleScope.launch {
             repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
@@ -205,9 +203,7 @@ fun AppRoot(
         MapHintSource(
             EventRepository.create(),
             guestId = { walkSpeedRepository.guestId() },
-            favorites = {
-                savedPlaces.favorites.first().mapNotNull { f -> f.place?.let { f.name to LatLon(it.lat, it.lon) } }
-            },
+            openLog = AppOpenLog(appContext),
         )
     }
     // The assistant's 보호자에게 알리기: open SOS on the map.
@@ -216,23 +212,47 @@ fun AppRoot(
     val scope = rememberCoroutineScope()
     // 이동 기록: asked once, after the first finished guidance.
     val tripConsent by (tripLog?.consent ?: kotlinx.coroutines.flow.flowOf(TripConsent.NO)).collectAsStateWithLifecycle(initialValue = TripConsent.NO)
-    val tripsWaiting by (tripLog?.pendingCount ?: kotlinx.coroutines.flow.flowOf(0)).collectAsStateWithLifecycle(initialValue = 0)
     var askTripConsent by remember { mutableStateOf(false) }
-    // When the current guidance started, for the trip record.
+    // The server's record for the guidance now running, and when it started.
+    var tripId by remember { mutableStateOf<Long?>(null) }
+    var guideArrived by remember { mutableStateOf(false) }
     var guideStartedAt by remember { mutableStateOf(java.time.LocalDateTime.now()) }
-    LaunchedEffect(screen) {
-        if (screen is Screen.Guide || screen is Screen.TransitGuide) guideStartedAt = java.time.LocalDateTime.now()
+    /** At the start of a guidance: start the server's record (when the walker said yes). */
+    fun startTrip(destination: Place, transit: Boolean, result: RouteResult?, type: RouteType?, mode: UserMode) {
+        guideStartedAt = java.time.LocalDateTime.now()
+        tripId = null
+        val log = tripLog ?: return
+        if (tripConsent != TripConsent.YES) return
+        val route = result?.let { r -> type?.let { r.route(it) } ?: r.routes.firstOrNull() }
+        scope.launch {
+            tripId = runCatching {
+                log.start(
+                    destination, mode, transit,
+                    routeKind = if (transit) null else route?.type?.name?.lowercase(),
+                    weather = tripWeather(result),
+                    night = result?.conditions?.any { it.key == "night" && it.on } == true,
+                    plannedMin = route?.durationMin,
+                )
+            }.getOrNull()
+        }
     }
-    /** At the end of a guidance: keep the trip (when the walker said yes), or ask the first time. */
-    fun finishTrip(destination: Place, transit: Boolean, result: RouteResult?, mode: UserMode) {
+    /** At the end: close the record (arrived or stopped), or ask the first time. */
+    fun finishTrip(arrived: Boolean) {
         val log = tripLog ?: return
         when (tripConsent) {
             TripConsent.UNASKED -> askTripConsent = true
-            TripConsent.YES -> scope.launch {
-                runCatching { log.record(tripRecord(destination, guideStartedAt, transit, mode, tripWeather(result))) }
+            TripConsent.YES -> tripId?.let { id ->
+                val minutes = java.time.Duration.between(guideStartedAt, java.time.LocalDateTime.now()).toMinutes().toInt()
+                scope.launch { runCatching { log.end(id, arrived, minutes) } }
             }
             TripConsent.NO -> Unit
         }
+        tripId = null
+    }
+    // How many trips the server keeps, for settings.
+    var tripCount by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(screen, tripConsent) {
+        if (screen == Screen.Settings && tripConsent == TripConsent.YES) tripCount = runCatching { tripLog?.count() }.getOrNull()
     }
 
     when (val state = saved) {
@@ -348,9 +368,14 @@ fun AppRoot(
                         onResetToDefaults = { scope.launch { settingsRepository.resetToDefaults() } },
                         modifier = modifier,
                         tripConsent = tripConsent == TripConsent.YES,
-                        tripsWaiting = tripsWaiting,
-                        onTripConsentChange = { on -> scope.launch { tripLog?.setConsent(if (on) TripConsent.YES else TripConsent.NO) } },
-                        onClearTrips = { tripLog?.clearAll() ?: true },
+                        tripCount = tripCount,
+                        onTripConsentChange = { on ->
+                            scope.launch {
+                                tripLog?.setConsent(if (on) TripConsent.YES else TripConsent.NO, mode)
+                                tripCount = if (on) runCatching { tripLog?.count() }.getOrNull() else null
+                            }
+                        },
+                        onClearTrips = { (tripLog?.clearAll(mode) ?: true).also { if (it) tripCount = 0 } },
                     )
                 }
                 screen is Screen.Search -> {
@@ -405,8 +430,10 @@ fun AppRoot(
                 screen is Screen.TransitGuide -> {
                     val guide = screen as Screen.TransitGuide
                     BackHandler { screen = guide.route }
+                    LaunchedEffect(guide) { guideArrived = false; startTrip(guide.route.destination, transit = true, result = null, type = null, mode = mode) }
                     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                     TransitGuideScreen(
+                        onArrived = { guideArrived = true },
                         onOpenAssistant = openAssistantOverGuide,
                         mode = mode,
                         route = guide.transit,
@@ -418,7 +445,7 @@ fun AppRoot(
                         showSos = settings.sosButton,
                         routeRepository = routeRepository,
                         walkSpeedRepository = walkSpeedRepository,
-                        onFinish = { finishTrip(guide.route.destination, transit = true, result = null, mode = mode); screen = Screen.Home },
+                        onFinish = { finishTrip(arrived = guideArrived); screen = Screen.Home },
                         modifier = modifier,
                     )
                     if (assistantOverGuide) {
@@ -430,8 +457,10 @@ fun AppRoot(
                 screen is Screen.Guide -> {
                     val guide = screen as Screen.Guide
                     BackHandler { screen = guide.route }
+                    LaunchedEffect(guide) { guideArrived = false; startTrip(guide.route.destination, transit = false, result = guide.result, type = guide.type, mode = mode) }
                     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                     GuideScreen(
+                        onArrivedChange = { guideArrived = it },
                         onOpenAssistant = openAssistantOverGuide,
                         mode = mode,
                         result = guide.result,
@@ -444,7 +473,7 @@ fun AppRoot(
                         showSos = settings.sosButton,
                         routeRepository = routeRepository,
                         walkSpeedRepository = walkSpeedRepository,
-                        onFinish = { finishTrip(guide.route.destination, transit = false, result = guide.result, mode = mode); screen = Screen.Home },
+                        onFinish = { finishTrip(arrived = guideArrived); screen = Screen.Home },
                         modifier = modifier,
                     )
                     if (assistantOverGuide) {
@@ -475,7 +504,7 @@ fun AppRoot(
                     askTripConsent = askTripConsent,
                     onTripConsent = { yes ->
                         askTripConsent = false
-                        scope.launch { tripLog?.setConsent(if (yes) TripConsent.YES else TripConsent.NO) }
+                        scope.launch { tripLog?.setConsent(if (yes) TripConsent.YES else TripConsent.NO, mode) }
                     },
                 )
             }

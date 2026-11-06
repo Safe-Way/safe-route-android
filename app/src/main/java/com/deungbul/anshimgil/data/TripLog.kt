@@ -7,68 +7,24 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONObject
-import java.time.LocalDateTime
 import kotlin.math.roundToInt
 
 /*
- * 이동 기록: where and when the walker went, so AI 비서 can offer the usual trip ("8시 반에 문화전당
- * 가시죠?", the server's trip_habit) and learn bus or walk by weather (trip_weather_choice). Only with
- * the walker's yes, asked once after the first finished guidance; switched off or wiped in settings.
- * The destination goes rounded to about 100 m, never the start, never the path.
+ * 이동 기록: where the walker goes and when, so AI 비서 can offer the usual trip ("8시 반에 문화전당
+ * 가시죠?") and learn bus or walk by weather. Only with the walker's yes, asked once in AI 비서's live
+ * bubble after the first finished guidance; switched off or wiped in settings.
  *
- * The server table exists (trip_log, 027) but not yet a way in: trips wait on the phone and go as soon
- * as `POST /api/trips` answers (see [TripLogRepository.uploadPending]).
+ * Server (팀 할 일 5번, safe-route me/): the yes or no goes with `PATCH /api/me` (consentTrips; no also
+ * deletes what was kept), each guidance starts a record with `POST /api/me/trips` and ends it with
+ * `PATCH /api/me/trips/{id}`. The server sets the day and the 30-minute slot, takes no start position, and
+ * keeps the destination rounded to about 100 m; the app rounds it too before sending.
  */
 
 /** The walker's answer about keeping trips: not asked yet, yes, or no. */
 enum class TripConsent { UNASKED, YES, NO }
 
-/** One finished trip, as it is sent. [destLat]/[destLon] are already rounded ([roundTo100m]). */
-data class TripRecord(
-    val destName: String,
-    val destLat: Double,
-    val destLon: Double,
-    /** "2026-11-06T08:25", Korean time. */
-    val startedAt: String,
-    /** walk or transit */
-    val by: String,
-    val mode: UserMode,
-    /** rain, heat, cold or clear (as far as the route knew). */
-    val weather: String,
-) {
-    fun encode(): String = JSONObject()
-        .put("destName", destName).put("destLat", destLat).put("destLon", destLon)
-        .put("startedAt", startedAt).put("by", by).put("mode", mode.key).put("weather", weather)
-        .toString()
-
-    companion object {
-        fun decode(line: String): TripRecord? = runCatching {
-            val j = JSONObject(line)
-            TripRecord(
-                j.getString("destName"), j.getDouble("destLat"), j.getDouble("destLon"), j.getString("startedAt"),
-                j.getString("by"), UserMode.entries.first { it.key == j.getString("mode") }, j.getString("weather"),
-            )
-        }.getOrNull()
-
-        /** Kept on the phone while the server is not ready. */
-        const val KEEP = 200
-    }
-}
-
 /** About 100 m: three decimals of a degree (111 m north–south, about 90 m east–west here). */
 fun roundTo100m(value: Double): Double = (value * 1000).roundToInt() / 1000.0
-
-/** The record for a finished guidance to [destination], started at [startedAt]. */
-fun tripRecord(destination: Place, startedAt: LocalDateTime, transit: Boolean, mode: UserMode, weather: String): TripRecord =
-    TripRecord(
-        destName = destination.name.take(40),
-        destLat = roundTo100m(destination.lat),
-        destLon = roundTo100m(destination.lon),
-        startedAt = startedAt.withSecond(0).withNano(0).toString().take(16),
-        by = if (transit) "transit" else "walk",
-        mode = mode,
-        weather = weather,
-    )
 
 /** The weather word for a route: rain, heat or cold when the server said so, otherwise clear. */
 fun tripWeather(result: RouteResult?): String = when {
@@ -79,78 +35,94 @@ fun tripWeather(result: RouteResult?): String = when {
     else -> "clear"
 }
 
-/** The body for `POST /api/trips`. */
-internal fun tripJson(guestId: String, trip: TripRecord): JSONObject = JSONObject(trip.encode()).put("guestId", guestId)
+/** The body for `POST /api/me/trips`: the destination rounded, never the start or the path. */
+internal fun tripStartJson(
+    guestId: String,
+    destination: Place,
+    mode: UserMode,
+    transit: Boolean,
+    routeKind: String?,
+    weather: String,
+    night: Boolean,
+    plannedMin: Int?,
+): JSONObject = JSONObject()
+    .put("guestId", guestId)
+    .put("toName", destination.name.take(100))
+    .put("toLat", roundTo100m(destination.lat))
+    .put("toLon", roundTo100m(destination.lon))
+    .put("mode", mode.key)
+    .put("travel", if (transit) "transit" else "walk")
+    .put("routeKind", routeKind ?: JSONObject.NULL)
+    .put("weather", weather)
+    .put("night", night)
+    .put("plannedMin", plannedMin ?: JSONObject.NULL)
 
 class TripLogRepository(private val context: Context, private val guestId: suspend () -> String) {
     private val consentKey = stringPreferencesKey("trip_consent")
-    private val pendingKey = stringPreferencesKey("trips_pending")
 
     val consent: Flow<TripConsent> = context.settingsDataStore.data.map { prefs ->
         runCatching { TripConsent.valueOf(prefs[consentKey] ?: "UNASKED") }.getOrDefault(TripConsent.UNASKED)
     }
 
-    /** Trips waiting to go to the server. */
-    val pendingCount: Flow<Int> = context.settingsDataStore.data.map { prefs -> prefs[pendingKey].orEmpty().lines().count { it.isNotBlank() } }
-
-    suspend fun setConsent(value: TripConsent) {
+    /**
+     * Keeps the answer on the phone and tells the server (`PATCH /api/me`). No also deletes the trips
+     * the server kept. Returns false when the server could not be told (the phone keeps the answer).
+     */
+    suspend fun setConsent(value: TripConsent, mode: UserMode): Boolean {
         context.settingsDataStore.edit { it[consentKey] = value.name }
-        // Saying no also drops what was waiting to go.
-        if (value == TripConsent.NO) context.settingsDataStore.edit { it.remove(pendingKey) }
-    }
-
-    /** Keeps [trip] when the walker said yes, then tries to send. */
-    suspend fun record(trip: TripRecord) {
-        if (consent.first() != TripConsent.YES) return
-        context.settingsDataStore.edit {
-            it[pendingKey] = (it[pendingKey].orEmpty().lines().filter { l -> l.isNotBlank() } + trip.encode())
-                .takeLast(TripRecord.KEEP).joinToString("\n")
-        }
-        uploadPending()
-    }
-
-    /**
-     * Sends waiting trips (`POST /api/trips`). While the server has no such door yet (NOT_FOUND) or the
-     * phone is offline they stay; a trip the server refuses (BAD_PARAM) is dropped so it does not block the rest.
-     */
-    suspend fun uploadPending() {
-        if (!ServerApi.isConfigured || consent.first() != TripConsent.YES) return
-        val lines = context.settingsDataStore.data.first()[pendingKey].orEmpty().lines().filter { it.isNotBlank() }
-        if (lines.isEmpty()) return
-        val guest = guestId()
-        val done = mutableListOf<String>()
-        for (line in lines) {
-            val trip = TripRecord.decode(line) ?: run { done += line; null } ?: continue
-            try {
-                ServerApi.post("/api/trips", tripJson(guest, trip))
-                done += line
-            } catch (e: ApiException) {
-                if (e.code == "BAD_PARAM") done += line else break
-            }
-        }
-        if (done.isNotEmpty()) {
-            context.settingsDataStore.edit { prefs ->
-                prefs[pendingKey] = prefs[pendingKey].orEmpty().lines().filter { it.isNotBlank() && it !in done }.joinToString("\n")
-            }
-        }
-    }
-
-    /**
-     * Wipes the trips: those waiting on the phone at once, and asks the server to delete this guest's
-     * (`DELETE /api/trips`). Returns false when the server could not be reached or has no such door yet.
-     */
-    suspend fun clearAll(): Boolean {
-        context.settingsDataStore.edit { it.remove(pendingKey) }
-        if (!ServerApi.isConfigured) return true
+        if (value == TripConsent.UNASKED || !ServerApi.isConfigured) return true
         return try {
-            ServerApi.delete("/api/trips", mapOf("guestId" to guestId()))
+            ServerApi.patch("/api/me", JSONObject().put("guestId", guestId()).put("mode", mode.key).put("consentTrips", value == TripConsent.YES))
             true
         } catch (e: ApiException) {
             false
         }
     }
-}
 
+    /** At the start of a guidance (when the walker said yes): the record's id, or null when it could not be kept. */
+    suspend fun start(destination: Place, mode: UserMode, transit: Boolean, routeKind: String?, weather: String, night: Boolean, plannedMin: Int?): Long? {
+        if (!ServerApi.isConfigured || consent.first() != TripConsent.YES) return null
+        return try {
+            ServerApi.post("/api/me/trips", tripStartJson(guestId(), destination, mode, transit, routeKind, weather, night, plannedMin))
+                .optLong("id").takeIf { it > 0 }
+        } catch (e: ApiException) {
+            // NO_CONSENT: the server never heard the yes (offline then); tell it again for next time.
+            if (e.code == "NO_CONSENT") runCatching { setConsent(TripConsent.YES, mode) }
+            null
+        }
+    }
+
+    /** At the end: arrived or stopped, and how long it took. */
+    suspend fun end(id: Long, arrived: Boolean, actualMin: Int?) {
+        if (!ServerApi.isConfigured) return
+        runCatching {
+            ServerApi.patch(
+                "/api/me/trips/$id",
+                JSONObject().put("guestId", guestId()).put("result", if (arrived) "arrived" else "stopped")
+                    .put("actualMin", actualMin ?: JSONObject.NULL),
+            )
+        }
+    }
+
+    /** How many trips the server keeps for this phone; null when it could not be asked. */
+    suspend fun count(): Int? {
+        if (!ServerApi.isConfigured) return null
+        return runCatching { ServerApi.get("/api/me", mapOf("guestId" to guestId())).optInt("trips") }.getOrNull()
+    }
+
+    /**
+     * Wipes the trips on the server: consent off deletes them, and on again when the walker still wants
+     * them kept. Returns false when the server could not be reached.
+     */
+    suspend fun clearAll(mode: UserMode): Boolean {
+        val keep = consent.first() == TripConsent.YES
+        if (!setConsent(TripConsent.NO, mode)) {
+            if (keep) context.settingsDataStore.edit { it[consentKey] = TripConsent.YES.name }
+            return false
+        }
+        return if (keep) setConsent(TripConsent.YES, mode) else true
+    }
+}
 
 /** AI 비서's question in its live bubble on the map, after the first finished guidance. */
 const val TRIP_CONSENT_QUESTION =
