@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.guide
 
+import com.deungbul.anshimgil.data.sidewalkHint
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.deungbul.anshimgil.data.walkMinutes
 import com.deungbul.anshimgil.data.personalSpeed
@@ -324,6 +325,10 @@ fun GuideScreen(
                     StatusPill("경로에서 ${state.offRouteM}m 벗어났어요", Color(0xFFB42318))
                 }
                 if (rerouting) StatusPill("길을 다시 찾는 중…", Color(0xFF2F6FDB))
+                // Which side to walk on beside a road, when the map knows it.
+                sidewalkHint(route.sidewalks, guidance.pointIndexAt(state.progressM))?.let { hint ->
+                    StatusPill(hint, if (hint.startsWith("인도가 없어요")) Color(0xFFB45309) else Color(0xFF2F6FDB))
+                }
                 if ((offRouteLong || rerouted) && guardians.isNotEmpty() && !offRouteTold) {
                     OffRouteCard(
                         rerouted = rerouted,

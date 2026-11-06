@@ -116,6 +116,10 @@ class Guidance(private val path: List<LatLon>, private val facilities: List<Faci
             HelpAhead(f.kind, (along - progressM).coerceAtLeast(0.0).roundToInt(), side, off.roundToInt())
         }.sortedBy { it.aheadM }
 
+    /** The index of the path point the walker last passed at [progressM]. */
+    fun pointIndexAt(progressM: Double): Int =
+        cumulative.indexOfLast { it <= progressM }.coerceIn(0, legLengths.lastIndex)
+
     /** Direction of travel at [progressM], looking a few meters ahead, in degrees clockwise from north. */
     fun travelBearing(progressM: Double): Float {
         val (ax, ay) = pointAt(progressM.coerceIn(0.0, totalM))

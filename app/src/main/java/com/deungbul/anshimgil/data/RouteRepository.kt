@@ -70,6 +70,19 @@ internal fun parseRouteResult(json: JSONObject): RouteResult {
                 geometry.getJSONArray(i).let { LatLon(it.getDouble(1), it.getDouble(0)) }
             },
             counts = route.optJSONObject("counts").ints(),
+            sidewalks = route.optJSONArray("sidewalks").objects().map { w ->
+                Sidewalk(
+                    from = w.optInt("from"),
+                    to = w.optInt("to"),
+                    side = when (w.optString("side")) {
+                        "left" -> SidewalkSide.LEFT
+                        "right" -> SidewalkSide.RIGHT
+                        "both" -> SidewalkSide.BOTH
+                        "no" -> SidewalkSide.NONE
+                        else -> SidewalkSide.UNKNOWN
+                    },
+                )
+            },
         )
     }
     val shortest = routes.firstOrNull { it.type == RouteType.SHORTEST }

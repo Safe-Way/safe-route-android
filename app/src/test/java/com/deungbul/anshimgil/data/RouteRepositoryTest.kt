@@ -131,4 +131,14 @@ class RouteRepositoryTest {
         // Already night from the server: nothing to add.
         assertEquals(null, autoNightReason(base.copy(conditions = listOf(Condition("night", "밤", true))), evening))
     }
+
+    @Test
+    fun sidewalkHintTellsTheSideOnlyWhenKnown() {
+        val walks = listOf(Sidewalk(1, 5, SidewalkSide.UNKNOWN), Sidewalk(5, 9, SidewalkSide.RIGHT), Sidewalk(9, 12, SidewalkSide.NONE))
+        assertEquals(null, sidewalkHint(walks, 0))
+        assertEquals(null, sidewalkHint(walks, 3))
+        assertEquals("오른쪽 인도로 걸어요", sidewalkHint(walks, 5))
+        assertEquals("인도가 없어요. 차 조심하세요", sidewalkHint(walks, 10))
+        assertEquals(null, sidewalkHint(walks, 12))
+    }
 }
