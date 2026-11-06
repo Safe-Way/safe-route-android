@@ -50,7 +50,6 @@ import com.deungbul.anshimgil.data.AppAssistant
 import com.deungbul.anshimgil.data.AssistantAction
 import com.deungbul.anshimgil.data.AssistantContext
 import androidx.compose.ui.unit.dp
-import com.deungbul.anshimgil.ui.mode.ModeBadge
 import com.deungbul.anshimgil.ui.assistant.AssistantChat
 import com.deungbul.anshimgil.ui.guide.TransitGuideScreen
 import com.deungbul.anshimgil.data.TransitRoute
@@ -106,23 +105,10 @@ class MainActivity : ComponentActivity() {
             SeipjidoTheme {
                 ScaledText(settings.textSize) {
                     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                        val currentMode by modeRepository.mode.collectAsStateWithLifecycle(initialValue = null)
-                        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-                            AppRoot(
-                                modeRepository, savedPlaces, placeRepository, facilityRepository, routeRepository,
-                                settingsRepository, settings, walkSpeedRepository, Modifier.padding(innerPadding),
-                            )
-                            // The mode just under "SKT 2:28", on every screen.
-                            currentMode?.let { m ->
-                                ModeBadge(
-                                    m,
-                                    Modifier
-                                        .align(androidx.compose.ui.Alignment.TopStart)
-                                        .padding(innerPadding)
-                                        .padding(start = 20.dp),
-                                )
-                            }
-                        }
+                        AppRoot(
+                            modeRepository, savedPlaces, placeRepository, facilityRepository, routeRepository,
+                            settingsRepository, settings, walkSpeedRepository, Modifier.padding(innerPadding),
+                        )
                     }
                 }
             }
@@ -223,6 +209,41 @@ fun AppRoot(
         SavedMode.Loading -> Box(modifier.fillMaxSize())
         is SavedMode.Ready -> {
             val mode = state.mode
+            // AI 비서, as its own screen from the map or laid over walking guidance (which keeps running underneath).
+            val assistantPanel: @Composable (UserMode, () -> Unit) -> Unit = { mode, onClose ->
+                    AssistantScreen(
+                        opening = assistantOpening,
+                        listenAtStart = assistantListen,
+                        chat = assistantChat,
+                        assistant = appAssistant,
+                        context = AssistantContext(mode, settings, where = { currentLocation(appContext, 4_000) }),
+                        placeRepository = placeRepository,
+                        onChangeSettings = { change ->
+                            scope.launch {
+                                change.mode?.let { modeRepository.save(it) }
+                                change.textSize?.let { settingsRepository.setTextSize(it) }
+                                change.voiceGuide?.let { settingsRepository.setVoiceGuide(it) }
+                                change.sosButton?.let { settingsRepository.setSosButton(it) }
+                                change.addMapItems.forEach { settingsRepository.setExtraMapItem(it, true) }
+                                change.removeMapItems.forEach { settingsRepository.setExtraMapItem(it, false) }
+                            }
+                        },
+                        onRoute = { place -> screen = Screen.Route(place, fromHome = true) },
+                        onRouteByTransit = { place -> screen = Screen.Route(place, fromHome = true, transit = true) },
+                        onShowBuses = { busesOnHome = true; screen = Screen.Home },
+                        onOpenReport = { r -> reportPrefill = r; screen = Screen.Report },
+                        onAlertGuardian = { sosOnHome = true; screen = Screen.Home },
+                        onBack = onClose,
+                        modifier = modifier,
+                    )
+            }
+            // AI 비서 opened over guidance; closed again whenever the screen changes.
+            var assistantOverGuide by remember(screen) { mutableStateOf(false) }
+            val openAssistantOverGuide = {
+                assistantOpening = null
+                assistantListen = true
+                assistantOverGuide = true
+            }
             when {
                 (mode == null || changingMode) && talking -> {
                     BackHandler { talking = false }
@@ -264,31 +285,7 @@ fun AppRoot(
                     MapMessage("local.properties에 KAKAO_NATIVE_APP_KEY를 넣고 다시 빌드해 주세요.", modifier)
                 screen == Screen.Assistant -> {
                     BackHandler { screen = Screen.Home }
-                    AssistantScreen(
-                        opening = assistantOpening,
-                        listenAtStart = assistantListen,
-                        chat = assistantChat,
-                        assistant = appAssistant,
-                        context = AssistantContext(mode, settings, where = { currentLocation(appContext, 4_000) }),
-                        placeRepository = placeRepository,
-                        onChangeSettings = { change ->
-                            scope.launch {
-                                change.mode?.let { modeRepository.save(it) }
-                                change.textSize?.let { settingsRepository.setTextSize(it) }
-                                change.voiceGuide?.let { settingsRepository.setVoiceGuide(it) }
-                                change.sosButton?.let { settingsRepository.setSosButton(it) }
-                                change.addMapItems.forEach { settingsRepository.setExtraMapItem(it, true) }
-                                change.removeMapItems.forEach { settingsRepository.setExtraMapItem(it, false) }
-                            }
-                        },
-                        onRoute = { place -> screen = Screen.Route(place, fromHome = true) },
-                        onRouteByTransit = { place -> screen = Screen.Route(place, fromHome = true, transit = true) },
-                        onShowBuses = { busesOnHome = true; screen = Screen.Home },
-                        onOpenReport = { r -> reportPrefill = r; screen = Screen.Report },
-                        onAlertGuardian = { sosOnHome = true; screen = Screen.Home },
-                        onBack = { screen = Screen.Home },
-                        modifier = modifier,
-                    )
+                    assistantPanel(mode) { screen = Screen.Home }
                 }
                 screen == Screen.Report -> {
                     BackHandler { screen = Screen.Home }
@@ -373,7 +370,9 @@ fun AppRoot(
                 screen is Screen.TransitGuide -> {
                     val guide = screen as Screen.TransitGuide
                     BackHandler { screen = guide.route }
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                     TransitGuideScreen(
+                        onOpenAssistant = openAssistantOverGuide,
                         mode = mode,
                         route = guide.transit,
                         destinationName = guide.route.destination.name,
@@ -387,11 +386,18 @@ fun AppRoot(
                         onFinish = { screen = Screen.Home },
                         modifier = modifier,
                     )
+                    if (assistantOverGuide) {
+                        BackHandler { assistantOverGuide = false }
+                        assistantPanel(mode) { assistantOverGuide = false }
+                    }
+                    }
                 }
                 screen is Screen.Guide -> {
                     val guide = screen as Screen.Guide
                     BackHandler { screen = guide.route }
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                     GuideScreen(
+                        onOpenAssistant = openAssistantOverGuide,
                         mode = mode,
                         result = guide.result,
                         type = guide.type,
@@ -406,6 +412,11 @@ fun AppRoot(
                         onFinish = { screen = Screen.Home },
                         modifier = modifier,
                     )
+                    if (assistantOverGuide) {
+                        BackHandler { assistantOverGuide = false }
+                        assistantPanel(mode) { assistantOverGuide = false }
+                    }
+                    }
                 }
                 else -> HomeScreen(
                     mode = mode,

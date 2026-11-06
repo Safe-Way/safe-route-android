@@ -17,6 +17,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsBus
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Subway
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -89,6 +90,8 @@ fun TransitGuideScreen(
     walkSpeedRepository: WalkSpeedRepository,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
+    /** AI 비서's microphone, on walking parts and rides alike. */
+    onOpenAssistant: (() -> Unit)? = null,
 ) {
     val legs = remember(route) { guideLegs(route) }
     var step by rememberSaveable { mutableIntStateOf(0) }
@@ -107,9 +110,10 @@ fun TransitGuideScreen(
                         showSos, routeRepository, walkSpeedRepository,
                         finishLabel = nextLabel ?: "도착! 끝내기",
                         onDone = ::next,
+                        onOpenAssistant = onOpenAssistant,
                     )
                 } else {
-                    RidePart(leg, voiceByDefault, nextLabel = nextLabel, onDone = ::next, onStop = onFinish)
+                    RidePart(leg, voiceByDefault, nextLabel = nextLabel, onDone = ::next, onStop = onFinish, onOpenAssistant = onOpenAssistant)
                 }
             }
         }
@@ -122,8 +126,7 @@ private fun StepStrip(legs: List<TransitLeg>, step: Int) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().background(Color(0xFFEFF4FB)).horizontalScroll(rememberScrollState())
-            // Starts right of the mode icon that sits over the top left corner.
-            .padding(start = 44.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
         legs.forEachIndexed { i, l ->
             if (i > 0) Text("  →  ", fontSize = 14.sp, color = Muted)
@@ -156,6 +159,7 @@ private fun WalkPart(
     walkSpeedRepository: WalkSpeedRepository,
     finishLabel: String,
     onDone: () -> Unit,
+    onOpenAssistant: (() -> Unit)?,
 ) {
     // The server's walking line when it gave one; otherwise our own walking route to the stop.
     var result by remember { mutableStateOf(walkResult(leg)) }
@@ -185,6 +189,7 @@ private fun WalkPart(
             walkSpeedRepository = walkSpeedRepository,
             onFinish = onDone,
             finishLabel = finishLabel,
+            onOpenAssistant = onOpenAssistant,
         )
         else -> Column(
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -208,7 +213,14 @@ private fun WalkPart(
 
 /** A bus or subway ride: what to take, where to get off, and a warning when that stop is near. */
 @Composable
-private fun RidePart(leg: TransitLeg, voiceByDefault: Boolean, nextLabel: String?, onDone: () -> Unit, onStop: () -> Unit) {
+private fun RidePart(
+    leg: TransitLeg,
+    voiceByDefault: Boolean,
+    nextLabel: String?,
+    onDone: () -> Unit,
+    onStop: () -> Unit,
+    onOpenAssistant: (() -> Unit)?,
+) {
     val context = LocalContext.current
     val tts = rememberTts(context)
     LaunchedEffect(Unit) {
@@ -259,8 +271,20 @@ private fun RidePart(leg: TransitLeg, voiceByDefault: Boolean, nextLabel: String
             colors = ButtonDefaults.buttonColors(containerColor = color),
             modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
         ) { Text(if (nextLabel != null) "내렸어요 · $nextLabel" else "내렸어요 · 끝내기", fontSize = 18.sp, fontWeight = FontWeight.Black) }
-        OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-            Text("안내 끝내기", fontSize = 16.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            onOpenAssistant?.let { open ->
+                Button(
+                    onClick = open,
+                    colors = ButtonDefaults.buttonColors(containerColor = Green),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) {
+                    Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Text(" AI 비서", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            OutlinedButton(onClick = onStop, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                Text("안내 끝내기", fontSize = 16.sp)
+            }
         }
     }
 }

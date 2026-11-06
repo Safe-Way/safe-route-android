@@ -66,6 +66,7 @@ import androidx.compose.material.icons.filled.TurnRight
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Straight
@@ -98,6 +99,7 @@ import com.deungbul.anshimgil.location.hasLocationPermission
 import com.deungbul.anshimgil.data.Guidance
 import com.deungbul.anshimgil.data.GuidanceState
 import com.deungbul.anshimgil.data.LatLon
+import com.deungbul.anshimgil.ui.mode.ModeBadge
 import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.RouteType
 import com.deungbul.anshimgil.data.Turn
@@ -164,6 +166,8 @@ fun GuideScreen(
     modifier: Modifier = Modifier,
     /** The finish button's words when this walk is one part of a longer trip (대중교통 안내), e.g. "다음: 21번 타기". */
     finishLabel: String? = null,
+    /** AI 비서's microphone on the map; it opens over the guidance, which keeps running. */
+    onOpenAssistant: (() -> Unit)? = null,
 ) {
     var sos by remember { mutableStateOf(false) }
     var showHelpList by remember { mutableStateOf(false) }
@@ -403,6 +407,22 @@ fun GuideScreen(
                 )
             }
             if (showSos) SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp))
+            // The mode on the instruction card's top left corner.
+            ModeBadge(mode, Modifier.align(Alignment.TopStart).padding(start = 4.dp, top = 4.dp))
+            onOpenAssistant?.let { open ->
+                Surface(
+                    onClick = open,
+                    shape = CircleShape,
+                    color = Green,
+                    contentColor = Color.White,
+                    shadowElevation = 6.dp,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp).size(56.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.Mic, contentDescription = "AI 비서에게 말하기", modifier = Modifier.size(28.dp))
+                    }
+                }
+            }
             // The camera follows only when the position moves, so after dragging the map this brings it back.
             Surface(
                 onClick = { map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM)) },

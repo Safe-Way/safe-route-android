@@ -245,20 +245,14 @@ private fun ModeSelectScreenPreview() {
 
 
 /**
- * The mode as a tiny icon under the status bar on the left, on every screen once a mode is chosen,
- * guidance included (team, 11/6). It does not depend on the phone showing notification icons.
+ * The mode as a tiny icon: under the status bar on the left of the map, and on the instruction card's
+ * corner during walking guidance (11/6). It does not depend on the phone showing notification icons.
  */
 @Composable
 fun ModeBadge(mode: UserMode, modifier: Modifier = Modifier) {
     val style = mode.style()
-    androidx.compose.material3.Surface(
-        shape = CircleShape,
-        color = Color.White,
-        shadowElevation = 1.dp,
-        modifier = modifier.size(16.dp),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(style.icon, contentDescription = "${style.label} 모드", tint = style.accent, modifier = Modifier.size(12.dp))
-        }
+    // No background: just the icon in the mode's colour.
+    Box(modifier.size(16.dp), contentAlignment = Alignment.Center) {
+        Icon(style.icon, contentDescription = "${style.label} 모드", tint = style.accent, modifier = Modifier.size(14.dp))
     }
 }
