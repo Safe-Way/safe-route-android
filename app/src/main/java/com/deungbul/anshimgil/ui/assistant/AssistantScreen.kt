@@ -99,11 +99,26 @@ fun AssistantScreen(
     modifier: Modifier = Modifier,
     /** The line AI 비서 opens with, when it came from its bubble on the map; otherwise the greeting. */
     opening: String? = null,
+    /** Opened from the map's microphone button: start listening at once. */
+    listenAtStart: Boolean = false,
+    /** The conversation, kept by the caller while the app runs so it is still there on coming back. */
+    chat: AssistantChat = remember { AssistantChat() },
 ) {
     val android = LocalContext.current
     val scope = rememberCoroutineScope()
-    val lines = remember { mutableStateListOf(ChatLine(fromUser = false, text = opening ?: HELLO)) }
-    var choices by remember { mutableStateOf(STARTERS) }
+    val lines = chat.lines
+    // A new chat starts with the greeting (or the bubble's line); coming back, a bubble's line is added on.
+    remember {
+        if (lines.isEmpty()) {
+            lines += ChatLine(fromUser = false, text = opening ?: HELLO)
+            chat.choices = STARTERS
+        } else if (opening != null) {
+            lines += ChatLine(fromUser = false, text = opening)
+            chat.choices = emptyList()
+        }
+        true
+    }
+    var choices by chat::choices
     var thinking by remember { mutableStateOf<String?>(null) }
     var urgent by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
@@ -181,6 +196,8 @@ fun AssistantScreen(
             say("이 휴대폰은 음성 입력을 쓸 수 없어요. 글로 써 주세요.")
         }
     }
+
+    LaunchedEffect(Unit) { if (listenAtStart) listen() }
 
     LaunchedEffect(lines.size, thinking) { listState.animateScrollToItem(maxOf(0, lines.size)) }
 
@@ -264,4 +281,14 @@ private fun EmergencyCard(onCall: () -> Unit, onGuardian: () -> Unit, onPolice: 
             OutlinedButton(onClick = onFine, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("괜찮아요", fontSize = 16.sp) }
         }
     }
+}
+
+
+/**
+ * AI 비서's conversation while the app runs: kept when leaving the screen and coming back, gone when the
+ * app is closed (it is only in memory, never saved).
+ */
+class AssistantChat {
+    val lines = mutableStateListOf<ChatLine>()
+    var choices by mutableStateOf<List<String>>(emptyList())
 }

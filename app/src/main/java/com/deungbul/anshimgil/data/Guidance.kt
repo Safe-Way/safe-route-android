@@ -31,7 +31,8 @@ data class GuidanceState(
 data class HelpPoint(val kind: FacilityKind, val meters: Int, val side: Turn)
 
 /** A sharp turn on the route at [point]; [left] says which way it goes. */
-data class TurnMark(val point: LatLon, val left: Boolean)
+/** A turn sign: where, which way, and [bearing] the way the walker comes into it (degrees clockwise from north). */
+data class TurnMark(val point: LatLon, val left: Boolean, val bearing: Float = 0f)
 
 /** A place to get help further along the route: [aheadM] along the route from here, [offM] off it. */
 data class HelpAhead(val kind: FacilityKind, val aheadM: Int, val side: Turn, val offM: Int)
@@ -87,7 +88,10 @@ class Guidance(private val path: List<LatLon>, private val facilities: List<Faci
         for (v in 1 until points.lastIndex) {
             val change = headingChange(points[v - 1], points[v], points[v + 1])
             if (abs(change) < TURN_ARROW_DEGREES || cumulative[v] - lastAt < TURN_MARK_GAP_M) continue
-            marks += TurnMark(toLatLon(points[v]), left = change > 0)
+            val (ax, ay) = points[v - 1]
+            val (bx, by) = points[v]
+            val bearing = ((Math.toDegrees(atan2(bx - ax, by - ay)) + 360) % 360).toFloat()
+            marks += TurnMark(toLatLon(points[v]), left = change > 0, bearing = bearing)
             lastAt = cumulative[v]
         }
         marks

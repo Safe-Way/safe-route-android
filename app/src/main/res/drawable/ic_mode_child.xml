@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon for the mode (Material icon shape), shown next to the clock while the app is open. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M12,3.5a2.5,2.5 0,1 1,0 5a2.5,2.5 0,1 1,0 -5zM8.5,10h7l-1.2,6H13.5v5h-3v-5H9.7z" />
+</vector>
