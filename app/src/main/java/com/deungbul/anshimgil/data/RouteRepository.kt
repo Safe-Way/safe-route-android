@@ -107,7 +107,7 @@ internal fun parseRouteResult(json: JSONObject, mode: UserMode? = null): RouteRe
                     },
                 )
             },
-        )
+        ).withoutEndDetours()
     }
     val shortest = routes.firstOrNull { it.type == RouteType.SHORTEST }
     val safe = routes.firstOrNull { it.type == RouteType.SAFE }
