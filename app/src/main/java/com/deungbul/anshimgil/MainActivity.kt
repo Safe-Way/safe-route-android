@@ -241,7 +241,8 @@ fun AppRoot(
             var assistantOverGuide by remember(screen) { mutableStateOf(false) }
             val openAssistantOverGuide = {
                 assistantOpening = null
-                assistantListen = true
+                // Like the map's AI 비서 button: opens without listening at once.
+                assistantListen = false
                 assistantOverGuide = true
             }
             when {
