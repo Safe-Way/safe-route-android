@@ -150,3 +150,44 @@ fun firstWait(route: TransitRoute): FirstWait? {
         LegType.WALK -> null
     }
 }
+
+/** A bus stop near the walker with the buses coming to it (`/api/bus/nearby`, FR-51). */
+data class NearbyStop(val name: String, val towards: String?, val distanceM: Int, val point: LatLon, val buses: List<BusComing>)
+
+object BusRepository {
+    /** Nearest stops first. Throws [ApiException]. */
+    suspend fun nearby(at: LatLon): List<NearbyStop> =
+        parseBusNearby(ServerApi.get("/api/bus/nearby", mapOf("lat" to at.lat, "lon" to at.lon)))
+}
+
+internal fun parseBusNearby(json: JSONObject): List<NearbyStop> {
+    val stops = json.optJSONArray("stops") ?: return emptyList()
+    return (0 until stops.length()).map { i ->
+        val s = stops.getJSONObject(i)
+        val arrivals = s.optJSONArray("arrivals")
+        NearbyStop(
+            name = s.optString("name"),
+            towards = s.optString("nextStop").takeUnless { s.isNull("nextStop") || it.isBlank() },
+            distanceM = s.optInt("distanceM"),
+            point = LatLon(s.optDouble("lat"), s.optDouble("lon")),
+            buses = if (arrivals == null) emptyList() else (0 until arrivals.length()).map { j ->
+                val b = arrivals.getJSONObject(j)
+                BusComing(
+                    line = b.optString("lineName"),
+                    inMin = if (b.isNull("remainMin")) null else b.optInt("remainMin"),
+                    stopsAway = if (b.isNull("remainStop")) null else b.optInt("remainStop"),
+                    lowFloor = b.optBoolean("lowFloor"),
+                )
+            },
+        )
+    }
+}
+
+/**
+ * The buses to list for a stop, soonest first. Seniors and wheelchair users see low-floor buses
+ * first, since those are the ones they can get on.
+ */
+fun busesToShow(buses: List<BusComing>, mode: UserMode): List<BusComing> {
+    val soonest = buses.sortedBy { it.inMin ?: Int.MAX_VALUE }
+    return if (mode == UserMode.DISABLED || mode == UserMode.SENIOR) soonest.sortedByDescending { it.lowFloor } else soonest
+}
