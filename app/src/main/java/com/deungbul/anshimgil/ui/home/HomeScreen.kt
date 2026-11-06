@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.home
 
+import com.deungbul.anshimgil.ui.common.AI_BUBBLE_ALPHA
 import com.deungbul.anshimgil.data.busesToShow
 import com.deungbul.anshimgil.data.BusRepository
 import com.deungbul.anshimgil.data.NearbyStop
@@ -644,9 +645,8 @@ private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit)
         onClick = onOpen,
         shape = RoundedCornerShape(16.dp),
         // See-through so the map behind stays visible; the words keep full contrast.
-        color = Color.White.copy(alpha = 0.88f),
+        color = Color.White.copy(alpha = AI_BUBBLE_ALPHA),
         border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF1F6B42).copy(alpha = 0.7f)),
-        shadowElevation = 0.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 2.dp)) {
@@ -672,9 +672,8 @@ private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit)
 private fun AiAskBubble(text: String, answers: List<Pair<String, () -> Unit>>) {
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = Color.White.copy(alpha = 0.95f),
+        color = Color.White.copy(alpha = AI_BUBBLE_ALPHA),
         border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF1F6B42)),
-        shadowElevation = 4.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

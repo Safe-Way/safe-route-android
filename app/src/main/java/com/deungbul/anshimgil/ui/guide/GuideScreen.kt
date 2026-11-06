@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.guide
 
+import com.deungbul.anshimgil.ui.common.AI_BUBBLE_ALPHA
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
@@ -653,9 +654,8 @@ private fun formatDistance(meters: Int): String =
 private fun AiNotice(text: String, onDismiss: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = Color.White.copy(alpha = 0.92f),
+        color = Color.White.copy(alpha = AI_BUBBLE_ALPHA),
         border = BorderStroke(1.5.dp, Green),
-        shadowElevation = 4.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 6.dp)) {
@@ -677,9 +677,8 @@ private fun EventAheadCard(
 ) {
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFFFFF4E5).copy(alpha = 0.95f),
+        color = Color(0xFFFFF4E5).copy(alpha = AI_BUBBLE_ALPHA),
         border = BorderStroke(1.5.dp, Color(0xFFB45309)),
-        shadowElevation = 4.dp,
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(14.dp)) {
