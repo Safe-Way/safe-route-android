@@ -145,6 +145,8 @@ fun RouteScreen(
     walkSpeedMPerMin: Double,
     onStart: (RouteResult, RouteType) -> Unit,
     modifier: Modifier = Modifier,
+    /** 대중교통 tab: guide the chosen transit route step by step. */
+    onStartTransit: (TransitRoute) -> Unit = {},
 ) {
     val context = LocalContext.current
     var conditionsOff by rememberSaveable { mutableStateOf(if (autoConditions) emptySet() else ALL_CONDITION_KEYS) }
@@ -411,6 +413,18 @@ fun RouteScreen(
                     }
                 }
                 if (!transitTab) (state as? RouteState.Ready)?.let { s -> StartButton(s.result.atPace(walkSpeedMPerMin), selected, onStart = { onStart(s.result, selected) }) }
+                if (transitTab) (transit as? TransitState.Ready)?.result?.routes?.getOrNull(transitSelected)?.let { t ->
+                    Button(
+                        onClick = { onStartTransit(t) },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2F5BB7), contentColor = Color.White),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
+                    ) {
+                        Icon(Icons.Filled.Navigation, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("대중교통으로 안내 시작", fontSize = 19.sp, fontWeight = FontWeight.Black)
+                    }
+                }
             }
         }
     }

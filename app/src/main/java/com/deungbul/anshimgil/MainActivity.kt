@@ -48,6 +48,8 @@ import com.deungbul.anshimgil.ui.mode.SetupChatScreen
 import com.deungbul.anshimgil.data.SetupAssistant
 import com.deungbul.anshimgil.data.AppAssistant
 import com.deungbul.anshimgil.data.AssistantContext
+import com.deungbul.anshimgil.ui.guide.TransitGuideScreen
+import com.deungbul.anshimgil.data.TransitRoute
 import com.deungbul.anshimgil.data.EventRepository
 import com.deungbul.anshimgil.data.MapHintSource
 import com.deungbul.anshimgil.data.LatLon
@@ -117,6 +119,7 @@ private sealed interface Screen {
     /** [start] null means the phone's position. [fromHome]: opened from a home shortcut, so back returns home. */
     data class Route(val destination: Place, val start: Place? = null, val fromHome: Boolean = false) : Screen
     data class Guide(val route: Route, val result: RouteResult, val type: RouteType) : Screen
+    data class TransitGuide(val route: Route, val transit: TransitRoute) : Screen
 }
 
 /** First launch shows the mode picker; after that the map opens directly. */
@@ -300,9 +303,28 @@ fun AppRoot(
                             onChangeDestination = { place -> screen = route.copy(destination = place) },
                             walkSpeedMPerMin = personalSpeed(mode, samples),
                             onStart = { result, type -> screen = Screen.Guide(route, result, type) },
+                            onStartTransit = { t -> screen = Screen.TransitGuide(route, t) },
                             modifier = modifier,
                         )
                     }
+                }
+                screen is Screen.TransitGuide -> {
+                    val guide = screen as Screen.TransitGuide
+                    BackHandler { screen = guide.route }
+                    TransitGuideScreen(
+                        mode = mode,
+                        route = guide.transit,
+                        destinationName = guide.route.destination.name,
+                        voiceByDefault = settings.voiceGuide,
+                        facilityRepository = facilityRepository,
+                        guardians = settings.guardians,
+                        showTurnSigns = settings.turnSigns,
+                        showSos = settings.sosButton,
+                        routeRepository = routeRepository,
+                        walkSpeedRepository = walkSpeedRepository,
+                        onFinish = { screen = Screen.Home },
+                        modifier = modifier,
+                    )
                 }
                 screen is Screen.Guide -> {
                     val guide = screen as Screen.Guide

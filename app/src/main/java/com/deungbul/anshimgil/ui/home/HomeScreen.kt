@@ -190,18 +190,21 @@ fun HomeScreen(
         locate()
     }
 
-    // The AI 비서 bubble: once the position is known, at most one line from real data; gone after a while.
-    val hereKnown = here != null
-    LaunchedEffect(hintSource, hereKnown) {
+    // The AI 비서 bubble: at most one line from real data; gone after a while. Looked for again when the
+    // walker has moved about 300 m (a grid cell), since a nearby event depends on where they are.
+    val hereCell = here?.let { (it.lat / HINT_CELL_DEG).toInt() to (it.lon / HINT_CELL_DEG).toInt() }
+    LaunchedEffect(hintSource, hereCell) {
         val source = hintSource ?: return@LaunchedEffect
         val at = here ?: return@LaunchedEffect
-        val found = source.next(mode, at) ?: return@LaunchedEffect
-        hint = found
+        // A bubble already up stays until it times out or is closed.
+        if (hint != null) return@LaunchedEffect
+        hint = source.next(mode, at)
+    }
+    LaunchedEffect(hint) {
+        val shown = hint ?: return@LaunchedEffect
         delay(HINT_SHOW_MS)
-        if (hint == found) {
-            ShownHints.mark(found.key)
-            hint = null
-        }
+        ShownHints.mark(shown.key)
+        hint = null
     }
     LaunchedEffect(map, here) {
         val m = map ?: return@LaunchedEffect
@@ -627,6 +630,9 @@ private fun NearbyBusCard(at: LatLon?, mode: UserMode, onClose: () -> Unit, modi
     }
 }
 
+
+/** About 300 m; moving into another cell of this size looks for a new bubble. */
+private const val HINT_CELL_DEG = 0.003
 
 /** How long the AI 비서 bubble stays when left alone. */
 private const val HINT_SHOW_MS = 15_000L
