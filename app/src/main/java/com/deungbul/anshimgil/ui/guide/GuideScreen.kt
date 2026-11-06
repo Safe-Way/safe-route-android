@@ -1,5 +1,14 @@
 package com.deungbul.anshimgil.ui.guide
 
+import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Button
+import com.deungbul.anshimgil.data.eventAheadText
+import com.deungbul.anshimgil.data.eventsAhead
+import com.deungbul.anshimgil.data.EVENT_CHECK_MS
+import com.deungbul.anshimgil.data.EventRepository
+import com.deungbul.anshimgil.data.EventAhead
+import androidx.compose.runtime.rememberUpdatedState
 import com.deungbul.anshimgil.data.sidewalkHint
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.deungbul.anshimgil.data.walkMinutes
@@ -281,20 +290,57 @@ fun GuideScreen(
     // navigator. The guardians can then be told the walker left the planned route.
     var rerouting by remember { mutableStateOf(false) }
     var rerouted by remember { mutableStateOf(false) }
+    /** A new route from [from] to the same destination; false when none was found (the old one stays). */
+    suspend fun findNewRoute(from: LatLon, spoken: String): Boolean {
+        rerouting = true
+        val found = try {
+            active = routeRepository.findRoutes(RouteRequest(from, destination, mode))
+            demoProgress = 0.0
+            if (voiceOn) tts.speak(spoken, TextToSpeech.QUEUE_FLUSH, null, "reroute")
+            true
+        } catch (e: ApiException) {
+            // Too close to the destination, out of the area, or no connection: keep the old route.
+            false
+        }
+        rerouting = false
+        return found
+    }
     LaunchedEffect(off) {
         if (!off) return@LaunchedEffect
         delay(REROUTE_AFTER_MS)
         val here = fix ?: return@LaunchedEffect
-        rerouting = true
-        try {
-            active = routeRepository.findRoutes(RouteRequest(here, destination, mode))
-            demoProgress = 0.0
-            rerouted = true
-            if (voiceOn) tts.speak("길을 벗어나 새 길을 찾았어요", TextToSpeech.QUEUE_FLUSH, null, "reroute")
-        } catch (e: ApiException) {
-            // Too close to the destination, out of the area, or no connection: keep the old route and the warning.
+        if (findNewRoute(here, "길을 벗어나 새 길을 찾았어요")) rerouted = true
+    }
+
+    // Roadworks, an accident or a closure that started after the route was found: ask the server every few
+    // minutes and tell the walker about a new one on the road ahead. Events there at the start are left out,
+    // since the route was found with them in mind and the route screen already told the walker.
+    val eventRepository = remember { EventRepository.create() }
+    val knownEvents = remember { mutableSetOf<Long>() }
+    var eventAhead by remember { mutableStateOf<EventAhead?>(null) }
+    var firstEventCheck by remember { mutableStateOf(true) }
+    val progressNow by rememberUpdatedState(state.progressM)
+    LaunchedEffect(guidance) {
+        while (true) {
+            val events = try {
+                eventRepository.within(bboxAround(route.path, marginDeg = 0.004))
+            } catch (e: ApiException) {
+                null
+            }
+            if (events != null) {
+                if (firstEventCheck) {
+                    knownEvents += events.map { it.id }
+                    firstEventCheck = false
+                } else {
+                    eventsAhead(guidance, progressNow, events, knownEvents).firstOrNull()?.let { ahead ->
+                        knownEvents += ahead.event.id
+                        eventAhead = ahead
+                        if (voiceOn) tts.speak(eventAheadText(ahead), TextToSpeech.QUEUE_FLUSH, null, "event")
+                    }
+                }
+            }
+            delay(EVENT_CHECK_MS)
         }
-        rerouting = false
     }
 
     // Keep the walker in the middle of the part of the map not covered by the instruction card:
@@ -340,6 +386,19 @@ fun GuideScreen(
                         onDismiss = { offRouteTold = true; rerouted = false },
                     )
                 }
+            }
+            eventAhead?.let { ahead ->
+                EventAheadCard(
+                    ahead,
+                    finding = rerouting,
+                    onReroute = {
+                        scope.launch {
+                            if (findNewRoute(fix ?: state.snapped, "${ahead.event.kind} 구간을 피해 새 길을 찾았어요")) eventAhead = null
+                        }
+                    },
+                    onDismiss = { eventAhead = null },
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 84.dp),
+                )
             }
             if (showSos) SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp))
             // The camera follows only when the position moves, so after dragging the map this brings it back.
@@ -541,6 +600,40 @@ private fun formatDistance(meters: Int): String =
     if (meters < 1000) "${meters}m" else "%.1fkm".format(meters / 1000.0)
 
 /** Shown after a while off the route: tell the guardians where the walker is, or dismiss. */
+/** A new road event ahead: what and where, with 다른 길 찾기 or carrying on. */
+@Composable
+private fun EventAheadCard(
+    ahead: EventAhead,
+    finding: Boolean,
+    onReroute: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(shape = RoundedCornerShape(16.dp), color = Color(0xFFFFF4E5), shadowElevation = 6.dp, modifier = modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Filled.WarningAmber, contentDescription = null, tint = Color(0xFFB45309))
+                Text("새로 생긴 ${ahead.event.kind}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7A5310))
+            }
+            Text(eventAheadText(ahead), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color(0xFF17211B), lineHeight = 23.sp)
+            listOfNotNull(ahead.event.place, ahead.event.message).joinToString(" · ").takeIf { it.isNotBlank() }?.let {
+                Text(it, fontSize = 14.sp, color = Color(0xFF5E6A62), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onReroute,
+                    enabled = !finding,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1F6B42)),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) { Text(if (finding) "찾는 중…" else "다른 길 찾기", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                    Text("그냥 갈게요", fontSize = 16.sp)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun OffRouteCard(rerouted: Boolean, onTell: () -> Unit, onDismiss: () -> Unit) {
     Surface(shape = RoundedCornerShape(14.dp), color = Color.White, shadowElevation = 4.dp) {
