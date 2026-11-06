@@ -31,4 +31,15 @@ class TransitTest {
         assertNull(nextBusText(emptyList()))
         assertEquals("1번 · 곧 도착 · 저상버스", nextBusText(listOf(BusComing("1", 0, 0, true))))
     }
+
+    @Test
+    fun waitIsForTheFirstBusTheWalkerCanCatch() {
+        val route = parseTransit(sample).routes.single()
+        // Walk 6 min to the stop; bus 45 comes in 5 min, so it is missed: no catchable bus listed.
+        assertNull(firstWait(route))
+        val later = route.copy(legs = route.legs.mapIndexed { i, l ->
+            if (i == 1) l.copy(buses = listOf(BusComing("45", 5, 3, false), BusComing("45", 14, 8, true))) else l
+        })
+        assertEquals(FirstWait(1, 8, "45번 저상버스"), firstWait(later))
+    }
 }

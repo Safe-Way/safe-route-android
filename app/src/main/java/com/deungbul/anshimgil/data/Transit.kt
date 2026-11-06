@@ -130,3 +130,23 @@ fun legTitle(leg: TransitLeg): String = when (leg.type) {
     LegType.SUBWAY -> "${leg.lines.firstOrNull() ?: "지하철"}${leg.way?.let { " $it 방면" } ?: ""} · ${leg.from.name ?: "역"} → ${leg.to.name ?: "역"}" +
         (leg.stationCount?.let { " · ${it}개 역" } ?: "")
 }
+
+/**
+ * Waiting at the first bus stop or station: the walker gets there after the legs before it, and takes
+ * the first bus or train that comes after that (one that comes sooner is missed). Null when no arrival
+ * time is known or nothing catchable is listed.
+ */
+data class FirstWait(val legIndex: Int, val waitMin: Int, val catches: String)
+
+fun firstWait(route: TransitRoute): FirstWait? {
+    val i = route.legs.indexOfFirst { it.type != LegType.WALK }.takeIf { it >= 0 } ?: return null
+    val ride = route.legs[i]
+    val reachMin = route.legs.take(i).sumOf { it.minutes }
+    return when (ride.type) {
+        LegType.BUS -> ride.buses.filter { it.inMin != null && it.inMin >= reachMin }.minByOrNull { it.inMin!! }
+            ?.let { FirstWait(i, it.inMin!! - reachMin, "${it.line}번" + if (it.lowFloor) " 저상버스" else "") }
+        LegType.SUBWAY -> ride.trains.filter { it.inMin >= reachMin }.minByOrNull { it.inMin }
+            ?.let { FirstWait(i, it.inMin - reachMin, it.direction) }
+        LegType.WALK -> null
+    }
+}

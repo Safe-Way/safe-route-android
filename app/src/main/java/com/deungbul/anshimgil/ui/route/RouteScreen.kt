@@ -1,5 +1,7 @@
 package com.deungbul.anshimgil.ui.route
 
+import com.deungbul.anshimgil.data.firstWait
+import com.deungbul.anshimgil.data.FirstWait
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.draw.clip
 import com.deungbul.anshimgil.map.showTransit
@@ -644,10 +646,14 @@ private fun TransitCard(route: TransitRoute, selected: Boolean, onClick: () -> U
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            // With the wait at the first stop, so the arrival time is when the walker really gets there.
+            val wait = firstWait(route)
+            val total = route.totalMin + (wait?.waitMin ?: 0)
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("${route.totalMin}분", fontSize = 24.sp, fontWeight = FontWeight.Black, color = Ink)
-                Text("도착 ${arrivalTime(route.totalMin)}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Ink)
+                Text("${total}분", fontSize = 24.sp, fontWeight = FontWeight.Black, color = Ink)
+                Text("도착 ${arrivalTime(total)}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Ink)
             }
+            wait?.takeIf { it.waitMin > 0 }?.let { Text("기다리는 시간 약 ${it.waitMin}분 포함", fontSize = 13.sp, color = Transit) }
             Text(
                 listOfNotNull(
                     route.fare?.let { "%,d원".format(it) },
@@ -657,13 +663,13 @@ private fun TransitCard(route: TransitRoute, selected: Boolean, onClick: () -> U
                 fontSize = 14.sp, color = Muted,
             )
             // Steps only for the chosen route, so the list stays short.
-            if (selected) route.legs.forEach { leg -> LegRow(leg) }
+            if (selected) route.legs.forEachIndexed { i, leg -> LegRow(leg, wait?.takeIf { it.legIndex == i }) }
         }
     }
 }
 
 @Composable
-private fun LegRow(leg: TransitLeg) {
+private fun LegRow(leg: TransitLeg, wait: FirstWait?) {
     val (mark, color) = when (leg.type) {
         LegType.WALK -> "걷기" to Green
         LegType.BUS -> "버스" to Transit
@@ -682,6 +688,12 @@ private fun LegRow(leg: TransitLeg) {
                 LegType.WALK -> null
             }
             live?.let { Text(it, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color) }
+            wait?.let {
+                Text(
+                    if (it.waitMin == 0) "도착하면 바로 ${it.catches}를 탈 수 있어요" else "정류장에서 약 ${it.waitMin}분 기다려 ${it.catches}를 타요",
+                    fontSize = 14.sp, color = Muted,
+                )
+            }
         }
     }
 }
