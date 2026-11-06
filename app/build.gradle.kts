@@ -15,7 +15,7 @@ val kakaoNativeAppKey: String = localProperties.getProperty("KAKAO_NATIVE_APP_KE
 val serverBaseUrl: String = localProperties.getProperty("SERVER_BASE_URL", "")
 // Gemini (free tier) for the 말로 맞추기 setup chat; empty means the app's own rules answer instead.
 val geminiApiKey: String = localProperties.getProperty("GEMINI_API_KEY", "")
-val geminiModel: String = localProperties.getProperty("GEMINI_MODEL", "gemini-flash-latest")
+val geminiModel: String = localProperties.getProperty("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 android {
     namespace = "com.deungbul.anshimgil"
