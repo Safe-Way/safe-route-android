@@ -162,6 +162,8 @@ fun GuideScreen(
     walkSpeedRepository: WalkSpeedRepository,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The finish button's words when this walk is one part of a longer trip (대중교통 안내), e.g. "다음: 21번 타기". */
+    finishLabel: String? = null,
 ) {
     var sos by remember { mutableStateOf(false) }
     var showHelpList by remember { mutableStateOf(false) }
@@ -487,7 +489,7 @@ fun GuideScreen(
                         contentPadding = PaddingValues(horizontal = 6.dp),
                         modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     ) {
-                        Text(if (state.arrived) "도착! 끝내기" else "안내 끝내기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink, maxLines = 1)
+                        Text(finishLabel ?: if (state.arrived) "도착! 끝내기" else "안내 끝내기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink, maxLines = 1)
                     }
                 }
             }

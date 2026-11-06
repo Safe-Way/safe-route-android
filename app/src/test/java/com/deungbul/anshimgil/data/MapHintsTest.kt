@@ -25,7 +25,7 @@ class MapHintsTest {
     fun eveningOnlyWithinTheHourBeforeSunset() {
         val sunset = LocalTime.of(17, 33)
         val hint = eveningHint(LocalDateTime.of(2026, 11, 6, 17, 0), sunset)!!
-        assertEquals("5시 33분 해가 져요. 지금부터는 밝은 길을 먼저 골라 안내해요.", hint.text)
+        assertEquals("5시 33분에 해가 져요. 지금부터는 밝은 길로 먼저 안내할게요.", hint.text)
         assertNull(eveningHint(LocalDateTime.of(2026, 11, 6, 13, 0), sunset))
         assertNull(eveningHint(LocalDateTime.of(2026, 11, 6, 18, 0), sunset))
     }
@@ -36,7 +36,7 @@ class MapHintsTest {
         val biennale = RoadEvent(8, "행사", "광주비엔날레", null, 35.18309828, 126.8892087, 300, null)
         val hint = eventHint(here, listOf(biennale, festival))!!
         assertEquals("event-9", hint.key)
-        assertTrue(hint.text, hint.text.startsWith("100m 거리 금남로 차 없는 거리 걷자잉에서 행사로 사람이 많아요"))
+        assertTrue(hint.text, hint.text == "약 100m 떨어진 곳에서 '금남로 차 없는 거리 걷자잉' 행사가 열리고 있어요. 그쪽을 지나게 되면 미리 알려 드릴게요.")
         assertNull(eventHint(here, listOf(biennale)))
     }
 

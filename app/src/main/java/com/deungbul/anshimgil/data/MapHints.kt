@@ -58,7 +58,7 @@ fun eveningHint(now: LocalDateTime, sunset: LocalTime?): MapHint? {
     val left = java.time.Duration.between(now.toLocalTime(), sunset).toMinutes()
     if (left !in 1..EVENING_BEFORE_SUNSET_MIN) return null
     val time = "%d시 %02d분".format(if (sunset.hour > 12) sunset.hour - 12 else sunset.hour, sunset.minute)
-    return MapHint("sunset-${now.toLocalDate()}", "$time 해가 져요. 지금부터는 밝은 길을 먼저 골라 안내해요.")
+    return MapHint("sunset-${now.toLocalDate()}", "${time}에 해가 져요. 지금부터는 밝은 길로 먼저 안내할게요.")
 }
 
 /** How near (beyond its own radius) an event must be to mention. */
@@ -70,16 +70,15 @@ fun eventHint(here: LatLon, events: List<RoadEvent>): MapHint? {
         .map { it to distanceMeters(here.lat, here.lon, it.lat, it.lon) }
         .filter { (e, d) -> d <= e.radiusM + EVENT_NEAR_EXTRA_M }
         .minByOrNull { it.second } ?: return null
+    val where = if (meters <= event.radiusM) "지금 계신 곳 근처에서" else "약 ${((meters - event.radiusM) / 50 + 1) * 50}m 떨어진 곳에서"
     val what = when (event.kind) {
-        "행사" -> "행사로 사람이 많아요"
-        "공사" -> "공사 중이에요"
-        "사고" -> "사고가 났어요"
-        "통제" -> "길이 통제되고 있어요"
-        "재난" -> "재난 상황이 있어요"
-        else -> "돌발 상황이 있어요"
+        "행사" -> "'${event.title}' 행사가 열리고 있어요"
+        "공사" -> "공사를 하고 있어요 (${event.title})"
+        "사고" -> "사고가 났어요 (${event.title})"
+        "통제" -> "길을 막고 있어요 (${event.title})"
+        else -> "${event.kind} 상황이 있어요 (${event.title})"
     }
-    val where = if (meters <= event.radiusM) "지금 계신 곳" else "${((meters - event.radiusM) / 50 + 1) * 50}m 거리"
-    return MapHint("event-${event.id}", "$where ${event.title}에서 $what. 길을 찾으면 피하거나 미리 알려 드려요.")
+    return MapHint("event-${event.id}", "$where $what. 그쪽을 지나게 되면 미리 알려 드릴게요.")
 }
 
 /**
