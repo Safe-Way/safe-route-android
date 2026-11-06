@@ -67,6 +67,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -433,14 +434,14 @@ fun GuideScreen(
                 Surface(
                     onClick = open,
                     shape = RoundedCornerShape(14.dp),
-                    color = Green,
-                    contentColor = Color.White,
-                    shadowElevation = 6.dp,
+                    color = Color.White,
+                    contentColor = Green,
+                    shadowElevation = 4.dp,
                     // Right above the location button, the same rounded square.
                     modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 80.dp).size(52.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.Mic, contentDescription = "AI 비서에게 말하기", modifier = Modifier.size(26.dp))
+                        Icon(Icons.Outlined.Mic, contentDescription = "AI 비서에게 말하기", modifier = Modifier.size(26.dp))
                     }
                 }
             }

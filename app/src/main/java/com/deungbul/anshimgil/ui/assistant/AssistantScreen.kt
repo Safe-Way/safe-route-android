@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -256,7 +258,19 @@ fun AssistantScreen(
                 colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Ink, unfocusedTextColor = Ink, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White),
                 modifier = Modifier.weight(1f),
             )
-            IconButton(onClick = ::listen) { Icon(Icons.Filled.Mic, contentDescription = "말로 하기", tint = Green) }
+            // The same simple rounded square as the microphone in walking guidance.
+            Surface(
+                onClick = ::listen,
+                shape = RoundedCornerShape(14.dp),
+                color = Color.White,
+                contentColor = Green,
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, Green),
+                modifier = Modifier.padding(start = 8.dp).size(52.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.Mic, contentDescription = "말로 하기", modifier = Modifier.size(26.dp))
+                }
+            }
             IconButton(onClick = { send(input) }, enabled = input.isNotBlank() && thinking == null) {
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "보내기", tint = if (input.isNotBlank()) Green else Muted)
             }
