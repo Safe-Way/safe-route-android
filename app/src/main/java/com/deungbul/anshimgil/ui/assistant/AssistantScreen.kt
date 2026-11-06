@@ -92,7 +92,7 @@ fun AssistantScreen(
     /** Like [onRoute], opening on the 대중교통 tab. */
     onRouteByTransit: (Place) -> Unit = onRoute,
     onShowBuses: () -> Unit,
-    onOpenReport: () -> Unit,
+    onOpenReport: (AssistantAction.OpenReport) -> Unit,
     /** Go to the map and open SOS (it counts down before texting, so it can still be cancelled). */
     onAlertGuardian: () -> Unit,
     onBack: () -> Unit,
@@ -159,7 +159,7 @@ fun AssistantScreen(
                 )
                 is AssistantAction.GoPlace -> { delay(1200); if (action.transit) onRouteByTransit(action.place) else onRoute(action.place) }
                 is AssistantAction.ShowBuses -> { delay(500); onShowBuses() }
-                is AssistantAction.OpenReport -> { delay(500); onOpenReport() }
+                is AssistantAction.OpenReport -> { delay(1200); onOpenReport(action) }
                 is AssistantAction.Ask -> choices = action.choices
                 is AssistantAction.Answer -> Unit
             }

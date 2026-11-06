@@ -52,7 +52,8 @@ sealed interface AssistantAction {
     data class GoPlace(override val say: String, val place: Place, val transit: Boolean = false) : AssistantAction
 
     data class ShowBuses(override val say: String) : AssistantAction
-    data class OpenReport(override val say: String) : AssistantAction
+    /** Open 불편 신고 filled in from what was said: the kind of problem when it is clear, and the words as the memo. */
+    data class OpenReport(override val say: String, val type: ReportType? = null, val memo: String = "") : AssistantAction
 
     /** Ask back, with ready answers. */
     data class Ask(override val say: String, val choices: List<String>) : AssistantAction
@@ -115,13 +116,41 @@ object RuleAppAssistant : AppAssistant {
             has("음성", "소리", "읽어") && has("켜", "들려") -> AssistantAction.ChangeSettings("음성 안내를 켤게요.", voiceGuide = true)
             has("휠체어") -> AssistantAction.ChangeSettings("장애인(휠체어) 모드로 바꿀게요.", mode = UserMode.DISABLED)
             has("버스") -> AssistantAction.ShowBuses("가까운 정류장에 곧 오는 버스를 보여 드릴게요.")
-            has("신고", "망가", "부서", "공사", "막혀") -> AssistantAction.OpenReport("불편 신고 화면을 열게요.")
+            reportTypeIn(said) != null || has("신고", "불편") -> reportAction(said)
             else -> AssistantAction.Ask(
                 "무엇을 도와드릴까요?",
                 listOf("근처 화장실로 안내해 줘", "글씨 크게 해 줘", "가까운 버스 보여 줘", "가까운 편의점"),
             )
         }
     }
+}
+
+/** Words for each kind of problem on the way, for 불편 신고 by voice. */
+private val REPORT_WORDS = listOf(
+    ReportType.CONSTRUCTION to listOf("공사"),
+    ReportType.STEEP to listOf("경사", "비탈", "가팔"),
+    ReportType.CURB to listOf("턱"),
+    ReportType.BROKEN to listOf("깨졌", "깨진", "파손", "부서", "망가", "패인", "파였", "움푹", "들떴", "보도블록"),
+    ReportType.OBSTACLE to listOf("막혀", "막고", "막혔", "못 지나", "못지나", "쓰레기", "킥보드"),
+)
+
+/** The kind of problem [said] describes, e.g. 공사 in "여기 공사 중이라 못 지나가"; null when it is not clear. */
+fun reportTypeIn(said: String): ReportType? {
+    val s = said.replace(" ", "")
+    return REPORT_WORDS.firstOrNull { (_, words) -> words.any { s.contains(it.replace(" ", "")) } }?.first
+}
+
+/** Opens 불편 신고 with the kind and the walker's words filled in; they still check it and press 보내기. */
+fun reportAction(said: String, say: String? = null): AssistantAction.OpenReport {
+    val type = reportTypeIn(said)
+    val words = say ?: if (type != null) {
+        "'${type.label}' 신고를 지금 위치로 채워 둘게요. 사진을 붙이고 보내기를 누르면 신고돼요."
+    } else {
+        "불편 신고 화면을 열게요. 어떤 불편인지 고르고 보내기를 누르면 신고돼요."
+    }
+    // Just "신고할래" is not worth keeping as a memo.
+    val memo = if (said.replace(" ", "").length > 6) said.trim().take(REPORT_MAX_MEMO) else ""
+    return AssistantAction.OpenReport(words, type, memo)
 }
 
 /** Other words for a saved place's name: "회사" for 직장, "우리 집" for 집. */
@@ -312,8 +341,11 @@ internal fun parseServerAssistantReply(json: JSONObject): ServerAssistantReply? 
 
 /** Gemini picks the action in a fixed JSON shape; anything unusable falls back to the rules. */
 class GeminiAppAssistant(private val fallback: AppAssistant) : AppAssistant {
-    override suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction =
-        runCatching { ask(history, context) }.getOrNull() ?: fallback.reply(history, context)
+    override suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction {
+        val action = runCatching { ask(history, context) }.getOrNull() ?: return fallback.reply(history, context)
+        // Gemini says "report" without the kind; fill it in from the words.
+        return if (action is AssistantAction.OpenReport) reportAction(history.lastOrNull { it.fromUser }?.text.orEmpty()) else action
+    }
 
     private suspend fun ask(history: List<ChatLine>, context: AssistantContext): AssistantAction? = withContext(Dispatchers.IO) {
         val url = URL("https://generativelanguage.googleapis.com/v1beta/models/${BuildConfig.GEMINI_MODEL}:generateContent")

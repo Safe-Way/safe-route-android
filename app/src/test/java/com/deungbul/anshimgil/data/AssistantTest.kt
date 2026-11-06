@@ -227,4 +227,29 @@ class AssistantTest {
         )
         assertTrue((parseServerAssistantReply(json)!!.action as AssistantAction.GoPlace).transit)
     }
+
+    // --- 불편 신고 by voice ---
+
+    @Test
+    fun reportKindIsHeard() {
+        assertEquals(ReportType.CONSTRUCTION, reportTypeIn("여기 공사 중이라 못 지나가"))
+        assertEquals(ReportType.BROKEN, reportTypeIn("보도블록이 깨졌어"))
+        assertEquals(ReportType.STEEP, reportTypeIn("길이 너무 가팔라요"))
+        assertEquals(ReportType.CURB, reportTypeIn("턱이 높아서 휠체어가 못 올라가"))
+        assertEquals(ReportType.OBSTACLE, reportTypeIn("킥보드가 길을 막고 있어"))
+        assertNull(reportTypeIn("신고하고 싶어"))
+        assertNull(reportTypeIn("주차장 가자"))
+    }
+
+    @Test
+    fun reportOpensFilledIn() {
+        val r = rule("여기 공사 중이라 못 지나가") as AssistantAction.OpenReport
+        assertEquals(ReportType.CONSTRUCTION, r.type)
+        assertEquals("여기 공사 중이라 못 지나가", r.memo)
+        assertTrue(r.say.startsWith("'공사' 신고를 지금 위치로 채워 둘게요."))
+        // Just asking to report: open it empty, without a memo
+        val plain = rule("신고할래") as AssistantAction.OpenReport
+        assertNull(plain.type)
+        assertEquals("", plain.memo)
+    }
 }
