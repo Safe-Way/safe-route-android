@@ -432,22 +432,22 @@ fun GuideScreen(
             onOpenAssistant?.let { open ->
                 Surface(
                     onClick = open,
-                    shape = CircleShape,
+                    shape = RoundedCornerShape(14.dp),
                     color = Green,
                     contentColor = Color.White,
                     shadowElevation = 6.dp,
-                    // Bottom left corner (the location button has the right); above SOS when that is shown.
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 18.dp, bottom = if (showSos) 92.dp else 16.dp).size(56.dp),
+                    // Right above the location button, the same rounded square.
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 80.dp).size(52.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.Mic, contentDescription = "AI 비서에게 말하기", modifier = Modifier.size(28.dp))
+                        Icon(Icons.Filled.Mic, contentDescription = "AI 비서에게 말하기", modifier = Modifier.size(26.dp))
                     }
                 }
             }
             // The camera follows only when the position moves, so after dragging the map this brings it back.
             Surface(
                 onClick = { map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM)) },
-                shape = CircleShape,
+                shape = RoundedCornerShape(14.dp),
                 color = Color.White,
                 shadowElevation = 4.dp,
                 modifier = Modifier
