@@ -45,8 +45,11 @@ sealed interface AssistantAction {
     /** Search for a place by name and route there. */
     data class GoTo(override val say: String, val query: String) : AssistantAction
 
-    /** Route to a place the server already found (its recommendation or a nearby place). */
-    data class GoPlace(override val say: String, val place: Place) : AssistantAction
+    /**
+     * Route to a place the server already found (its recommendation or a nearby place) or a saved place.
+     * [transit] opens the 대중교통 tab, when the recommendation was the bus or subway.
+     */
+    data class GoPlace(override val say: String, val place: Place, val transit: Boolean = false) : AssistantAction
 
     data class ShowBuses(override val say: String) : AssistantAction
     data class OpenReport(override val say: String) : AssistantAction
@@ -73,13 +76,20 @@ interface AppAssistant {
     suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction
 
     companion object {
-        /** [guestId] and [favorites] go to the server assistant only (favorites hold home, which only the phone knows). */
+        /**
+         * [guestId] goes to the server assistant only; [favorites] (자주 가는 곳) are matched on the phone and
+         * the saved ones also go to the server (they hold home, which only the phone knows).
+         */
         fun create(
             guestId: suspend () -> String? = { null },
-            favorites: suspend () -> List<Pair<String, LatLon>> = { emptyList() },
+            favorites: suspend () -> List<Favorite> = { emptyList() },
         ): AppAssistant {
             val local = if (BuildConfig.GEMINI_API_KEY.isNotBlank()) GeminiAppAssistant(RuleAppAssistant) else RuleAppAssistant
-            return if (ServerApi.isConfigured) ServerAppAssistant(local, guestId, favorites) else local
+            val saved: suspend () -> List<Pair<String, LatLon>> = {
+                favorites().mapNotNull { f -> f.place?.let { f.name to LatLon(it.lat, it.lon) } }
+            }
+            val inner = if (ServerApi.isConfigured) ServerAppAssistant(local, guestId, saved) else local
+            return FavoriteAppAssistant(inner, favorites)
         }
     }
 }
@@ -111,6 +121,57 @@ object RuleAppAssistant : AppAssistant {
                 listOf("근처 화장실로 안내해 줘", "글씨 크게 해 줘", "가까운 버스 보여 줘", "가까운 편의점"),
             )
         }
+    }
+}
+
+/** Other words for a saved place's name: "회사" for 직장, "우리 집" for 집. */
+private val FAVORITE_SYNONYMS = mapOf("직장" to listOf("회사", "일터"), "학교" to listOf("학원"))
+
+/**
+ * The saved place (자주 가는 곳) [said] is about, e.g. 집 in "집에 가자" or 직장 in "회사 가는 길".
+ * The name must stand as a word, so "국밥집" is not 집.
+ */
+fun favoriteIn(said: String, favorites: List<Favorite>): Favorite? = favorites.firstOrNull { f ->
+    (listOf(f.name) + FAVORITE_SYNONYMS[f.name].orEmpty()).any { name ->
+        Regex("""(^|\s|우리)${Regex.escape(name)}(\s|$|에|으로|로|까지|가|이|은|는|을|를|쪽|방향)""").containsMatchIn(said.trim())
+    }
+}
+
+/** "집이", "학교가": the subject particle for [word]. */
+internal fun withSubject(word: String): String = word + if (hasBatchim(word)) "이" else "가"
+
+/** "집으로", "학교로": the direction particle for [word] (ㄹ takes 로). */
+internal fun withDirection(word: String): String {
+    val last = word.lastOrNull() ?: return word
+    val code = last.code - 0xAC00
+    return word + if (code in 0..11171 && code % 28 != 0 && code % 28 != 8) "으로" else "로"
+}
+
+private fun hasBatchim(word: String): Boolean {
+    val code = (word.lastOrNull()?.code ?: return false) - 0xAC00
+    return code in 0..11171 && code % 28 != 0
+}
+
+/**
+ * Saved places first: "집에 가자" goes home even when the server is down (the phone's own assistant would
+ * search the map for a place called 집), and a place not saved yet gets told so instead of a search.
+ */
+class FavoriteAppAssistant(
+    private val inner: AppAssistant,
+    private val favorites: suspend () -> List<Favorite>,
+) : AppAssistant {
+    override suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction {
+        val said = history.lastOrNull { it.fromUser }?.text.orEmpty()
+        val rule = RuleAppAssistant.reply(history, context)
+        if (rule is AssistantAction.Emergency) return rule
+        val favorite = runCatching { favoriteIn(said, favorites()) }.getOrNull() ?: return inner.reply(history, context)
+        val place = favorite.place ?: return AssistantAction.Answer(
+            "${withSubject(favorite.name)} 아직 등록되지 않았어요. 설정의 '자주 가는 곳'에서 등록하면 바로 안내해 드릴게요.",
+        )
+        val answer = inner.reply(history, context)
+        // The server's recommendation (walk or transit, with its reason) when it gave one; otherwise straight there.
+        return answer as? AssistantAction.GoPlace
+            ?: AssistantAction.GoPlace("${withDirection(favorite.name)} 길을 찾을게요.", place.copy(name = favorite.name))
     }
 }
 
@@ -242,7 +303,7 @@ internal fun parseServerAssistantReply(json: JSONObject): ServerAssistantReply? 
     val action = when {
         // A question waits for the walker, even when a place came with it.
         ask != null || choices.isNotEmpty() -> AssistantAction.Ask(say, choices.map { it.second })
-        place != null -> AssistantAction.GoPlace(say, place)
+        place != null -> AssistantAction.GoPlace(say, place, transit = json.optJSONObject("pick")?.optString("type") == "transit")
         else -> AssistantAction.Answer(say)
     }
     val setup = "get_my_info" in tools && place == null && choices.any { it.first in SETUP_CHOICES }

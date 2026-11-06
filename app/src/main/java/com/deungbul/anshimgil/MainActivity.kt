@@ -117,7 +117,8 @@ private sealed interface Screen {
     /** 말로 하기 on the map screen. */
     data object Assistant : Screen
     /** [start] null means the phone's position. [fromHome]: opened from a home shortcut, so back returns home. */
-    data class Route(val destination: Place, val start: Place? = null, val fromHome: Boolean = false) : Screen
+    /** [transit] opens on the 대중교통 tab (AI 비서 recommended the bus or subway). */
+    data class Route(val destination: Place, val start: Place? = null, val fromHome: Boolean = false, val transit: Boolean = false) : Screen
     data class Guide(val route: Route, val result: RouteResult, val type: RouteType) : Screen
     data class TransitGuide(val route: Route, val transit: TransitRoute) : Screen
 }
@@ -145,9 +146,7 @@ fun AppRoot(
     val appAssistant = remember {
         AppAssistant.create(
             guestId = { walkSpeedRepository.guestId() },
-            favorites = {
-                savedPlaces.favorites.first().mapNotNull { f -> f.place?.let { f.name to LatLon(it.lat, it.lon) } }
-            },
+            favorites = { savedPlaces.favorites.first() },
         )
     }
     // The assistant asked the map to open the nearby-bus card.
@@ -229,6 +228,7 @@ fun AppRoot(
                             }
                         },
                         onRoute = { place -> screen = Screen.Route(place, fromHome = true) },
+                        onRouteByTransit = { place -> screen = Screen.Route(place, fromHome = true, transit = true) },
                         onShowBuses = { busesOnHome = true; screen = Screen.Home },
                         onOpenReport = { screen = Screen.Report },
                         onAlertGuardian = { sosOnHome = true; screen = Screen.Home },
@@ -288,6 +288,7 @@ fun AppRoot(
                     androidx.compose.runtime.key(route) {
                         RouteScreen(
                             mode = mode,
+                            startWithTransit = route.transit,
                             startPlace = route.start,
                             destination = route.destination,
                             routeRepository = routeRepository,
