@@ -1,5 +1,18 @@
 package com.deungbul.anshimgil.ui.route
 
+import com.deungbul.anshimgil.data.firstWait
+import com.deungbul.anshimgil.data.FirstWait
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.draw.clip
+import com.deungbul.anshimgil.map.showTransit
+import com.deungbul.anshimgil.data.nextTrainLines
+import com.deungbul.anshimgil.data.nextBusText
+import com.deungbul.anshimgil.data.legTitle
+import com.deungbul.anshimgil.data.LegType
+import com.deungbul.anshimgil.data.TransitLeg
+import com.deungbul.anshimgil.data.TransitRoute
+import com.deungbul.anshimgil.data.TransitResult
+import com.deungbul.anshimgil.data.TransitRepository
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -237,9 +250,31 @@ fun RouteScreen(
             conditionsOn = conditionsOn + "night"
         }
     }
-    LaunchedEffect(map, result, selected) {
+    // 걸어서 / 대중교통 tabs. Transit is asked for only when its tab is opened (the server's ODsay
+    // lookups are limited per day) and kept while the screen is open.
+    var transitTab by rememberSaveable { mutableStateOf(false) }
+    var transit by remember { mutableStateOf<TransitState?>(null) }
+    var transitSelected by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(transitTab, origin) {
+        val from = origin ?: return@LaunchedEffect
+        if (!transitTab || transit is TransitState.Ready) return@LaunchedEffect
+        transit = TransitState.Loading
+        transit = try {
+            val r = TransitRepository.find(from.point, LatLon(destination.lat, destination.lon), mode)
+            if (r.routes.isEmpty()) TransitState.Failed(r.note ?: "대중교통 경로가 없어요", null) else TransitState.Ready(r)
+        } catch (e: ApiException) {
+            TransitState.Failed(e.message, e.code)
+        }
+    }
+
+    LaunchedEffect(map, result, selected, transitTab, transit, transitSelected) {
         val m = map ?: return@LaunchedEffect
-        result?.let { m.showRoutes(context, it, selected, destination.name) }
+        val t = (transit as? TransitState.Ready)?.result
+        if (transitTab && t != null) {
+            t.routes.getOrNull(transitSelected)?.let { m.showTransit(context, it, destination.name) }
+        } else if (!transitTab) {
+            result?.let { m.showRoutes(context, it, selected, destination.name) }
+        }
     }
 
     Column(modifier = modifier.fillMaxSize().background(Color.White)) {
@@ -339,13 +374,16 @@ fun RouteScreen(
         val maxPanel = (LocalConfiguration.current.screenHeightDp * 0.55f).dp
         Surface(shadowElevation = 8.dp, color = Color.White, modifier = Modifier.heightIn(max = maxPanel)) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(16.dp)) {
+                ModeTabs(transitTab, onSelect = { transitTab = it })
                 Column(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier
                         .weight(1f, fill = false)
                         .verticalScroll(rememberScrollState()),
                 ) {
-                    when (val s = state) {
+                    if (transitTab) {
+                        TransitPanel(transit, transitSelected, onSelect = { transitSelected = it }, onWalk = { transitTab = false })
+                    } else when (val s = state) {
                         RouteState.Loading -> Text(if (origin == null) "현재 위치를 찾는 중…" else "길을 찾는 중…", fontSize = 16.sp, color = Muted, modifier = Modifier.padding(vertical = 24.dp))
                         is RouteState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(s.message, fontSize = 16.sp, color = Color(0xFFB42318))
@@ -354,7 +392,14 @@ fun RouteScreen(
                                     Text("바로 옆이에요. 지도에서 위치를 확인하세요.", fontSize = 15.sp, color = Muted)
                                     TextButton(onClick = onPickStart) { Text("출발지 바꾸기") }
                                 }
-                                s.code == "TOO_FAR" -> NearerChoice(nearer, onGo = onChangeDestination, onSearch = onBack)
+                                s.code == "TOO_FAR" -> {
+                                    Button(
+                                        onClick = { transitTab = true },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2F5BB7)),
+                                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                                    ) { Text("대중교통으로 가기", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                                    NearerChoice(nearer, onGo = onChangeDestination, onSearch = onBack)
+                                }
                                 s.retryHelps -> TextButton(onClick = { retry++ }) { Text("다시 시도") }
                                 else -> TextButton(onClick = onPickStart) { Text("출발지 바꾸기") }
                             }
@@ -362,7 +407,7 @@ fun RouteScreen(
                         is RouteState.Ready -> RouteDetails(s.result.atPace(walkSpeedMPerMin), selected, onSelect = { selected = it })
                     }
                 }
-                (state as? RouteState.Ready)?.let { s -> StartButton(s.result.atPace(walkSpeedMPerMin), selected, onStart = { onStart(s.result, selected) }) }
+                if (!transitTab) (state as? RouteState.Ready)?.let { s -> StartButton(s.result.atPace(walkSpeedMPerMin), selected, onStart = { onStart(s.result, selected) }) }
             }
         }
     }
@@ -531,3 +576,124 @@ internal fun formatDistance(meters: Int): String =
 /** The same routes with walking times from the walker's own pace instead of the mode's default. */
 private fun RouteResult.atPace(speedMPerMin: Double): RouteResult =
     copy(routes = routes.map { it.copy(durationMin = walkMinutes(it.distanceM.toDouble(), speedMPerMin)) })
+
+private sealed interface TransitState {
+    data object Loading : TransitState
+    data class Ready(val result: TransitResult) : TransitState
+    data class Failed(val message: String, val code: String?) : TransitState
+}
+
+private val Transit = Color(0xFF2F5BB7)
+
+/** 걸어서 / 대중교통 switch at the top of the route panel. */
+@Composable
+private fun ModeTabs(transit: Boolean, onSelect: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFEFF3EE), RoundedCornerShape(12.dp))
+            .padding(4.dp)
+            .selectableGroup(),
+    ) {
+        listOf(false to "걸어서", true to "대중교통").forEach { (isTransit, label) ->
+            val on = transit == isTransit
+            Text(
+                label,
+                fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+                color = if (on) Color.White else Ink,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (on) (if (isTransit) Transit else Green) else Color.Transparent)
+                    .selectable(selected = on, role = Role.Tab) { onSelect(isTransit) }
+                    .padding(vertical = 10.dp),
+            )
+        }
+    }
+}
+
+/** Up to three transit routes; the chosen one shows its steps and is drawn on the map. */
+@Composable
+private fun TransitPanel(state: TransitState?, selected: Int, onSelect: (Int) -> Unit, onWalk: () -> Unit) {
+    when (state) {
+        null, TransitState.Loading -> Text("대중교통 길을 찾는 중…", fontSize = 16.sp, color = Muted, modifier = Modifier.padding(vertical = 24.dp))
+        is TransitState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val text = when (state.code) {
+                "TOO_CLOSE" -> "가까워서 걸어가는 게 나아요"
+                "DAILY_LIMIT" -> "오늘 대중교통 길찾기 횟수를 다 썼어요. 내일 다시 해 주세요"
+                "NO_ROUTE" -> "대중교통으로 가는 길이 없어요"
+                else -> state.message
+            }
+            Text(text, fontSize = 16.sp, color = Color(0xFFB42318))
+            TextButton(onClick = onWalk) { Text("걸어서 가는 길 보기") }
+        }
+        is TransitState.Ready -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            state.result.note?.let { Text(it, fontSize = 14.sp, color = Muted) }
+            state.result.routes.forEachIndexed { i, route ->
+                TransitCard(route, selected = i == selected, onClick = { onSelect(i) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransitCard(route: TransitRoute, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) Color(0xFFEFF4FB) else Color.White,
+        border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) Transit else Color(0xFFDCE3DD)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            // With the wait at the first stop, so the arrival time is when the walker really gets there.
+            val wait = firstWait(route)
+            val total = route.totalMin + (wait?.waitMin ?: 0)
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("${total}분", fontSize = 24.sp, fontWeight = FontWeight.Black, color = Ink)
+                Text("도착 ${arrivalTime(total)}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Ink)
+            }
+            wait?.takeIf { it.waitMin > 0 }?.let { Text("기다리는 시간 약 ${it.waitMin}분 포함", fontSize = 13.sp, color = Transit) }
+            Text(
+                listOfNotNull(
+                    route.fare?.let { "%,d원".format(it) },
+                    "걷기 ${formatDistance(route.walkM)}",
+                    if (route.transfers == 0) "환승 없음" else "환승 ${route.transfers}번",
+                ).joinToString(" · "),
+                fontSize = 14.sp, color = Muted,
+            )
+            // Steps only for the chosen route, so the list stays short.
+            if (selected) route.legs.forEachIndexed { i, leg -> LegRow(leg, wait?.takeIf { it.legIndex == i }) }
+        }
+    }
+}
+
+@Composable
+private fun LegRow(leg: TransitLeg, wait: FirstWait?) {
+    val (mark, color) = when (leg.type) {
+        LegType.WALK -> "걷기" to Green
+        LegType.BUS -> "버스" to Transit
+        LegType.SUBWAY -> "지하철" to Color(0xFF6D28D9)
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+        Text(
+            mark, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White,
+            modifier = Modifier.background(color, RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
+        )
+        Column(Modifier.weight(1f)) {
+            Text(legTitle(leg), fontSize = 15.sp, color = Ink, lineHeight = 20.sp)
+            val live = when (leg.type) {
+                LegType.BUS -> nextBusText(leg.buses)
+                LegType.SUBWAY -> nextTrainLines(leg.trains).firstOrNull()
+                LegType.WALK -> null
+            }
+            live?.let { Text(it, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color) }
+            wait?.let {
+                Text(
+                    if (it.waitMin == 0) "도착하면 바로 ${it.catches}를 탈 수 있어요" else "정류장에서 약 ${it.waitMin}분 기다려 ${it.catches}를 타요",
+                    fontSize = 14.sp, color = Muted,
+                )
+            }
+        }
+    }
+}

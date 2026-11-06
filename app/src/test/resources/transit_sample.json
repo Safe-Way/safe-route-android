@@ -1,0 +1,124 @@
+{
+ "paths": [
+  {
+   "totalMin": 57,
+   "fare": 1250,
+   "transfers": 0,
+   "walkM": 693,
+   "legs": [
+    {
+     "type": "walk",
+     "distanceM": 457,
+     "minutes": 6,
+     "from": {
+      "name": null,
+      "lat": 35.1425,
+      "lon": 126.9335
+     },
+     "to": {
+      "name": "조선대해오름관",
+      "lat": 35.140582,
+      "lon": 126.931998
+     },
+     "lines": [],
+     "way": null,
+     "stationCount": null,
+     "safeWalk": true,
+     "geometry": [
+      [
+       126.9335,
+       35.1425
+      ],
+      [
+       126.9337201,
+       35.1425784
+      ],
+      [
+       126.933245,
+       35.1425105
+      ]
+     ],
+     "sidewalks": [],
+     "liveAvailable": null,
+     "buses": null,
+     "trains": null
+    },
+    {
+     "type": "bus",
+     "distanceM": 13962,
+     "minutes": 48,
+     "from": {
+      "name": "조선대해오름관",
+      "lat": 35.140582,
+      "lon": 126.931998
+     },
+     "to": {
+      "name": "시청광주청사",
+      "lat": 35.158955,
+      "lon": 126.85428
+     },
+     "lines": [
+      "45"
+     ],
+     "way": null,
+     "stationCount": 32,
+     "safeWalk": null,
+     "geometry": null,
+     "sidewalks": [],
+     "liveAvailable": true,
+     "buses": [
+      {
+       "lineId": 160,
+       "lineName": "45",
+       "remainMin": 5,
+       "remainStop": 3,
+       "lowFloor": false,
+       "direction": "조선대해오름관",
+       "nowAt": "조선대공과대학"
+      }
+     ],
+     "trains": null
+    },
+    {
+     "type": "walk",
+     "distanceM": 236,
+     "minutes": 3,
+     "from": {
+      "name": "시청광주청사",
+      "lat": 35.158955,
+      "lon": 126.85428
+     },
+     "to": {
+      "name": null,
+      "lat": 35.1595,
+      "lon": 126.8526
+     },
+     "lines": [],
+     "way": null,
+     "stationCount": null,
+     "safeWalk": true,
+     "geometry": [
+      [
+       126.85428,
+       35.158955
+      ],
+      [
+       126.8544224,
+       35.1595189
+      ],
+      [
+       126.8534812,
+       35.1595279
+      ]
+     ],
+     "sidewalks": [],
+     "liveAvailable": null,
+     "buses": null,
+     "trains": null
+    }
+   ]
+  }
+ ],
+ "hiddenForWheelchair": 0,
+ "note": null
+}
