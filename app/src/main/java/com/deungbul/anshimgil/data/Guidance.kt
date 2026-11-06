@@ -134,6 +134,28 @@ class Guidance(private val path: List<LatLon>, private val facilities: List<Faci
         return legLengths.indices.minOf { projectOnLeg(p, it).second }
     }
 
+    /**
+     * Where the rest of the route (from [fromM] on) comes closest to [center], as meters along the route,
+     * when it passes within [radiusM] of it; null when the rest of the route keeps clear.
+     */
+    fun passesWithin(center: LatLon, radiusM: Double, fromM: Double): Double? {
+        val p = toXY(center)
+        var best: Pair<Double, Double>? = null // (distance, progress)
+        for (i in legLengths.indices) {
+            if (cumulative[i + 1] <= fromM) continue
+            val (t, projected) = projectOnLeg(p, i)
+            var at = cumulative[i] + legLengths[i] * t
+            var d = projected
+            // The nearest point is already behind the walker: what is left of this leg starts where they are.
+            if (at < fromM) {
+                at = fromM
+                d = dist(p, pointAt(fromM))
+            }
+            if (d <= radiusM && (best == null || d < best.first)) best = d to at
+        }
+        return best?.second
+    }
+
     /** Guidance at a given distance along the route; used for the demo walk without GPS. */
     fun atProgress(progressM: Double): GuidanceState {
         val progress = progressM.coerceIn(0.0, totalM)
