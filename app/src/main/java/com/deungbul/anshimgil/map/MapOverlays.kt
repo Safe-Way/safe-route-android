@@ -29,6 +29,7 @@ import com.kakao.vectormap.label.CompetitionType
 import com.kakao.vectormap.label.Label
 import com.kakao.vectormap.label.LabelLayerOptions
 import com.kakao.vectormap.label.LabelOptions
+import com.kakao.vectormap.label.TransformMethod
 import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
 import com.kakao.vectormap.shape.MapPoints
@@ -225,8 +226,14 @@ fun KakaoMap.addTurnArrows(context: Context, marks: List<TurnMark>) {
         )
     }
     layer?.removeAll()
+    // Fixed to the map rather than the screen, turned the way the walker comes in, so as the map turns with
+    // the walker each sign keeps pointing along its own street instead of spinning.
     marks.forEach { mark ->
-        layer?.addLabel(LabelOptions.from(mark.point.toLatLng()).setStyles(if (mark.left) left else right))
+        layer?.addLabel(
+            LabelOptions.from(mark.point.toLatLng())
+                .setStyles(if (mark.left) left else right)
+                .setTransform(TransformMethod.AbsoluteRotation),
+        )?.rotateTo(Math.toRadians(mark.bearing.toDouble()).toFloat())
     }
 }
 

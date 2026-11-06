@@ -49,6 +49,7 @@ import com.deungbul.anshimgil.data.SetupAssistant
 import com.deungbul.anshimgil.data.AppAssistant
 import com.deungbul.anshimgil.data.AssistantAction
 import com.deungbul.anshimgil.data.AssistantContext
+import com.deungbul.anshimgil.ui.assistant.AssistantChat
 import com.deungbul.anshimgil.ui.guide.TransitGuideScreen
 import com.deungbul.anshimgil.data.TransitRoute
 import com.deungbul.anshimgil.data.EventRepository
@@ -158,6 +159,8 @@ fun AppRoot(
     var assistantOpening by remember { mutableStateOf<String?>(null) }
     // Opened from the map's microphone button, so it listens at once.
     var assistantListen by remember { mutableStateOf(false) }
+    // AI 비서's conversation: kept while the app runs, gone when it is closed.
+    val assistantChat = remember { AssistantChat() }
     val mapHints = remember {
         MapHintSource(
             EventRepository.create(),
@@ -220,6 +223,7 @@ fun AppRoot(
                     AssistantScreen(
                         opening = assistantOpening,
                         listenAtStart = assistantListen,
+                        chat = assistantChat,
                         assistant = appAssistant,
                         context = AssistantContext(mode, settings, where = { currentLocation(appContext, 4_000) }),
                         placeRepository = placeRepository,
