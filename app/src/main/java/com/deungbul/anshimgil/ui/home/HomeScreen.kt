@@ -35,7 +35,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalPolice
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Store
@@ -418,8 +417,7 @@ fun HomeScreen(
 
         error?.let { MapMessage(it, Modifier.align(Alignment.BottomCenter)) }
 
-        // AI 비서 as the map's microphone, bottom centre: tapping opens it already listening (team, 11/6).
-        // Its one-line bubble sits just above it, unless a card is open there.
+        // AI 비서's one-line bubble sits just above its button, unless a card is open there.
         if (!showBuses && picked == null) hint?.let { h ->
             Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 148.dp)) {
                 HintBubble(
@@ -434,27 +432,18 @@ fun HomeScreen(
                 )
             }
         }
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 36.dp),
+        // AI 비서: a rounded square at the bottom centre; its own screen has the microphone (11/6).
+        Surface(
+            onClick = onOpenAssistant,
+            shape = RoundedCornerShape(16.dp),
+            color = Color(0xFF1F6B42),
+            contentColor = Color.White,
+            shadowElevation = 6.dp,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp).heightIn(min = 56.dp),
         ) {
-            Surface(
-                onClick = onOpenAssistant,
-                shape = CircleShape,
-                color = Color(0xFF1F6B42),
-                contentColor = Color.White,
-                shadowElevation = 6.dp,
-                modifier = Modifier.size(68.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Mic, contentDescription = "AI 비서에게 말하기", modifier = Modifier.size(32.dp))
-                }
-            }
-            Surface(shape = RoundedCornerShape(10.dp), color = Color.White.copy(alpha = 0.9f), modifier = Modifier.padding(top = 4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)) {
-                    Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = Color(0xFF1F6B42), modifier = Modifier.size(13.dp))
-                    Text(" AI 비서", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1F6B42))
-                }
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp)) {
+                Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(22.dp))
+                Text(" AI 비서", fontSize = 18.sp, fontWeight = FontWeight.Black)
             }
         }
         if (showSos) SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 44.dp))

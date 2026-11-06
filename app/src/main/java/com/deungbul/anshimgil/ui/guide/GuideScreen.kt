@@ -67,6 +67,10 @@ import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Straight
@@ -129,6 +133,9 @@ private const val OFF_ROUTE_WARN_M = 40
 private const val BACKTRACK_M = 25.0
 /** Off the route this long before finding a new route from where the walker is. */
 private const val REROUTE_AFTER_MS = 8_000L
+
+/** How long AI 비서's short notice stays under the status line. */
+private const val AI_NOTICE_MS = 10_000L
 /** Off the route this long before offering to tell the guardians. */
 private const val OFF_ROUTE_ALERT_MS = 20_000L
 private const val DEMO_STEP_M = 8.0
@@ -311,11 +318,22 @@ fun GuideScreen(
         rerouting = false
         return found
     }
+    // AI 비서's short word about what just happened (a new route found), shown under the status line for a while.
+    var aiNotice by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(aiNotice) {
+        if (aiNotice != null) {
+            delay(AI_NOTICE_MS)
+            aiNotice = null
+        }
+    }
     LaunchedEffect(off) {
         if (!off) return@LaunchedEffect
         delay(REROUTE_AFTER_MS)
         val here = fix ?: return@LaunchedEffect
-        if (findNewRoute(here, "길을 벗어나 새 길을 찾았어요")) rerouted = true
+        if (findNewRoute(here, "길을 벗어나 새 길을 찾았어요")) {
+            rerouted = true
+            aiNotice = "길을 벗어나서 지금 자리에서 새 길을 찾았어요."
+        }
     }
 
     // Roadworks, an accident or a closure that started after the route was found: ask the server every few
@@ -392,19 +410,22 @@ fun GuideScreen(
                         onDismiss = { offRouteTold = true; rerouted = false },
                     )
                 }
-            }
-            eventAhead?.let { ahead ->
-                EventAheadCard(
-                    ahead,
-                    finding = rerouting,
-                    onReroute = {
-                        scope.launch {
-                            if (findNewRoute(fix ?: state.snapped, "${ahead.event.kind} 구간을 피해 새 길을 찾았어요")) eventAhead = null
-                        }
-                    },
-                    onDismiss = { eventAhead = null },
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 84.dp),
-                )
+                // Something new on the way, in AI 비서's words, here under the status line (team, 11/6).
+                eventAhead?.let { ahead ->
+                    EventAheadCard(
+                        ahead,
+                        finding = rerouting,
+                        onReroute = {
+                            scope.launch {
+                                if (findNewRoute(fix ?: state.snapped, "${ahead.event.kind} 구간을 피해 새 길을 찾았어요")) {
+                                    eventAhead = null
+                                    aiNotice = "${ahead.event.kind} 구간을 피해 지금 자리에서 새 길을 찾았어요."
+                                }
+                            }
+                        },
+                        onDismiss = { eventAhead = null },
+                    )
+                } ?: aiNotice?.let { AiNotice(it, onDismiss = { aiNotice = null }) }
             }
             if (showSos) SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp))
             // The mode on the instruction card's top left corner.
@@ -412,21 +433,22 @@ fun GuideScreen(
             onOpenAssistant?.let { open ->
                 Surface(
                     onClick = open,
-                    shape = CircleShape,
-                    color = Green,
-                    contentColor = Color.White,
-                    shadowElevation = 6.dp,
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp).size(56.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White,
+                    contentColor = Green,
+                    shadowElevation = 4.dp,
+                    // Right above the location button, the same rounded square.
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 80.dp).size(52.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.Mic, contentDescription = "AI 비서에게 말하기", modifier = Modifier.size(28.dp))
+                        Icon(Icons.Outlined.Mic, contentDescription = "AI 비서에게 말하기", modifier = Modifier.size(26.dp))
                     }
                 }
             }
             // The camera follows only when the position moves, so after dragging the map this brings it back.
             Surface(
                 onClick = { map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM)) },
-                shape = CircleShape,
+                shape = RoundedCornerShape(14.dp),
                 color = Color.White,
                 shadowElevation = 4.dp,
                 modifier = Modifier
@@ -622,6 +644,24 @@ private fun formatDistance(meters: Int): String =
     if (meters < 1000) "${meters}m" else "%.1fkm".format(meters / 1000.0)
 
 /** Shown after a while off the route: tell the guardians where the walker is, or dismiss. */
+/** AI 비서's short word under the status line, e.g. that a new route was found. */
+@Composable
+private fun AiNotice(text: String, onDismiss: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White.copy(alpha = 0.92f),
+        border = BorderStroke(1.5.dp, Green),
+        shadowElevation = 4.dp,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 6.dp)) {
+            Icon(Icons.Filled.AutoAwesome, contentDescription = "AI 비서", tint = Green, modifier = Modifier.size(18.dp))
+            Text(text, fontSize = 16.sp, color = Color(0xFF17211B), lineHeight = 22.sp, modifier = Modifier.weight(1f).padding(start = 8.dp))
+            IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Color(0xFF5E6A62)) }
+        }
+    }
+}
+
 /** A new road event ahead: what and where, with 다른 길 찾기 or carrying on. */
 @Composable
 private fun EventAheadCard(
@@ -631,11 +671,18 @@ private fun EventAheadCard(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(shape = RoundedCornerShape(16.dp), color = Color(0xFFFFF4E5), shadowElevation = 6.dp, modifier = modifier.fillMaxWidth()) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFFFF4E5).copy(alpha = 0.95f),
+        border = BorderStroke(1.5.dp, Color(0xFFB45309)),
+        shadowElevation = 4.dp,
+        modifier = modifier.fillMaxWidth(),
+    ) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Filled.WarningAmber, contentDescription = null, tint = Color(0xFFB45309))
-                Text("새로 생긴 ${ahead.event.kind}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7A5310))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = Green, modifier = Modifier.size(18.dp))
+                Text("AI 비서", fontSize = 14.sp, fontWeight = FontWeight.Black, color = Green)
+                Text("· 새로 생긴 ${ahead.event.kind}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7A5310))
             }
             Text(eventAheadText(ahead), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color(0xFF17211B), lineHeight = 23.sp)
             listOfNotNull(ahead.event.place, ahead.event.message).joinToString(" · ").takeIf { it.isNotBlank() }?.let {

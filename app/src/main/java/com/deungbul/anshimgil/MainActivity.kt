@@ -430,7 +430,7 @@ fun AppRoot(
                     guardians = settings.guardians,
                     showSos = settings.sosButton,
                     modifier = modifier,
-                    onOpenAssistant = { busesOnHome = false; assistantOpening = null; assistantListen = true; screen = Screen.Assistant },
+                    onOpenAssistant = { busesOnHome = false; assistantOpening = null; assistantListen = false; screen = Screen.Assistant },
                     hintSource = mapHints,
                     onAskAssistant = { line -> busesOnHome = false; assistantOpening = line; assistantListen = false; screen = Screen.Assistant },
                     startWithBuses = busesOnHome,
