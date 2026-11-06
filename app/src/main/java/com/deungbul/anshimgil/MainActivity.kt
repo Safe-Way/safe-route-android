@@ -472,40 +472,14 @@ fun AppRoot(
                     onBusesShown = { busesOnHome = false },
                     startWithSos = sosOnHome,
                     onSosShown = { sosOnHome = false },
+                    askTripConsent = askTripConsent,
+                    onTripConsent = { yes ->
+                        askTripConsent = false
+                        scope.launch { tripLog?.setConsent(if (yes) TripConsent.YES else TripConsent.NO) }
+                    },
                 )
             }
         }
     }
-    if (askTripConsent) {
-        TripConsentDialog(
-            onYes = {
-                askTripConsent = false
-                scope.launch { tripLog?.setConsent(TripConsent.YES) }
-            },
-            onNo = {
-                askTripConsent = false
-                scope.launch { tripLog?.setConsent(TripConsent.NO) }
-            },
-        )
-    }
 }
 
-/** Asked once after the first finished guidance: may the app keep where and when the walker goes? */
-@Composable
-private fun TripConsentDialog(onYes: () -> Unit, onNo: () -> Unit) {
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onNo,
-        icon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.AutoAwesome, contentDescription = null) },
-        title = { androidx.compose.material3.Text("자주 가는 길을 기억할까요?") },
-        text = {
-            androidx.compose.material3.Text(
-                "기억해 두면 AI 비서가 \"8시 반에 문화전당 가시죠?\"처럼 먼저 길을 알려 드려요.\n\n" +
-                    "· 저장하는 것: 도착한 곳(약 100m 범위), 출발 시각, 걸었는지 탔는지, 그날 날씨\n" +
-                    "· 출발한 곳과 걸은 길은 저장하지 않아요\n" +
-                    "· 설정에서 언제든 끄거나 모두 지울 수 있어요",
-            )
-        },
-        confirmButton = { androidx.compose.material3.TextButton(onClick = onYes) { androidx.compose.material3.Text("좋아요") } },
-        dismissButton = { androidx.compose.material3.TextButton(onClick = onNo) { androidx.compose.material3.Text("괜찮아요") } },
-    )
-}

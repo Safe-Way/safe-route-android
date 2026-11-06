@@ -150,3 +150,12 @@ class TripLogRepository(private val context: Context, private val guestId: suspe
         }
     }
 }
+
+
+/** AI 비서's question in its live bubble on the map, after the first finished guidance. */
+const val TRIP_CONSENT_QUESTION =
+    "길 안내를 마쳤어요. 자주 가는 길을 기억해 둘까요? 다음에 먼저 길을 알려 드릴게요. " +
+        "(도착한 곳 약 100m 범위와 시간만 저장, 출발지·걸은 길은 저장하지 않아요)"
+
+const val TRIP_CONSENT_YES = "좋아요, 기억해 줘"
+const val TRIP_CONSENT_NO = "괜찮아요"
