@@ -103,6 +103,8 @@ import com.deungbul.anshimgil.location.hasLocationPermission
 import com.deungbul.anshimgil.data.Guidance
 import com.deungbul.anshimgil.data.GuidanceState
 import com.deungbul.anshimgil.data.LatLon
+import com.deungbul.anshimgil.data.guideHeading
+import com.deungbul.anshimgil.data.MotionTracker
 import com.deungbul.anshimgil.ui.mode.ModeBadge
 import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.RouteType
@@ -149,7 +151,13 @@ private val FOLLOW = CameraAnimation.from(FOLLOW_MS, false, true)
 /** How long the map and the arrow take to turn. */
 private const val TURN_MS = 300
 /** The map turns only when the walker turns by at least this much. */
-private const val MAP_TURN_DEGREES = 10f
+private const val MAP_TURN_DEGREES = 25f
+
+/** How long the map takes to turn to a new direction. */
+private const val MAP_TURN_MS = 800
+
+/** Faster than this (about 2 km/h) the walker is moving, so the heading follows the way they go. */
+private const val MOVING_MPS = 0.6
 
 /**
  * Walking guidance along the chosen route (issue #7): next turn, nearest help, remaining distance,
@@ -214,9 +222,20 @@ fun GuideScreen(
             }
         }
     }
+    // Speed and course from the fixes; a car or bus pauses walking guidance.
+    val motion = remember { MotionTracker() }
+    var inVehicle by remember { mutableStateOf(false) }
+    var moving by remember { mutableStateOf(false) }
+    var course by remember { mutableStateOf<Float?>(null) }
     if (hasPermission) LocationUpdates(context) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        motion.add(it, now)
+        inVehicle = motion.inVehicle
+        moving = (motion.speedMps ?: 0.0) >= MOVING_MPS
+        course = motion.courseDeg
         fix = it
-        meter.add(it, android.os.SystemClock.elapsedRealtime())
+        // A ride is not a walk: it would make the personal walking speed far too fast.
+        if (!motion.inVehicle) meter.add(it, now)
     }
 
     // Along the route the walker only goes forward: a fix a few meters behind the last one is GPS noise,
@@ -247,7 +266,10 @@ fun GuideScreen(
     val instruction = instructionText(state)
     val spokenKey = "${state.nextTurn}-${distanceBucket(state.metersToNextTurn)}-${state.arrived}"
     LaunchedEffect(spokenKey, voiceOn) {
-        if (voiceOn) tts.speak(instruction.spoken, TextToSpeech.QUEUE_FLUSH, null, "guide")
+        if (voiceOn && !inVehicle) tts.speak(instruction.spoken, TextToSpeech.QUEUE_FLUSH, null, "guide")
+    }
+    LaunchedEffect(inVehicle) {
+        if (inVehicle && voiceOn) tts.speak("차로 이동하는 것 같아요. 내려서 걸으면 다시 안내할게요.", TextToSpeech.QUEUE_FLUSH, null, "vehicle")
     }
 
     // Drawn again whenever the route changes (after finding a new one).
@@ -272,25 +294,28 @@ fun GuideScreen(
         map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM), FOLLOW)
     }
 
-    // The way the walker faces: the phone's compass. In the demo walk, or without a compass,
-    // the way ahead on the route instead.
+    // The way the walker faces. Walking on the route: the route ahead, which cannot flip round as the
+    // compass did when the phone was held upright (11/8). Off the route: the GPS course. Standing still:
+    // the compass. The demo walk follows the route.
     val compass = rememberCompassHeading()
     val travel = guidance.travelBearing(state.progressM)
-    val heading = if (demo || compass == null) travel else compass
+    val onRoute = !demo && state.offRouteM <= OFF_ROUTE_WARN_M
+    val heading = if (demo) travel else guideHeading(onRoute, moving, travel, course, compass)
 
-    // Heading-up, like Naver's walking guidance: the map turns so the way the walker faces points up.
-    // Small wobbles are ignored so the map does not keep swaying.
+    // Heading-up, like Naver's walking guidance: the map turns so the way ahead points up. It turns only
+    // for a real change of direction and slowly, so it does not swing about (11/8).
     var mapBearing by remember { mutableFloatStateOf(heading) }
     LaunchedEffect(heading) { if (angleBetween(mapBearing, heading) >= MAP_TURN_DEGREES) mapBearing = heading }
     // Kakao turns the map the other way round from a compass bearing, hence the minus.
     LaunchedEffect(map, mapBearing) {
-        map?.moveCamera(CameraUpdateFactory.rotateTo(Math.toRadians(-mapBearing.toDouble())), CameraAnimation.from(TURN_MS, false, true))
+        map?.moveCamera(CameraUpdateFactory.rotateTo(Math.toRadians(-mapBearing.toDouble())), CameraAnimation.from(MAP_TURN_MS, false, true))
     }
     // Marker rotation is measured on the screen, not the map, so take off the map's own turn.
     LaunchedEffect(me, heading, mapBearing) { me?.pointTo(heading - mapBearing, TURN_MS) }
 
     // 귀가 지킴이: off the planned route for a while, offer to tell the guardians (once per stretch off route).
-    val off = !demo && state.offRouteM > OFF_ROUTE_WARN_M
+    // In a car or bus the route is left on purpose: no off-route warning, no new route.
+    val off = !demo && !inVehicle && state.offRouteM > OFF_ROUTE_WARN_M
     var offRouteLong by remember { mutableStateOf(false) }
     var offRouteTold by remember { mutableStateOf(false) }
     LaunchedEffect(off) {
@@ -399,6 +424,7 @@ fun GuideScreen(
                     StatusPill("경로에서 ${state.offRouteM}m 벗어났어요", Color(0xFFB42318))
                 }
                 if (rerouting) StatusPill("길을 다시 찾는 중…", Color(0xFF2F6FDB))
+                if (inVehicle) StatusPill("차로 이동 중 · 걸으면 다시 안내해요", Color(0xFF6D28D9))
                 // Which side to walk on beside a road, when the map knows it.
                 sidewalkHint(route.sidewalks, guidance.pointIndexAt(state.progressM))?.let { hint ->
                     StatusPill(hint, if (hint.startsWith("인도가 없어요")) Color(0xFFB45309) else Color(0xFF2F6FDB))
