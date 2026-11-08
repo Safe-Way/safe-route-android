@@ -30,14 +30,36 @@ data class MapHint(
     val startNow: Boolean = false,
     /** The suggestion was the bus or subway: open the 대중교통 tab. */
     val transit: Boolean = false,
+    /** A suggested trip is taken down at this time (past the usual time, the event started). */
+    val until: LocalDateTime? = null,
 )
 
 /** Lines already shown while the app runs, so leaving the map and coming back does not repeat them. */
 object ShownHints {
     private val keys = mutableSetOf<String>()
+    private var prefs: android.content.SharedPreferences? = null
+
+    /**
+     * Suggestions of a trip (a habit, a calendar event) are remembered across app starts, so that one closed
+     * with ✕ does not come back each time the app opens that day. Their keys carry the day.
+     */
+    fun init(context: android.content.Context) {
+        if (prefs != null) return
+        prefs = context.getSharedPreferences("shown_hints", android.content.Context.MODE_PRIVATE).also {
+            keys += it.getStringSet("keys", emptySet()).orEmpty()
+        }
+    }
+
     fun isNew(key: String) = key !in keys
+
+    /** A habit for [name] today was already offered (so the server's suggestion of the same place is not repeated). */
+    fun habitOffered(today: LocalDate, name: String) = "habit-$today-$name" in keys
+
     fun mark(key: String) {
         keys += key
+        if (key.startsWith("habit-") || key.startsWith("cal-")) {
+            prefs?.edit()?.putStringSet("keys", keys.filter { it.startsWith("habit-") || it.startsWith("cal-") }.takeLast(40).toSet())?.apply()
+        }
     }
 }
 
@@ -181,12 +203,23 @@ class MapHintSource(
     private val usage: suspend () -> Usage? = { null },
     /** The saved home (자주 가는 곳 '집'), when there is one. */
     private val home: suspend () -> Place? = { null },
+    /** An upcoming calendar event with a place (when switched on), see [calendarHint]. */
+    private val calendar: suspend (LatLon, LocalDateTime) -> MapHint? = { _, _ -> null },
 ) {
     // Worked out once per app start, on the first bubble.
     private var moment: OpenMoment? = null
 
     suspend fun next(mode: UserMode, here: LatLon, now: LocalDateTime = LocalDateTime.now(KST)): MapHint? {
         val m = moment ?: (openLog?.let { runCatching { it.record(now) }.getOrNull() } ?: OpenMoment.OTHER).also { moment = it }
+        val learned = runCatching { usage() }.getOrNull()
+        // An event the walker wrote down themselves comes first.
+        if (learned?.adapt == true && learned.calendarOn) {
+            runCatching { calendar(here, now) }.getOrNull()?.takeIf { ShownHints.isNew(it.key) }?.let { return it }
+        }
+        // A habit learned on this phone (이동 패턴), around its usual time: it knows the walker within a week.
+        if (learned?.adapt == true) {
+            habitNow(learned.trips, now, here)?.let { habitHint(it, now.toLocalDate()) }?.takeIf { ShownHints.isNew(it.key) }?.let { return it }
+        }
         if (ServerApi.isConfigured && m != OpenMoment.OTHER) {
             val today = runCatching {
                 val guest = guestId() ?: return@runCatching null
@@ -195,10 +228,10 @@ class MapHintSource(
                     now.toLocalDate(),
                 )
             }.getOrNull()
-            if (today != null && ShownHints.isNew(today.key)) return today
+            if (today != null && ShownHints.isNew(today.key) && !ShownHints.habitOffered(now.toLocalDate(), today.place?.name.orEmpty())) return today
         }
         // After the usual stay where the walker arrived: the way home.
-        runCatching { usage()?.let { u -> returnHint(u, here, now, home()) } }.getOrNull()
+        runCatching { learned?.let { u -> returnHint(u, here, now, home()) } }.getOrNull()
             ?.takeIf { ShownHints.isNew(it.key) }?.let { return it }
         val event = runCatching {
             eventHint(here, events.within(Bbox(here.lon - 0.012, here.lat - 0.01, here.lon + 0.012, here.lat + 0.01)))

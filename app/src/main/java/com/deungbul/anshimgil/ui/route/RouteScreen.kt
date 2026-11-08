@@ -11,6 +11,7 @@ import com.deungbul.anshimgil.data.legTitle
 import com.deungbul.anshimgil.data.LegType
 import com.deungbul.anshimgil.data.CompareItem
 import com.deungbul.anshimgil.data.RouteChoice
+import com.deungbul.anshimgil.data.choiceCounts
 import com.deungbul.anshimgil.data.TransitLeg
 import com.deungbul.anshimgil.data.TransitRoute
 import com.deungbul.anshimgil.data.TransitResult
@@ -268,6 +269,14 @@ fun RouteScreen(
     // 걸어서 / 대중교통 tabs. Transit is asked for only when its tab is opened (the server's ODsay
     // lookups are limited per day) and kept while the screen is open.
     var transitTab by rememberSaveable { mutableStateOf(startWithTransit || preferred == RouteChoice.TRANSIT) }
+    // What this screen picked before the walker did: going along with it says nothing ([choiceCounts]).
+    val preselected = remember {
+        when {
+            startWithTransit || preferred == RouteChoice.TRANSIT -> RouteChoice.TRANSIT
+            else -> preferred
+        }
+    }
+    fun chosen(choice: RouteChoice) { if (choiceCounts(preselected, choice)) onChosen(choice) }
     var transit by remember { mutableStateOf<TransitState?>(null) }
     var transitSelected by rememberSaveable { mutableIntStateOf(0) }
     // [바로 출발]: start as soon as the route (of the usual kind) is there; the walker can still go back.
@@ -438,13 +447,13 @@ fun RouteScreen(
                 }
                 if (!transitTab) (state as? RouteState.Ready)?.let { s ->
                     StartButton(s.result.atPace(walkSpeedMPerMin), selected, onStart = {
-                        if (s.result.routes.size > 1) onChosen(if (selected == RouteType.SHORTEST) RouteChoice.SHORTEST else RouteChoice.SAFE)
+                        if (s.result.routes.size > 1) chosen(if (selected == RouteType.SHORTEST) RouteChoice.SHORTEST else RouteChoice.SAFE)
                         onStart(s.result, selected)
                     })
                 }
                 if (transitTab) (transit as? TransitState.Ready)?.result?.routes?.getOrNull(transitSelected)?.let { t ->
                     Button(
-                        onClick = { onChosen(RouteChoice.TRANSIT); onStartTransit(t) },
+                        onClick = { chosen(RouteChoice.TRANSIT); onStartTransit(t) },
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2F5BB7), contentColor = Color.White),
                         modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),

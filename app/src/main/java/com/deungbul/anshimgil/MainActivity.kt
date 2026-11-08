@@ -55,6 +55,9 @@ import com.deungbul.anshimgil.location.lastKnownLocation
 import com.deungbul.anshimgil.data.Adaptation
 import com.deungbul.anshimgil.data.adaptationToOffer
 import com.deungbul.anshimgil.data.preferredRoute
+import com.deungbul.anshimgil.data.ShownHints
+import com.deungbul.anshimgil.data.calendarHint
+import com.deungbul.anshimgil.data.hasCalendarPermission
 import com.deungbul.anshimgil.data.Usage
 import com.deungbul.anshimgil.data.UsageRepository
 import com.deungbul.anshimgil.data.tripWeather
@@ -101,6 +104,7 @@ class MainActivity : ComponentActivity() {
         readReminder(intent)
         // 출발 시간 알림: a check every 15 minutes (it does nothing without the trip-record yes).
         runCatching { DepartureWorker.schedule(applicationContext) }
+        ShownHints.init(applicationContext)
         enableEdgeToEdge()
         val modeRepository = ModeRepository(applicationContext)
         val savedPlaces = SavedPlacesRepository(applicationContext)
@@ -249,12 +253,21 @@ fun AppRoot(
             openLog = AppOpenLog(appContext),
             usage = { usageRepository?.current() },
             home = { savedPlaces.favorites.first().firstOrNull { it.name == "집" }?.place },
+            calendar = { here, now -> calendarHint(appContext, placeRepository, here, now) },
         )
     }
     // The assistant's 보호자에게 알리기: open SOS on the map.
     var sosOnHome by remember { mutableStateOf(false) }
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
     val scope = rememberCoroutineScope()
+    // 캘린더 일정으로 길 알려 주기: on only with the permission; off at once.
+    val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        scope.launch { usageRepository?.setCalendar(granted) }
+    }
+    fun useCalendar(on: Boolean) {
+        if (on && !hasCalendarPermission(appContext)) calendarPermission.launch(android.Manifest.permission.READ_CALENDAR)
+        else scope.launch { usageRepository?.setCalendar(on) }
+    }
     // 이동 기록: asked once, after the first finished guidance.
     val tripConsent by (tripLog?.consent ?: kotlinx.coroutines.flow.flowOf(TripConsent.NO)).collectAsStateWithLifecycle(initialValue = TripConsent.NO)
     var askTripConsent by remember { mutableStateOf(false) }
@@ -276,7 +289,8 @@ fun AppRoot(
         tripId = null
         tripDestination = destination
         // Leaving the place last arrived at: how long the walker stays there is learned (for "집으로 갈까요?").
-        scope.launch { runCatching { usageRepository?.leaving(lastKnownLocation(appContext), guideStartedAt) } }
+        // Also kept for the habits (이동 패턴): where to and when.
+        scope.launch { runCatching { usageRepository?.leaving(lastKnownLocation(appContext), destination, transit, guideStartedAt) } }
         val log = tripLog ?: return
         if (tripConsent != TripConsent.YES) return
         val route = result?.let { r -> type?.let { r.route(it) } ?: r.routes.firstOrNull() }
@@ -441,6 +455,8 @@ fun AppRoot(
                         onResetTextBoost = { scope.launch { usageRepository?.resetTextBoost() } },
                         onAdaptChange = { on -> scope.launch { usageRepository?.setAdapt(on) } },
                         onBigButtonsChange = { on -> scope.launch { usageRepository?.setBigButtons(on) } },
+                        calendarOn = usage.calendarOn,
+                        onCalendarChange = { on -> useCalendar(on) },
                         onResetAdapt = { scope.launch { usageRepository?.reset() } },
                     )
                 }
@@ -578,14 +594,15 @@ fun AppRoot(
                         scope.launch { tripLog?.setConsent(if (yes) TripConsent.YES else TripConsent.NO, mode) }
                     },
                     usage = usage,
-                    adaptation = if (askTripConsent) null else adaptationToOffer(usage, settings.textSize),
+                    adaptation = if (askTripConsent) null else adaptationToOffer(usage),
                     onAdaptation = { a, yes ->
                         scope.launch {
                             usageRepository?.answer(a, yes)
                         }
+                        if (a == Adaptation.CALENDAR && yes) useCalendar(true)
                     },
                     onNearbyTap = { k -> scope.launch { usageRepository?.tapNearby(k) } },
-                    onRetap = { scope.launch { usageRepository?.retap() } },
+                    onPress = { missed -> scope.launch { usageRepository?.press(missed) } },
                     onZoomIn = { scope.launch { usageRepository?.zoomIn() } },
                     onStartNow = { place, transit -> screen = Screen.Route(place, fromHome = true, transit = transit, autoStart = true) },
                     onLive = { fromUser, text -> assistantChat.note(fromUser, text) },

@@ -99,6 +99,9 @@ fun SettingsScreen(
     bigButtons: Boolean = false,
     onAdaptChange: (Boolean) -> Unit = {},
     onBigButtonsChange: (Boolean) -> Unit = {},
+    /** 캘린더 일정으로 길 알려 주기 (turning it on asks for the calendar permission). */
+    calendarOn: Boolean = false,
+    onCalendarChange: (Boolean) -> Unit = {},
     onResetAdapt: () -> Unit = {},
     /** How much AI 비서 has made the text bigger on top of the 글자 크기 below (1 = none). */
     textBoost: Float = 1f,
@@ -182,6 +185,7 @@ fun SettingsScreen(
             onAdaptChange,
         )
         SwitchRow("큰 버튼", "지도 화면의 버튼을 더 크게 보여 줘요", bigButtons, onBigButtonsChange)
+        SwitchRow("캘린더 일정으로 길 알려 주기", "장소가 적힌 일정 전에 길을 먼저 알려 줘요. 일정은 폰 안에서만 봐요", calendarOn, onCalendarChange)
         if (textBoost > 1.001f) {
             // The AI part is separate from 글자 크기 (작게·보통·크게), which stays as chosen.
             LinkRow(
@@ -191,12 +195,12 @@ fun SettingsScreen(
             )
         }
         var confirmResetAdapt by remember { mutableStateOf(false) }
-        LinkRow("맞춘 것 처음대로", "버튼 순서·고르는 길·큰 버튼을 처음 상태로 돌려요") { confirmResetAdapt = true }
+        LinkRow("맞춘 것 처음대로", "버튼 순서·고르는 길·큰 버튼·이동 패턴을 처음 상태로 돌려요") { confirmResetAdapt = true }
         if (confirmResetAdapt) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { confirmResetAdapt = false },
                 title = { Text("맞춘 것을 처음대로 돌릴까요?") },
-                text = { Text("쓰면서 배운 버튼 순서, 자주 고르는 길, 큰 버튼, 머무는 시간을 지워요.") },
+                text = { Text("쓰면서 배운 버튼 순서, 자주 고르는 길, 큰 버튼, 머무는 시간, 이동 패턴을 지우고 캘린더 알림도 꺼요.") },
                 confirmButton = {
                     androidx.compose.material3.TextButton(onClick = { confirmResetAdapt = false; onResetAdapt() }) { Text("처음대로") }
                 },
