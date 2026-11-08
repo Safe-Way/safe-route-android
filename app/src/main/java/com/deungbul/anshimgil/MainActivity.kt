@@ -81,6 +81,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import com.deungbul.anshimgil.ui.common.LOADING_PAGE
 import com.deungbul.anshimgil.ui.common.PageReveal
+import com.deungbul.anshimgil.ui.common.PageTransitions
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -115,6 +116,7 @@ class MainActivity : ComponentActivity() {
         // 출발 시간 알림: a check every 15 minutes (it does nothing without the trip-record yes).
         runCatching { DepartureWorker.schedule(applicationContext) }
         ShownHints.init(applicationContext)
+        PageTransitions.load(applicationContext)
         enableEdgeToEdge()
         val modeRepository = ModeRepository(applicationContext)
         val savedPlaces = SavedPlacesRepository(applicationContext)
@@ -669,7 +671,7 @@ fun AppRoot(
             }
         }
     }
-    PageReveal(pageKey, lastTap, Modifier.fillMaxSize())
+    PageReveal(pageKey, lastTap, PageTransitions.current, Modifier.fillMaxSize())
     }
 }
 
