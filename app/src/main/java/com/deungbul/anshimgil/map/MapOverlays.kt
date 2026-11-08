@@ -55,12 +55,15 @@ fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
 
     // One style per distinct tag, since text and look can differ within a kind.
     val styles = mutableMapOf<List<Any>, Pair<LabelStyles, Bitmap>>()
+    // A dot or a bare picture sits on the place itself; a tag stands above it.
+    fun centered(facility: Facility) = facility.look == FacilityLook.DOT ||
+        (facility.look == FacilityLook.NORMAL && tagWords(facility).isEmpty() && !facility.elevator)
     fun styleOf(facility: Facility) = styles.getOrPut(listOf(facility.kind, facility.label, facility.look, facility.elevator)) {
         val bitmap = when (facility.look) {
             // Every kind as a picture instead of a word (11/8); what only words can say (an exit number, no
             // elevator) follows the picture in a tag.
             FacilityLook.NORMAL -> tagWords(facility).let { words ->
-                if (words.isEmpty() && !facility.elevator) pictureBitmap(facility.kind, facility.kind.color.toInt(), density)
+                if (centered(facility)) pictureBitmap(facility.kind, facility.kind.color.toInt(), density)
                 else pillBitmap(words, facility.kind.color.toInt(), density, elevator = facility.elevator, picture = facility.kind)
             }
             FacilityLook.GRAY -> pillBitmap(tagWords(facility), GRAY, density, picture = facility.kind)
@@ -68,7 +71,7 @@ fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
         }
         LabelStyles.from(
             LabelStyle.from(bitmap)
-                .setAnchorPoint(0.5f, if (facility.look == FacilityLook.DOT) 0.5f else 1f)
+                .setAnchorPoint(0.5f, if (centered(facility)) 0.5f else 1f)
                 .setApplyDpScale(false),
         ) to bitmap
     }
@@ -81,7 +84,7 @@ fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
         val (style, bitmap) = styleOf(facility)
         val p = runCatching { toScreenPoint(facility.latLng) }.getOrNull()
         if (p != null) {
-            val top = if (facility.look == FacilityLook.DOT) p.y - bitmap.height / 2 else p.y - bitmap.height
+            val top = if (centered(facility)) p.y - bitmap.height / 2 else p.y - bitmap.height
             val box = android.graphics.Rect(p.x - bitmap.width / 2 - gap, top - gap, p.x + bitmap.width / 2 + gap, top + bitmap.height + gap)
             if (placed.any { android.graphics.Rect.intersects(it, box) }) return@forEach
             placed += box
@@ -366,28 +369,21 @@ fun dotBitmap(color: Int, density: Float, sizeDp: Float = 18f): Bitmap {
 internal fun tagWords(facility: Facility): String =
     (facility.text ?: "").removePrefix(facility.kind.label).trim().removePrefix("·").trim()
 
-/** A white round tag with a colored border and the kind's picture ([drawPicture]) in its color. */
+/**
+ * The kind's picture ([drawPicture]) on its own, in its color: no round tag behind it (11/9, the user's call:
+ * the map reads more cleanly without the white circles). Only the walker's own position keeps its disc.
+ */
 internal fun pictureBitmap(kind: FacilityKind, color: Int, density: Float): Bitmap {
-    val size = 30f * density
-    val stroke = 2f * density
+    val size = PICTURE_DP * density
     val bitmap = Bitmap.createBitmap(size.toInt() + 1, size.toInt() + 1, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
-    val r = size / 2
-    canvas.drawCircle(r, r, r - stroke / 2, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = 0xFFFFFFFF.toInt() })
-    canvas.drawCircle(r, r, r - stroke / 2, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color
-        style = Paint.Style.STROKE
-        strokeWidth = stroke
-    })
-    // The picture: 18 dp in the middle, on a 24-unit grid.
-    val unit = 18f * density / 24f
-    canvas.save()
-    canvas.translate(r - 12 * unit, r - 12 * unit)
-    canvas.scale(unit, unit)
+    canvas.scale(size / 24f, size / 24f)
     drawPicture(canvas, kind, color)
-    canvas.restore()
     return bitmap
 }
+
+/** How big a bare picture is on the map: a little bigger than inside the old 30 dp tag (18 dp), to read alone. */
+private const val PICTURE_DP = 24f
 
 /**
  * Draws [kind]'s picture in [color] on a 24-unit grid at the canvas's origin (scale the canvas first):
