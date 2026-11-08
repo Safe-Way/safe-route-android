@@ -185,6 +185,8 @@ fun GuideScreen(
     onOpenAssistant: (() -> Unit)? = null,
     /** Whether the walker has reached the destination (for the trip record). */
     onArrivedChange: (Boolean) -> Unit = {},
+    /** AI 비서's live words here and the walker's answers, for the chat (fromUser, text). */
+    onLive: (Boolean, String) -> Unit = { _, _ -> },
 ) {
     var sos by remember { mutableStateOf(false) }
     var showHelpList by remember { mutableStateOf(false) }
@@ -269,6 +271,7 @@ fun GuideScreen(
         if (voiceOn && !inVehicle) tts.speak(instruction.spoken, TextToSpeech.QUEUE_FLUSH, null, "guide")
     }
     LaunchedEffect(inVehicle) {
+        if (inVehicle) onLive(false, "차로 이동하는 것 같아요. 내려서 걸으면 다시 안내할게요.")
         if (inVehicle && voiceOn) tts.speak("차로 이동하는 것 같아요. 내려서 걸으면 다시 안내할게요.", TextToSpeech.QUEUE_FLUSH, null, "vehicle")
     }
 
@@ -349,6 +352,7 @@ fun GuideScreen(
     }
     // AI 비서's short word about what just happened (a new route found), shown under the status line for a while.
     var aiNotice by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(aiNotice) { aiNotice?.let { onLive(false, it) } }
     LaunchedEffect(aiNotice) {
         if (aiNotice != null) {
             delay(AI_NOTICE_MS)
@@ -371,6 +375,7 @@ fun GuideScreen(
     val eventRepository = remember { EventRepository.create() }
     val knownEvents = remember { mutableSetOf<Long>() }
     var eventAhead by remember { mutableStateOf<EventAhead?>(null) }
+    LaunchedEffect(eventAhead) { eventAhead?.let { onLive(false, eventAheadText(it)) } }
     var firstEventCheck by remember { mutableStateOf(true) }
     val progressNow by rememberUpdatedState(state.progressM)
     LaunchedEffect(guidance) {
@@ -447,13 +452,14 @@ fun GuideScreen(
                         finding = rerouting,
                         onReroute = {
                             scope.launch {
+                                onLive(true, "다른 길 찾기")
                                 if (findNewRoute(fix ?: state.snapped, "${ahead.event.kind} 구간을 피해 새 길을 찾았어요")) {
                                     eventAhead = null
                                     aiNotice = "${ahead.event.kind} 구간을 피해 지금 자리에서 새 길을 찾았어요."
                                 }
                             }
                         },
-                        onDismiss = { eventAhead = null },
+                        onDismiss = { onLive(true, "그냥 갈게요"); eventAhead = null },
                     )
                 } ?: aiNotice?.let { AiNotice(it, onDismiss = { aiNotice = null }) }
             }

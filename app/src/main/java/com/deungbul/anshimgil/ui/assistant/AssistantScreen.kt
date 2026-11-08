@@ -112,7 +112,8 @@ fun AssistantScreen(
     val lines = chat.lines
     // A new chat starts with the greeting (or the bubble's line); coming back, a bubble's line is added on.
     remember {
-        if (lines.isEmpty()) {
+        if (!chat.greeted) {
+            chat.greeted = true
             lines += ChatLine(fromUser = false, text = opening ?: HELLO)
             chat.choices = STARTERS
         } else if (opening != null) {
@@ -317,4 +318,17 @@ class AssistantChat {
     var choices by mutableStateOf<List<String>>(emptyList())
     /** The place found last, so "그곳 몇 층이야" is about it. */
     var lastPlace by mutableStateOf<Place?>(null)
+    /** The greeting has been said (live lines may come in before AI 비서 is first opened). */
+    var greeted by mutableStateOf(false)
+
+    /**
+     * A line from AI 비서's live bubbles (map, guidance) or the walker's tap on one, kept here so the chat shows
+     * the whole conversation (11/8). The same words twice in a row are kept once.
+     */
+    fun note(fromUser: Boolean, text: String) {
+        if (text.isBlank()) return
+        val last = lines.lastOrNull()
+        if (last != null && last.fromUser == fromUser && last.text == text) return
+        lines += ChatLine(fromUser = fromUser, text = text)
+    }
 }

@@ -155,6 +155,8 @@ fun HomeScreen(
     onZoomIn: () -> Unit = {},
     /** [바로 출발] on a suggestion: guidance at once with the usual kind of route. */
     onStartNow: (Place, Boolean) -> Unit = { _, _ -> },
+    /** AI 비서's live words here and the walker's answers, for the chat (fromUser, text). */
+    onLive: (Boolean, String) -> Unit = { _, _ -> },
 ) {
     var sos by remember { mutableStateOf(startWithSos) }
     LaunchedEffect(Unit) { if (startWithSos) onSosShown() }
@@ -231,8 +233,12 @@ fun HomeScreen(
         if (hint != null) return@LaunchedEffect
         hint = source.next(mode, at)
     }
+    // What AI 비서 says in its bubbles also goes into its chat.
+    LaunchedEffect(askTripConsent) { if (askTripConsent) onLive(false, TRIP_CONSENT_QUESTION) }
+    LaunchedEffect(adaptation) { adaptation?.let { onLive(false, it.question) } }
     LaunchedEffect(hint) {
         val shown = hint ?: return@LaunchedEffect
+        onLive(false, shown.text)
         // A suggested trip stays until answered or closed (it went before it could be tapped, 11/6).
         if (shown.startNow) return@LaunchedEffect
         delay(HINT_SHOW_MS)
@@ -459,7 +465,10 @@ fun HomeScreen(
             Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp)) {
                 AiAskBubble(
                     TRIP_CONSENT_QUESTION,
-                    answers = listOf(TRIP_CONSENT_YES to { onTripConsent(true) }, TRIP_CONSENT_NO to { onTripConsent(false) }),
+                    answers = listOf(
+                        TRIP_CONSENT_YES to { onLive(true, TRIP_CONSENT_YES); onTripConsent(true) },
+                        TRIP_CONSENT_NO to { onLive(true, TRIP_CONSENT_NO); onTripConsent(false) },
+                    ),
                 )
             }
         } else if (adaptation != null && !showBuses && picked == null) {
@@ -467,7 +476,10 @@ fun HomeScreen(
             Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp)) {
                 AiAskBubble(
                     adaptation.question,
-                    answers = listOf(adaptation.yes to { onAdaptation(adaptation, true) }, "괜찮아요" to { onAdaptation(adaptation, false) }),
+                    answers = listOf(
+                        adaptation.yes to { onLive(true, adaptation.yes); onAdaptation(adaptation, true) },
+                        "괜찮아요" to { onLive(true, "괜찮아요"); onAdaptation(adaptation, false) },
+                    ),
                 )
             }
         } else if (!showBuses && picked == null) hint?.let { h ->
@@ -478,11 +490,12 @@ fun HomeScreen(
                         ShownHints.mark(h.key)
                         hint = null
                         val place = h.place
-                        if (place != null) onPlaceSelected(place) else onAskAssistant(h.text)
+                        if (place != null) { onLive(true, "길 보기"); onPlaceSelected(place) } else onAskAssistant(h.text)
                     },
                     onDismiss = { ShownHints.mark(h.key); hint = null },
                     onStartNow = h.place?.takeIf { h.startNow }?.let { place ->
                         {
+                            onLive(true, "바로 출발")
                             ShownHints.mark(h.key)
                             hint = null
                             onStartNow(place, h.transit)

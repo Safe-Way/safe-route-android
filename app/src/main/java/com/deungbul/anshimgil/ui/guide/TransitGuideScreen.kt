@@ -94,6 +94,8 @@ fun TransitGuideScreen(
     onOpenAssistant: (() -> Unit)? = null,
     /** Called when the last part is done (for the trip record). */
     onArrived: () -> Unit = {},
+    /** AI 비서's live words and the walker's answers, for the chat. */
+    onLive: (Boolean, String) -> Unit = { _, _ -> },
 ) {
     val legs = remember(route) { guideLegs(route) }
     var step by rememberSaveable { mutableIntStateOf(0) }
@@ -113,6 +115,7 @@ fun TransitGuideScreen(
                         finishLabel = nextLabel ?: "도착! 끝내기",
                         onDone = ::next,
                         onOpenAssistant = onOpenAssistant,
+                        onLive = onLive,
                     )
                 } else {
                     RidePart(leg, voiceByDefault, nextLabel = nextLabel, onDone = ::next, onStop = onFinish, onOpenAssistant = onOpenAssistant)
@@ -162,6 +165,7 @@ private fun WalkPart(
     finishLabel: String,
     onDone: () -> Unit,
     onOpenAssistant: (() -> Unit)?,
+    onLive: (Boolean, String) -> Unit,
 ) {
     // The server's walking line when it gave one; otherwise our own walking route to the stop.
     var result by remember { mutableStateOf(walkResult(leg)) }
@@ -192,6 +196,7 @@ private fun WalkPart(
             onFinish = onDone,
             finishLabel = finishLabel,
             onOpenAssistant = onOpenAssistant,
+            onLive = onLive,
         )
         else -> Column(
             verticalArrangement = Arrangement.spacedBy(12.dp),

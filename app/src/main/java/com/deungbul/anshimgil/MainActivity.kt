@@ -503,6 +503,7 @@ fun AppRoot(
                     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                     TransitGuideScreen(
                         onArrived = { guideArrived = true },
+                        onLive = { fromUser, text -> assistantChat.note(fromUser, text) },
                         onOpenAssistant = openAssistantOverGuide,
                         mode = mode,
                         route = guide.transit,
@@ -530,6 +531,7 @@ fun AppRoot(
                     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                     GuideScreen(
                         onArrivedChange = { guideArrived = it },
+                        onLive = { fromUser, text -> assistantChat.note(fromUser, text) },
                         onOpenAssistant = openAssistantOverGuide,
                         mode = mode,
                         result = guide.result,
@@ -586,6 +588,7 @@ fun AppRoot(
                     onRetap = { scope.launch { usageRepository?.retap() } },
                     onZoomIn = { scope.launch { usageRepository?.zoomIn() } },
                     onStartNow = { place, transit -> screen = Screen.Route(place, fromHome = true, transit = transit, autoStart = true) },
+                    onLive = { fromUser, text -> assistantChat.note(fromUser, text) },
                 )
             }
         }
