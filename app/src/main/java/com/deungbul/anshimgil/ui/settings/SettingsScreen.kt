@@ -175,26 +175,6 @@ fun SettingsScreen(
         SwitchRow("상황 자동 판단", "밤, 비, 폭염 등을 알아서 경로에 반영해요", settings.autoConditions, onAutoConditionsChange)
         SwitchRow("꺾는 곳 표시", "길안내 지도에서 크게 꺾는 곳에 ↰ ↱ 표시를 보여 줘요", settings.turnSigns, onTurnSignsChange)
 
-        // 화면 전환 효과: trial choices for the team to pick from (11/8); goes once one is chosen.
-        SectionTitle("화면 전환 효과 (고르는 중)")
-        val context = androidx.compose.ui.platform.LocalContext.current
-        com.deungbul.anshimgil.ui.common.PageTransition.entries.forEach { t ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 56.dp)
-                    .clickable(role = Role.RadioButton) { com.deungbul.anshimgil.ui.common.PageTransitions.set(context, t) }
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-            ) {
-                androidx.compose.material3.RadioButton(selected = com.deungbul.anshimgil.ui.common.PageTransitions.current == t, onClick = null)
-                Column(Modifier.padding(start = 12.dp)) {
-                    Text(t.label, fontSize = 17.sp, fontWeight = FontWeight.Medium, color = Ink)
-                    Text(t.about, fontSize = 14.sp, color = Muted)
-                }
-            }
-        }
-
         SectionTitle("쓰는 대로 맞추기")
         SwitchRow(
             "쓰는 대로 맞추기",
