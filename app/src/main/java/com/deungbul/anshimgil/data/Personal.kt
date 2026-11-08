@@ -376,6 +376,9 @@ class UsageRepository(private val context: Context) {
         }
     }
 
+    /** AI 비서's text enlargement set from 처음 맞추기 ([answerSetup]). */
+    suspend fun setTextBoost(boost: Float) = change { _, m -> if (boost <= 1f) m.remove(textBoostKey) else m[textBoostKey] = boost.toString() }
+
     /** Takes back AI 비서's text enlargement. */
     suspend fun resetTextBoost() = change { _, m -> m.remove(textBoostKey) }
 

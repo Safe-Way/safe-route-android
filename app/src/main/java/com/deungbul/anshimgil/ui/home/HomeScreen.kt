@@ -168,6 +168,9 @@ fun HomeScreen(
     onZoomIn: () -> Unit = {},
     /** [바로 출발] on a suggestion: guidance at once with the usual kind of route. */
     onStartNow: (Place, Boolean) -> Unit = { _, _ -> },
+    /** 처음 맞추기: AI 비서's question and its answers, answered with [onSetupAnswer] (the answer's index). */
+    setupAsk: Pair<String, List<String>>? = null,
+    onSetupAnswer: (Int) -> Unit = {},
     /** AI 비서's live words here and the walker's answers, for the chat (fromUser, text). */
     onLive: (Boolean, String) -> Unit = { _, _ -> },
 ) {
@@ -252,6 +255,7 @@ fun HomeScreen(
     // What AI 비서 says in its bubbles also goes into its chat.
     LaunchedEffect(askTripConsent) { if (askTripConsent) onLive(false, TRIP_CONSENT_QUESTION) }
     LaunchedEffect(adaptation) { adaptation?.let { onLive(false, it.question) } }
+    LaunchedEffect(setupAsk?.first) { setupAsk?.let { onLive(false, it.first) } }
     LaunchedEffect(hint) {
         val shown = hint ?: return@LaunchedEffect
         onLive(false, shown.text)
@@ -514,7 +518,15 @@ fun HomeScreen(
 
         // AI 비서's one-line bubble sits just above its button, unless a card is open there.
         // "자주 가는 길을 기억해 둘까요?" comes first, in the same live bubble, with the two answers under it.
-        if (askTripConsent && !showBuses && picked == null) {
+        if (setupAsk != null && !showBuses && picked == null) {
+            // 처음 맞추기 comes before anything else.
+            Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
+                AiAskBubble(
+                    setupAsk.first,
+                    answers = setupAsk.second.mapIndexed { i, a -> a to { onLive(true, a); onSetupAnswer(i) } },
+                )
+            }
+        } else if (askTripConsent && !showBuses && picked == null) {
             Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
                 AiAskBubble(
                     TRIP_CONSENT_QUESTION,
@@ -796,6 +808,7 @@ private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit,
 
 
 /** AI 비서 asking in its live bubble, with ready answers to tap right under the words. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun AiAskBubble(text: String, answers: List<Pair<String, () -> Unit>>) {
     Surface(
@@ -809,7 +822,12 @@ private fun AiAskBubble(text: String, answers: List<Pair<String, () -> Unit>>) {
                 Icon(Icons.Filled.AutoAwesome, contentDescription = "AI 비서", tint = Color(0xFF1F6B42), modifier = Modifier.size(18.dp).padding(top = 2.dp))
                 Text(text, fontSize = 15.sp, color = Ink, lineHeight = 21.sp, modifier = Modifier.padding(start = 8.dp))
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(start = 26.dp)) {
+            // Wraps to a second line when the answers do not fit (three answers, big text).
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(start = 26.dp),
+            ) {
                 answers.forEachIndexed { i, (label, onClick) ->
                     Surface(
                         onClick = onClick,

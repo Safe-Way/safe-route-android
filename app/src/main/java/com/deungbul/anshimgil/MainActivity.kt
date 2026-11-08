@@ -56,6 +56,10 @@ import com.deungbul.anshimgil.data.Adaptation
 import com.deungbul.anshimgil.data.adaptationToOffer
 import com.deungbul.anshimgil.data.preferredRoute
 import com.deungbul.anshimgil.data.ShownHints
+import com.deungbul.anshimgil.data.SetupStep
+import com.deungbul.anshimgil.data.SetupAnswers
+import com.deungbul.anshimgil.data.answerSetup
+import com.deungbul.anshimgil.data.setupQuestion
 import com.deungbul.anshimgil.data.calendarHint
 import com.deungbul.anshimgil.data.hasCalendarPermission
 import com.deungbul.anshimgil.data.Usage
@@ -228,6 +232,9 @@ fun AppRoot(
     var changingMode by rememberSaveable { mutableStateOf(false) }
     // 말로 맞추기 open on top of the mode picker.
     var talking by rememberSaveable { mutableStateOf(false) }
+    // 처음 맞추기: AI 비서's few questions on the map after the first mode pick ([SetupStep]).
+    var setupStep by rememberSaveable { mutableStateOf<SetupStep?>(null) }
+    var setupAnswers by remember { mutableStateOf(SetupAnswers()) }
     val setupAssistant = remember { SetupAssistant.create() }
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     val appAssistant = remember {
@@ -399,6 +406,8 @@ fun AppRoot(
                     ModeSelectScreen(
                         initial = mode,
                         onStart = { picked ->
+                            // The first pick on a new install: AI 비서 offers to set up the rest.
+                            if (mode == null) setupStep = SetupStep.START
                             scope.launch {
                                 modeRepository.save(picked)
                                 changingMode = false
@@ -597,7 +606,26 @@ fun AppRoot(
                         scope.launch { tripLog?.setConsent(if (yes) TripConsent.YES else TripConsent.NO, mode) }
                     },
                     usage = usage,
-                    adaptation = if (askTripConsent) null else adaptationToOffer(usage),
+                    adaptation = if (askTripConsent || setupStep != null) null else adaptationToOffer(usage),
+                    setupAsk = setupStep?.let { setupQuestion(it, setupAnswers) to it.answers },
+                    onSetupAnswer = { i ->
+                        val step = setupStep
+                        if (step != null) {
+                            val (next, answers) = answerSetup(step, i, setupAnswers)
+                            setupAnswers = answers
+                            setupStep = next
+                            if (step == SetupStep.START && next == null) {
+                                assistantChat.note(false, "알겠어요. 필요하면 설정에서나 저에게 말해서 언제든 바꿀 수 있어요.")
+                            }
+                            // Applied at once, so the walker sees the text change.
+                            scope.launch {
+                                answers.textSize?.let { settingsRepository.setTextSize(it) }
+                                answers.textBoost?.let { usageRepository?.setTextBoost(it) }
+                                answers.voiceGuide?.let { settingsRepository.setVoiceGuide(it) }
+                                answers.sosButton?.let { settingsRepository.setSosButton(it) }
+                            }
+                        }
+                    },
                     onAdaptation = { a, yes ->
                         scope.launch {
                             usageRepository?.answer(a, yes)
