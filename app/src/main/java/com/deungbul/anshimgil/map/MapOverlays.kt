@@ -410,16 +410,17 @@ internal fun drawPicture(canvas: Canvas, kind: FacilityKind, color: Int) {
         }
         close()
     }
+    // Bold enough to read on the map without a tag behind it (11/9).
     fun person(cx: Float, paint: Paint, dress: Boolean) {
-        canvas.drawCircle(cx, 5f, 2.1f, paint)
+        canvas.drawCircle(cx, 4f, 2.7f, paint)
         if (dress) {
-            canvas.drawPath(path { moveTo(cx, 8f); lineTo(cx + 3.6f, 15.5f); lineTo(cx - 3.6f, 15.5f); close() }, paint)
+            canvas.drawPath(path { moveTo(cx - 1.6f, 7.5f); lineTo(cx + 1.6f, 7.5f); lineTo(cx + 4.8f, 16f); lineTo(cx - 4.8f, 16f); close() }, paint)
         } else {
-            canvas.drawRoundRect(RectF(cx - 2.2f, 8f, cx + 2.2f, 15.5f), 1.2f, 1.2f, paint)
+            canvas.drawRoundRect(RectF(cx - 3.4f, 7.5f, cx + 3.4f, 16f), 1.6f, 1.6f, paint)
         }
-        val leg = line(1.8f).apply { this.color = paint.color }
-        canvas.drawLine(cx - 1.1f, 15f, cx - 1.1f, 21f, leg)
-        canvas.drawLine(cx + 1.1f, 15f, cx + 1.1f, 21f, leg)
+        val leg = line(2.6f).apply { this.color = paint.color; strokeCap = Paint.Cap.BUTT }
+        canvas.drawLine(cx - 1.6f, 15.5f, cx - 1.6f, 22.5f, leg)
+        canvas.drawLine(cx + 1.6f, 15.5f, cx + 1.6f, 22.5f, leg)
     }
     when (kind) {
         FacilityKind.CCTV -> {
@@ -498,9 +499,9 @@ internal fun drawPicture(canvas: Canvas, kind: FacilityKind, color: Int) {
         }
         FacilityKind.TOILET -> {
             // A man and a woman, as on the map's 화장실 button.
-            person(6.5f, fill, dress = false)
-            person(17.5f, fill, dress = true)
-            canvas.drawLine(12f, 3f, 12f, 21f, line(1.2f))
+            person(5.8f, fill, dress = false)
+            person(18.2f, fill, dress = true)
+            canvas.drawLine(12f, 2.5f, 12f, 22f, line(1.6f))
         }
         FacilityKind.ACCESSIBLE_TOILET -> {
             // A person in a wheelchair.
@@ -530,11 +531,11 @@ internal fun drawPicture(canvas: Canvas, kind: FacilityKind, color: Int) {
             canvas.drawRect(RectF(17f, 13f, 19.5f, 21f), fill)
         }
         FacilityKind.STAIRS -> {
-            // Steps.
+            // Steps as a line, not a filled block (11/9: the block was too heavy on the map).
             canvas.drawPath(path {
-                moveTo(2.5f, 21f); lineTo(2.5f, 17f); lineTo(7.5f, 17f); lineTo(7.5f, 12.5f); lineTo(12.5f, 12.5f)
-                lineTo(12.5f, 8f); lineTo(17.5f, 8f); lineTo(17.5f, 3.5f); lineTo(21.5f, 3.5f); lineTo(21.5f, 21f); close()
-            }, fill)
+                moveTo(2.5f, 20.5f); lineTo(7.5f, 20.5f); lineTo(7.5f, 15.5f); lineTo(12.5f, 15.5f)
+                lineTo(12.5f, 10.5f); lineTo(17.5f, 10.5f); lineTo(17.5f, 5.5f); lineTo(21.5f, 5.5f)
+            }, line(2.4f))
         }
         FacilityKind.SUBWAY -> {
             // The front of a train.
