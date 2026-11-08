@@ -22,7 +22,15 @@ import kotlin.math.tan
  */
 
 /** One bubble. [place] is set when the bubble offers a route there (its button opens it). */
-data class MapHint(val key: String, val text: String, val place: Place? = null)
+data class MapHint(
+    val key: String,
+    val text: String,
+    val place: Place? = null,
+    /** Offer [바로 출발]: guidance starts at once with the route the walker usually picks. */
+    val startNow: Boolean = false,
+    /** The suggestion was the bus or subway: open the 대중교통 tab. */
+    val transit: Boolean = false,
+)
 
 /** Lines already shown while the app runs, so leaving the map and coming back does not repeat them. */
 object ShownHints {
@@ -145,7 +153,8 @@ internal fun todayHint(json: org.json.JSONObject, today: LocalDate): MapHint? {
             distanceM = null,
         )
         val say = json.text("say") ?: "이 시간엔 보통 ${name}에 가셨어요."
-        return MapHint("today-$today-$name", say, place)
+        val transit = json.optJSONObject("pick")?.optString("type") == "transit"
+        return MapHint("today-$today-$name", say, place, startNow = true, transit = transit)
     }
     val weather = json.optJSONObject("weather")
     val word = weather?.takeIf { it.optBoolean("weatherAvailable") || it.optBoolean("dustAvailable") }?.text("word")
@@ -168,6 +177,10 @@ class MapHintSource(
     private val guestId: suspend () -> String?,
     /** Records this app start; null skips today's suggestion. */
     private val openLog: AppOpenLog? = null,
+    /** What has been learned on this phone, for the way home. */
+    private val usage: suspend () -> Usage? = { null },
+    /** The saved home (자주 가는 곳 '집'), when there is one. */
+    private val home: suspend () -> Place? = { null },
 ) {
     // Worked out once per app start, on the first bubble.
     private var moment: OpenMoment? = null
@@ -184,6 +197,9 @@ class MapHintSource(
             }.getOrNull()
             if (today != null && ShownHints.isNew(today.key)) return today
         }
+        // After the usual stay where the walker arrived: the way home.
+        runCatching { usage()?.let { u -> returnHint(u, here, now, home()) } }.getOrNull()
+            ?.takeIf { ShownHints.isNew(it.key) }?.let { return it }
         val event = runCatching {
             eventHint(here, events.within(Bbox(here.lon - 0.012, here.lat - 0.01, here.lon + 0.012, here.lat + 0.01)))
         }.getOrNull()

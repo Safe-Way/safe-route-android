@@ -94,6 +94,12 @@ fun SettingsScreen(
     onTripConsentChange: (Boolean) -> Unit = {},
     /** Returns false when the server copy could not be deleted. */
     onClearTrips: suspend () -> Boolean = { true },
+    /** 쓰는 대로 맞추기 (Personal.kt). */
+    adapt: Boolean = true,
+    bigButtons: Boolean = false,
+    onAdaptChange: (Boolean) -> Unit = {},
+    onBigButtonsChange: (Boolean) -> Unit = {},
+    onResetAdapt: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var addingGuardian by remember { mutableStateOf(false) }
@@ -164,6 +170,28 @@ fun SettingsScreen(
         SwitchRow("음성 안내", "걷는 동안 다음 방향을 읽어 줘요", settings.voiceGuide, onVoiceChange)
         SwitchRow("상황 자동 판단", "밤, 비, 폭염 등을 알아서 경로에 반영해요", settings.autoConditions, onAutoConditionsChange)
         SwitchRow("꺾는 곳 표시", "길안내 지도에서 크게 꺾는 곳에 ↰ ↱ 표시를 보여 줘요", settings.turnSigns, onTurnSignsChange)
+
+        SectionTitle("쓰는 대로 맞추기")
+        SwitchRow(
+            "쓰는 대로 맞추기",
+            "자주 쓰는 버튼을 앞에, 자주 고르는 길을 먼저 보여 주고, 필요해 보이면 버튼·글씨를 크게 할지 물어봐요. 폰 안에서만 세요",
+            adapt,
+            onAdaptChange,
+        )
+        SwitchRow("큰 버튼", "지도 화면의 버튼을 더 크게 보여 줘요", bigButtons, onBigButtonsChange)
+        var confirmResetAdapt by remember { mutableStateOf(false) }
+        LinkRow("맞춘 것 처음대로", "버튼 순서·고르는 길·큰 버튼을 처음 상태로 돌려요") { confirmResetAdapt = true }
+        if (confirmResetAdapt) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { confirmResetAdapt = false },
+                title = { Text("맞춘 것을 처음대로 돌릴까요?") },
+                text = { Text("쓰면서 배운 버튼 순서, 자주 고르는 길, 큰 버튼, 머무는 시간을 지워요.") },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = { confirmResetAdapt = false; onResetAdapt() }) { Text("처음대로") }
+                },
+                dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmResetAdapt = false }) { Text("취소") } },
+            )
+        }
 
         SectionTitle("이동 기록")
         SwitchRow(

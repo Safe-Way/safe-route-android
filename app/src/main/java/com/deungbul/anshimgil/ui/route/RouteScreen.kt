@@ -10,6 +10,7 @@ import com.deungbul.anshimgil.data.nextBusText
 import com.deungbul.anshimgil.data.legTitle
 import com.deungbul.anshimgil.data.LegType
 import com.deungbul.anshimgil.data.CompareItem
+import com.deungbul.anshimgil.data.RouteChoice
 import com.deungbul.anshimgil.data.TransitLeg
 import com.deungbul.anshimgil.data.TransitRoute
 import com.deungbul.anshimgil.data.TransitResult
@@ -150,11 +151,17 @@ fun RouteScreen(
     onStartTransit: (TransitRoute) -> Unit = {},
     /** Open on the 대중교통 tab. */
     startWithTransit: Boolean = false,
+    /** The kind of route the walker keeps choosing (쓰는 대로 맞추기), shown first. */
+    preferred: RouteChoice? = null,
+    /** Start guidance as soon as the route is found ([바로 출발] on a suggestion). */
+    autoStart: Boolean = false,
+    /** Which kind was started, to learn from. */
+    onChosen: (RouteChoice) -> Unit = {},
 ) {
     val context = LocalContext.current
     var conditionsOff by rememberSaveable { mutableStateOf(if (autoConditions) emptySet() else ALL_CONDITION_KEYS) }
     var conditionsOn by rememberSaveable { mutableStateOf(emptySet<String>()) }
-    var selected by rememberSaveable { mutableStateOf(RouteType.SAFE) }
+    var selected by rememberSaveable { mutableStateOf(if (preferred == RouteChoice.SHORTEST) RouteType.SHORTEST else RouteType.SAFE) }
     var state by remember { mutableStateOf<RouteState>(RouteState.Loading) }
     var retry by remember { mutableIntStateOf(0) }
     var map by remember { mutableStateOf<KakaoMap?>(null) }
@@ -260,9 +267,23 @@ fun RouteScreen(
     }
     // 걸어서 / 대중교통 tabs. Transit is asked for only when its tab is opened (the server's ODsay
     // lookups are limited per day) and kept while the screen is open.
-    var transitTab by rememberSaveable { mutableStateOf(startWithTransit) }
+    var transitTab by rememberSaveable { mutableStateOf(startWithTransit || preferred == RouteChoice.TRANSIT) }
     var transit by remember { mutableStateOf<TransitState?>(null) }
     var transitSelected by rememberSaveable { mutableIntStateOf(0) }
+    // [바로 출발]: start as soon as the route (of the usual kind) is there; the walker can still go back.
+    var autoStarted by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(autoStart, state, transit, transitTab) {
+        if (!autoStart || autoStarted) return@LaunchedEffect
+        if (transitTab) {
+            (transit as? TransitState.Ready)?.result?.routes?.firstOrNull()?.let { autoStarted = true; onStartTransit(it) }
+        } else {
+            (state as? RouteState.Ready)?.let { s ->
+                val type = if (s.result.route(selected) != null) selected else s.result.routes.first().type
+                autoStarted = true
+                onStart(s.result, type)
+            }
+        }
+    }
     LaunchedEffect(transitTab, origin) {
         val from = origin ?: return@LaunchedEffect
         if (!transitTab || transit is TransitState.Ready) return@LaunchedEffect
@@ -415,10 +436,15 @@ fun RouteScreen(
                         is RouteState.Ready -> RouteDetails(s.result.atPace(walkSpeedMPerMin), mode, selected, onSelect = { selected = it })
                     }
                 }
-                if (!transitTab) (state as? RouteState.Ready)?.let { s -> StartButton(s.result.atPace(walkSpeedMPerMin), selected, onStart = { onStart(s.result, selected) }) }
+                if (!transitTab) (state as? RouteState.Ready)?.let { s ->
+                    StartButton(s.result.atPace(walkSpeedMPerMin), selected, onStart = {
+                        if (s.result.routes.size > 1) onChosen(if (selected == RouteType.SHORTEST) RouteChoice.SHORTEST else RouteChoice.SAFE)
+                        onStart(s.result, selected)
+                    })
+                }
                 if (transitTab) (transit as? TransitState.Ready)?.result?.routes?.getOrNull(transitSelected)?.let { t ->
                     Button(
-                        onClick = { onStartTransit(t) },
+                        onClick = { onChosen(RouteChoice.TRANSIT); onStartTransit(t) },
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2F5BB7), contentColor = Color.White),
                         modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),

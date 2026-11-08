@@ -49,6 +49,10 @@ import androidx.compose.runtime.LaunchedEffect
 import com.deungbul.anshimgil.data.ShownHints
 import com.deungbul.anshimgil.data.MapHintSource
 import com.deungbul.anshimgil.data.MapHint
+import com.deungbul.anshimgil.data.RETAP_WINDOW_MS
+import com.deungbul.anshimgil.data.nearbyOrder
+import com.deungbul.anshimgil.data.Adaptation
+import com.deungbul.anshimgil.data.Usage
 import com.deungbul.anshimgil.data.TRIP_CONSENT_NO
 import com.deungbul.anshimgil.data.TRIP_CONSENT_YES
 import com.deungbul.anshimgil.data.TRIP_CONSENT_QUESTION
@@ -140,6 +144,17 @@ fun HomeScreen(
     /** AI 비서 asks in its live bubble whether to keep trips; [onTripConsent] gets the answer. */
     askTripConsent: Boolean = false,
     onTripConsent: (Boolean) -> Unit = {},
+    /** What has been learned on this phone (쓰는 대로 맞추기). */
+    usage: Usage = Usage(),
+    /** A change AI 비서 offers now (bigger buttons or text), answered with [onAdaptation]. */
+    adaptation: Adaptation? = null,
+    onAdaptation: (Adaptation, Boolean) -> Unit = { _, _ -> },
+    /** Signals for 쓰는 대로 맞추기: a nearby button used, a button tapped again quickly, the map zoomed in. */
+    onNearbyTap: (String) -> Unit = {},
+    onRetap: () -> Unit = {},
+    onZoomIn: () -> Unit = {},
+    /** [바로 출발] on a suggestion: guidance at once with the usual kind of route. */
+    onStartNow: (Place, Boolean) -> Unit = { _, _ -> },
 ) {
     var sos by remember { mutableStateOf(startWithSos) }
     LaunchedEffect(Unit) { if (startWithSos) onSosShown() }
@@ -159,6 +174,14 @@ fun HomeScreen(
     var zoom by remember { mutableIntStateOf(WALK_ZOOM) }
     val scope = rememberCoroutineScope()
     var hint by remember { mutableStateOf<MapHint?>(null) }
+    // 쓰는 대로 맞추기: bigger buttons when asked for, and quick second taps on the same button noticed.
+    val big = if (usage.bigButtons) BIG_SCALE else 1f
+    var lastTap by remember { mutableStateOf("" to 0L) }
+    fun tapped(key: String) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (lastTap.first == key && now - lastTap.second < RETAP_WINDOW_MS) onRetap()
+        lastTap = key to now
+    }
 
     // The phone's position, kept up to date so the location button moves at once and the dot follows.
     var hasPermission by remember { mutableStateOf(hasLocationPermission(context)) }
@@ -210,6 +233,8 @@ fun HomeScreen(
     }
     LaunchedEffect(hint) {
         val shown = hint ?: return@LaunchedEffect
+        // A suggested trip stays until answered or closed (it went before it could be tapped, 11/6).
+        if (shown.startNow) return@LaunchedEffect
         delay(HINT_SHOW_MS)
         ShownHints.mark(shown.key)
         hint = null
@@ -255,6 +280,8 @@ fun HomeScreen(
         m.tiltForWalking()
         bbox = m.visibleBbox()
         m.setOnCameraMoveEndListener { moved, position, _ ->
+            // Zooming in close (past the walking view) is a sign the map is hard to read.
+            if (position.zoomLevel > zoom && position.zoomLevel >= WALK_ZOOM + 2) onZoomIn()
             zoom = position.zoomLevel
             moved.visibleBbox()?.let { bbox = it }
         }
@@ -340,22 +367,24 @@ fun HomeScreen(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NEARBY.forEach { (query, label, icon) ->
+                // Most used first (쓰는 대로 맞추기).
+                nearbyOrder(usage).mapNotNull { k -> NEARBY.firstOrNull { it.first == k } }.forEach { (query, label, icon) ->
                     NearbyButton(
                         text = if (finding == query) "찾는 중…" else label,
                         icon = icon,
-                        onClick = { goToNearest(query, label) },
+                        onClick = { tapped(query); onNearbyTap(query); goToNearest(query, label) },
                         modifier = Modifier.weight(1f),
+                        scale = big,
                     )
                 }
             }
             // 불편 신고: a small icon on the right, under the nearby buttons (team, 11/6).
             Surface(
-                onClick = onOpenReport,
+                onClick = { tapped("report"); onOpenReport() },
                 shape = RoundedCornerShape(14.dp),
                 color = Color.White,
                 shadowElevation = 4.dp,
-                modifier = Modifier.align(Alignment.End).size(56.dp),
+                modifier = Modifier.align(Alignment.End).size(56.dp * big),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Icon(Icons.Filled.Campaign, contentDescription = "불편 신고", tint = Color(0xFFB45309), modifier = Modifier.size(24.dp))
@@ -374,14 +403,14 @@ fun HomeScreen(
 
         // The phone's position when it is known and in Gwangju, otherwise the demo area.
         Surface(
-            onClick = { if (hasPermission) locate() else permissionLauncher.launch(LOCATION_PERMISSIONS) },
+            onClick = { tapped("locate"); if (hasPermission) locate() else permissionLauncher.launch(LOCATION_PERMISSIONS) },
             shape = CircleShape,
             color = Color.White,
             shadowElevation = 4.dp,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp, bottom = 48.dp)
-                .size(52.dp),
+                .size(52.dp * big),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(Icons.Filled.MyLocation, contentDescription = "내 위치로 이동", tint = Color(0xFF2F6FDB))
@@ -433,6 +462,14 @@ fun HomeScreen(
                     answers = listOf(TRIP_CONSENT_YES to { onTripConsent(true) }, TRIP_CONSENT_NO to { onTripConsent(false) }),
                 )
             }
+        } else if (adaptation != null && !showBuses && picked == null) {
+            // 쓰는 대로 맞추기: asked before anything changes.
+            Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp)) {
+                AiAskBubble(
+                    adaptation.question,
+                    answers = listOf(adaptation.yes to { onAdaptation(adaptation, true) }, "괜찮아요" to { onAdaptation(adaptation, false) }),
+                )
+            }
         } else if (!showBuses && picked == null) hint?.let { h ->
             Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 148.dp)) {
                 HintBubble(
@@ -444,17 +481,24 @@ fun HomeScreen(
                         if (place != null) onPlaceSelected(place) else onAskAssistant(h.text)
                     },
                     onDismiss = { ShownHints.mark(h.key); hint = null },
+                    onStartNow = h.place?.takeIf { h.startNow }?.let { place ->
+                        {
+                            ShownHints.mark(h.key)
+                            hint = null
+                            onStartNow(place, h.transit)
+                        }
+                    },
                 )
             }
         }
         // AI 비서: a rounded square at the bottom centre; its own screen has the microphone (11/6).
         Surface(
-            onClick = onOpenAssistant,
+            onClick = { tapped("ai"); onOpenAssistant() },
             shape = RoundedCornerShape(16.dp),
             color = Color(0xFF1F6B42),
             contentColor = Color.White,
             shadowElevation = 6.dp,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp).heightIn(min = 56.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp).heightIn(min = 56.dp * big),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp)) {
                 Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(22.dp))
@@ -467,23 +511,23 @@ fun HomeScreen(
 }
 
 @Composable
-private fun NearbyButton(text: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun NearbyButton(text: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier, scale: Float = 1f) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
         shadowElevation = 3.dp,
-        modifier = modifier.heightIn(min = 56.dp),
+        modifier = modifier.heightIn(min = 56.dp * scale),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
         ) {
-            Icon(icon, contentDescription = null, tint = Color(0xFF1F6B42), modifier = Modifier.size(22.dp))
+            Icon(icon, contentDescription = null, tint = Color(0xFF1F6B42), modifier = Modifier.size(22.dp * scale))
             Column {
-                Text("가까운", fontSize = 12.sp, color = Color(0xFF4A564E), maxLines = 1)
-                Text(text, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink, maxLines = 1)
+                Text("가까운", fontSize = 12.sp * scale, color = Color(0xFF4A564E), maxLines = 1)
+                Text(text, fontSize = 16.sp * scale, fontWeight = FontWeight.Bold, color = Ink, maxLines = 1)
             }
         }
     }
@@ -635,12 +679,15 @@ private fun NearbyBusCard(at: LatLon?, mode: UserMode, onClose: () -> Unit, modi
 /** About 300 m; moving into another cell of this size looks for a new bubble. */
 private const val HINT_CELL_DEG = 0.003
 
+/** Buttons this much bigger when the walker said yes to bigger buttons. */
+private const val BIG_SCALE = 1.25f
+
 /** How long the AI 비서 bubble stays when left alone. */
 private const val HINT_SHOW_MS = 15_000L
 
 /** One line from AI 비서 under its button; a route offer has its own button, other lines open AI 비서. */
 @Composable
-private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit) {
+private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit, onStartNow: (() -> Unit)? = null) {
     Surface(
         onClick = onOpen,
         shape = RoundedCornerShape(16.dp),
@@ -657,8 +704,16 @@ private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit)
                 modifier = Modifier.weight(1f).padding(start = 8.dp),
             )
             if (hint.place != null) {
-                androidx.compose.material3.TextButton(onClick = onOpen) {
-                    Text("길 보기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1F6B42))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    // One tap to go: guidance starts with the kind of route the walker usually picks.
+                    onStartNow?.let { start ->
+                        Surface(onClick = start, shape = RoundedCornerShape(14.dp), color = Color(0xFF1F6B42), contentColor = Color.White) {
+                            Text("바로 출발", fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                        }
+                    }
+                    androidx.compose.material3.TextButton(onClick = onOpen) {
+                        Text("길 보기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1F6B42))
+                    }
                 }
             }
             IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Color(0xFF5E6A62)) }

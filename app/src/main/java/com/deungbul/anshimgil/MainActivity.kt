@@ -51,6 +51,12 @@ import com.deungbul.anshimgil.data.AssistantAction
 import androidx.compose.material.icons.filled.AutoAwesome
 import com.deungbul.anshimgil.data.AppOpenLog
 import com.deungbul.anshimgil.data.AssistantContext
+import com.deungbul.anshimgil.location.lastKnownLocation
+import com.deungbul.anshimgil.data.Adaptation
+import com.deungbul.anshimgil.data.adaptationToOffer
+import com.deungbul.anshimgil.data.preferredRoute
+import com.deungbul.anshimgil.data.Usage
+import com.deungbul.anshimgil.data.UsageRepository
 import com.deungbul.anshimgil.data.tripWeather
 import com.deungbul.anshimgil.data.TripConsent
 import com.deungbul.anshimgil.data.TripLogRepository
@@ -73,8 +79,28 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    /** A place to open from the 출발 시간 알림 (name, point, by transit), handled once by AppRoot. */
+    private val reminded = androidx.compose.runtime.mutableStateOf<Pair<Place, Boolean>?>(null)
+
+    private fun readReminder(intent: android.content.Intent?) {
+        val name = intent?.getStringExtra(EXTRA_GO_NAME) ?: return
+        val lat = intent.getDoubleExtra(EXTRA_GO_LAT, Double.NaN)
+        val lon = intent.getDoubleExtra(EXTRA_GO_LON, Double.NaN)
+        if (lat.isNaN() || lon.isNaN()) return
+        reminded.value = Place(null, name, "", lat, lon, null) to intent.getBooleanExtra(EXTRA_GO_TRANSIT, false)
+        intent.removeExtra(EXTRA_GO_NAME)
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        readReminder(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        readReminder(intent)
+        // 출발 시간 알림: a check every 15 minutes (it does nothing without the trip-record yes).
+        runCatching { DepartureWorker.schedule(applicationContext) }
         enableEdgeToEdge()
         val modeRepository = ModeRepository(applicationContext)
         val savedPlaces = SavedPlacesRepository(applicationContext)
@@ -84,6 +110,7 @@ class MainActivity : ComponentActivity() {
         val settingsRepository = SettingsRepository(applicationContext)
         val walkSpeedRepository = WalkSpeedRepository(applicationContext)
         val tripLog = TripLogRepository(applicationContext, guestId = { walkSpeedRepository.guestId() })
+        val usageRepository = UsageRepository(applicationContext)
         // Walks that could not be sent last time (offline, server not ready) go now.
         lifecycleScope.launch { runCatching { walkSpeedRepository.uploadPending() } }
         // The mode next to the clock while the app is in front; taken away in onStop.
@@ -115,6 +142,9 @@ class MainActivity : ComponentActivity() {
                             modeRepository, savedPlaces, placeRepository, facilityRepository, routeRepository,
                             settingsRepository, settings, walkSpeedRepository, Modifier.padding(innerPadding),
                             tripLog = tripLog,
+                            usageRepository = usageRepository,
+                            reminded = reminded.value,
+                            onRemindedHandled = { reminded.value = null },
                         )
                     }
                 }
@@ -157,7 +187,14 @@ private sealed interface Screen {
     data object Assistant : Screen
     /** [start] null means the phone's position. [fromHome]: opened from a home shortcut, so back returns home. */
     /** [transit] opens on the 대중교통 tab (AI 비서 recommended the bus or subway). */
-    data class Route(val destination: Place, val start: Place? = null, val fromHome: Boolean = false, val transit: Boolean = false) : Screen
+    /** [autoStart]: guidance starts as soon as the route is found ([바로 출발]). */
+    data class Route(
+        val destination: Place,
+        val start: Place? = null,
+        val fromHome: Boolean = false,
+        val transit: Boolean = false,
+        val autoStart: Boolean = false,
+    ) : Screen
     data class Guide(val route: Route, val result: RouteResult, val type: RouteType) : Screen
     data class TransitGuide(val route: Route, val transit: TransitRoute) : Screen
 }
@@ -175,6 +212,10 @@ fun AppRoot(
     walkSpeedRepository: WalkSpeedRepository,
     modifier: Modifier = Modifier,
     tripLog: TripLogRepository? = null,
+    usageRepository: UsageRepository? = null,
+    /** From the 출발 시간 알림: open the route there. */
+    reminded: Pair<Place, Boolean>? = null,
+    onRemindedHandled: () -> Unit = {},
 ) {
     val savedFlow = remember(modeRepository) { modeRepository.mode.map { SavedMode.Ready(it) } }
     val saved by savedFlow.collectAsStateWithLifecycle(initialValue = SavedMode.Loading)
@@ -204,6 +245,8 @@ fun AppRoot(
             EventRepository.create(),
             guestId = { walkSpeedRepository.guestId() },
             openLog = AppOpenLog(appContext),
+            usage = { usageRepository?.current() },
+            home = { savedPlaces.favorites.first().firstOrNull { it.name == "집" }?.place },
         )
     }
     // The assistant's 보호자에게 알리기: open SOS on the map.
@@ -215,12 +258,23 @@ fun AppRoot(
     var askTripConsent by remember { mutableStateOf(false) }
     // The server's record for the guidance now running, and when it started.
     var tripId by remember { mutableStateOf<Long?>(null) }
+    var tripDestination by remember { mutableStateOf<Place?>(null) }
+    LaunchedEffect(reminded) {
+        val (place, transit) = reminded ?: return@LaunchedEffect
+        screen = Screen.Route(place, fromHome = true, transit = transit)
+        onRemindedHandled()
+    }
+    // 쓰는 대로 맞추기: what has been learned, and a change to offer (after the trip question, one at a time).
+    val usage by (usageRepository?.usage ?: kotlinx.coroutines.flow.flowOf(Usage())).collectAsStateWithLifecycle(initialValue = Usage())
     var guideArrived by remember { mutableStateOf(false) }
     var guideStartedAt by remember { mutableStateOf(java.time.LocalDateTime.now()) }
     /** At the start of a guidance: start the server's record (when the walker said yes). */
     fun startTrip(destination: Place, transit: Boolean, result: RouteResult?, type: RouteType?, mode: UserMode) {
         guideStartedAt = java.time.LocalDateTime.now()
         tripId = null
+        tripDestination = destination
+        // Leaving the place last arrived at: how long the walker stays there is learned (for "집으로 갈까요?").
+        scope.launch { runCatching { usageRepository?.leaving(lastKnownLocation(appContext), guideStartedAt) } }
         val log = tripLog ?: return
         if (tripConsent != TripConsent.YES) return
         val route = result?.let { r -> type?.let { r.route(it) } ?: r.routes.firstOrNull() }
@@ -238,6 +292,9 @@ fun AppRoot(
     }
     /** At the end: close the record (arrived or stopped), or ask the first time. */
     fun finishTrip(arrived: Boolean) {
+        if (arrived) tripDestination?.let { place ->
+            scope.launch { runCatching { usageRepository?.arrived(place, java.time.LocalDateTime.now()) } }
+        }
         val log = tripLog ?: return
         when (tripConsent) {
             TripConsent.UNASKED -> askTripConsent = true
@@ -376,6 +433,11 @@ fun AppRoot(
                             }
                         },
                         onClearTrips = { (tripLog?.clearAll(mode) ?: true).also { if (it) tripCount = 0 } },
+                        adapt = usage.adapt,
+                        bigButtons = usage.bigButtons,
+                        onAdaptChange = { on -> scope.launch { usageRepository?.setAdapt(on) } },
+                        onBigButtonsChange = { on -> scope.launch { usageRepository?.setBigButtons(on) } },
+                        onResetAdapt = { scope.launch { usageRepository?.reset() } },
                     )
                 }
                 screen is Screen.Search -> {
@@ -407,6 +469,9 @@ fun AppRoot(
                         RouteScreen(
                             mode = mode,
                             startWithTransit = route.transit,
+                            preferred = preferredRoute(usage),
+                            autoStart = route.autoStart,
+                            onChosen = { choice -> scope.launch { usageRepository?.chooseRoute(choice) } },
                             startPlace = route.start,
                             destination = route.destination,
                             routeRepository = routeRepository,
@@ -506,6 +571,18 @@ fun AppRoot(
                         askTripConsent = false
                         scope.launch { tripLog?.setConsent(if (yes) TripConsent.YES else TripConsent.NO, mode) }
                     },
+                    usage = usage,
+                    adaptation = if (askTripConsent) null else adaptationToOffer(usage, settings.textSize),
+                    onAdaptation = { a, yes ->
+                        scope.launch {
+                            usageRepository?.answer(a, yes)
+                            if (yes && a == Adaptation.BIG_TEXT) settingsRepository.setTextSize(TextSize.LARGE)
+                        }
+                    },
+                    onNearbyTap = { k -> scope.launch { usageRepository?.tapNearby(k) } },
+                    onRetap = { scope.launch { usageRepository?.retap() } },
+                    onZoomIn = { scope.launch { usageRepository?.zoomIn() } },
+                    onStartNow = { place, transit -> screen = Screen.Route(place, fromHome = true, transit = transit, autoStart = true) },
                 )
             }
         }
