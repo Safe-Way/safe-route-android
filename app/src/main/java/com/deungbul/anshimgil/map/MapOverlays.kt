@@ -57,7 +57,12 @@ fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
     val styles = mutableMapOf<List<Any>, Pair<LabelStyles, Bitmap>>()
     fun styleOf(facility: Facility) = styles.getOrPut(listOf(facility.kind, facility.label, facility.look, facility.elevator)) {
         val bitmap = when (facility.look) {
-            FacilityLook.NORMAL -> pillBitmap(facility.label, facility.kind.color.toInt(), density, elevator = facility.elevator)
+            // CCTV and convenience stores as a picture instead of a word (11/8): they are many and small.
+            FacilityLook.NORMAL -> if (facility.text == null && facility.kind in PICTURE_KINDS) {
+                pictureBitmap(facility.kind, facility.kind.color.toInt(), density)
+            } else {
+                pillBitmap(facility.label, facility.kind.color.toInt(), density, elevator = facility.elevator)
+            }
             FacilityLook.GRAY -> pillBitmap(facility.label, GRAY, density)
             FacilityLook.DOT -> dotBitmap(GRAY, density, sizeDp = 10f)
         }
@@ -354,6 +359,66 @@ fun dotBitmap(color: Int, density: Float, sizeDp: Float = 18f): Bitmap {
     val r = size / 2f
     canvas.drawCircle(r, r, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = 0xFFFFFFFF.toInt() })
     canvas.drawCircle(r, r, r - 3f * density, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+    return bitmap
+}
+
+/** Kinds drawn as a picture in a round tag instead of a word. */
+val PICTURE_KINDS = setOf(FacilityKind.CCTV, FacilityKind.CONVENIENCE_STORE)
+
+/**
+ * A white round tag with a colored border and a picture in the kind's color: a security camera on its arm for
+ * CCTV, a shop with an awning and a door for a convenience store. Drawn on a 24-unit grid.
+ */
+internal fun pictureBitmap(kind: FacilityKind, color: Int, density: Float): Bitmap {
+    val size = 30f * density
+    val stroke = 2f * density
+    val bitmap = Bitmap.createBitmap(size.toInt() + 1, size.toInt() + 1, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val r = size / 2
+    canvas.drawCircle(r, r, r - stroke / 2, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = 0xFFFFFFFF.toInt() })
+    canvas.drawCircle(r, r, r - stroke / 2, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = color
+        style = Paint.Style.STROKE
+        strokeWidth = stroke
+    })
+    // The picture: 18 dp in the middle, on a 24-unit grid.
+    val unit = 18f * density / 24f
+    canvas.save()
+    canvas.translate(r - 12 * unit, r - 12 * unit)
+    canvas.scale(unit, unit)
+    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color }
+    val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = 0xFFFFFFFF.toInt() }
+    val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = color
+        style = Paint.Style.STROKE
+        strokeWidth = 2.2f
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    when (kind) {
+        FacilityKind.CCTV -> {
+            // Wall plate and arm on the right, the camera body tilted down to the left with its lens.
+            canvas.drawRoundRect(RectF(19.5f, 5f, 22.5f, 15f), 1f, 1f, fill)
+            canvas.drawPath(android.graphics.Path().apply { moveTo(20f, 10f); lineTo(16f, 12.5f) }, line)
+            canvas.save()
+            canvas.rotate(22f, 10f, 10f)
+            canvas.drawRoundRect(RectF(2.5f, 6.5f, 17.5f, 13.5f), 2.5f, 2.5f, fill)
+            canvas.drawRect(RectF(1f, 7.5f, 3.5f, 12.5f), fill)
+            canvas.drawCircle(5.2f, 10f, 1.6f, white)
+            canvas.restore()
+        }
+        else -> {
+            // Awning with stripes, the shop below it and its door.
+            canvas.drawPath(android.graphics.Path().apply {
+                moveTo(4f, 3.5f); lineTo(20f, 3.5f); lineTo(22f, 9f); lineTo(2f, 9f); close()
+            }, fill)
+            canvas.drawRect(RectF(7.6f, 3.5f, 9.2f, 9f), white)
+            canvas.drawRect(RectF(14.8f, 3.5f, 16.4f, 9f), white)
+            canvas.drawRect(RectF(4f, 10.5f, 20f, 21f), line)
+            canvas.drawRect(RectF(9.5f, 14f, 14.5f, 21f), fill)
+        }
+    }
+    canvas.restore()
     return bitmap
 }
 
