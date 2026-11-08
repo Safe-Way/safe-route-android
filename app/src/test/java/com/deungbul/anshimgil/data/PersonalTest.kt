@@ -117,7 +117,7 @@ class PersonalTest {
         missedAt.map { Press(it) } + List(clean) { Press() }
 
     @Test
-    fun biggerButtonsOnlyForMissesHalfADayApart() {
+    fun biggerTextForMissedTapsOnlyHalfADayApart() {
         val d1 = today.minusDays(1).atTime(9, 0)
         val now = today.atTime(10, 0)
         // Pressing a lot is no sign at all.
@@ -126,10 +126,13 @@ class PersonalTest {
         assertNull(adaptationToOffer(Usage(presses = presses(now, now.plusMinutes(1), now.plusMinutes(2))), today))
         val midnight = today.atStartOfDay()
         assertNull(adaptationToOffer(Usage(presses = presses(midnight.minusMinutes(1), midnight, midnight.plusMinutes(1))), today))
-        assertEquals(Adaptation.BIG_BUTTONS, adaptationToOffer(Usage(presses = presses(d1, now, now)), today))
+        assertEquals(Adaptation.MISSED_TAPS, adaptationToOffer(Usage(presses = presses(d1, now, now)), today))
+        // The text is already the biggest, or bigger text was turned down: not asked.
+        assertNull(adaptationToOffer(Usage(presses = presses(d1, now, now), textBoost = 1.3f), today))
+        assertNull(adaptationToOffer(Usage(presses = presses(d1, now, now), askedBigText = true), today))
         // Clean presses since then push the old misses out.
         assertNull(adaptationToOffer(Usage(presses = (presses(d1, now, now) + presses(clean = 20)).takeLast(PRESSES_KEPT)), today))
-        assertNull(adaptationToOffer(Usage(presses = presses(d1, now, now), askedBigButtons = true), today))
+        assertNull(adaptationToOffer(Usage(presses = presses(d1, now, now), askedMissedTaps = true), today))
         assertNull(adaptationToOffer(Usage(adapt = false, presses = presses(d1, now, now)), today))
         assertEquals(Press(d1), Press.decode(Press(d1).encode()))
     }

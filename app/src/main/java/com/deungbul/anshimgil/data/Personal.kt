@@ -17,9 +17,9 @@ import kotlin.math.hypot
 
 /*
  * 쓰는 대로 맞추기 (11/8): the app watches how it is used — on this phone only, never sent — and
- *  - offers bigger buttons when taps keep missing them, and bigger text when the map is zoomed in close on
- *    several days — the text one step at a time on top of the text size in settings ([TEXT_BOOST_STEPS]), which
- *    stays 작게·보통·크게 (11/8);
+ *  - offers bigger text when taps keep missing the buttons or the map is zoomed in close on several days — one
+ *    step at a time on top of the text size in settings ([TEXT_BOOST_STEPS]), which stays 작게·보통·크게; the app
+ *    itself (its buttons, its settings) stays as it is: only AI 비서's suggestion changes the text (11/8);
  *  - puts the nearby button used clearly most first;
  *  - picks the kind of route the walker keeps choosing (safe, shortest, transit) first;
  *  - after arriving somewhere, offers the way home once the usual stay at that place is over;
@@ -51,12 +51,12 @@ const val MISS_FOLLOW_MS = 1_500L
 const val TAP_MAX_MS = 400L
 
 /**
- * Recent button presses kept, and the misses among them that ask for bigger buttons: at least
- * [MISSES_FOR_BIG_BUTTONS], the first and last [MISS_SPREAD_HOURS] hours apart (not one clumsy moment, even
+ * Recent button presses kept, and the misses among them that ask for bigger text: at least
+ * [MISSES_FOR_BIGGER_TEXT], the first and last [MISS_SPREAD_HOURS] hours apart (not one clumsy moment, even
  * one just around midnight).
  */
 const val PRESSES_KEPT = 20
-const val MISSES_FOR_BIG_BUTTONS = 3
+const val MISSES_FOR_BIGGER_TEXT = 3
 const val MISS_SPREAD_HOURS = 12L
 
 /** Days with a close zoom-in (within the last [ZOOM_WINDOW_DAYS]) that ask for bigger text. */
@@ -97,13 +97,13 @@ data class Stay(val name: String, val minutes: Int)
 data class Usage(
     /** Switched on by default; off keeps everything as it first was. */
     val adapt: Boolean = true,
-    val bigButtons: Boolean = false,
     val nearbyTaps: Map<String, Int> = emptyMap(),
     /** The latest [PRESSES_KEPT] presses of the map's buttons, most recent last. */
     val presses: List<Press> = emptyList(),
     /** Days the map was zoomed in close by hand, most recent last. */
     val zoomDays: List<LocalDate> = emptyList(),
-    val askedBigButtons: Boolean = false,
+    /** Asked about the missed taps: not asked again for them (until 처음대로). */
+    val askedMissedTaps: Boolean = false,
     /** Said no to bigger text: not asked again (until 처음대로). */
     val askedBigText: Boolean = false,
     /** AI 비서's text enlargement ([TEXT_BOOST_STEPS]); 1 = none. */
@@ -174,7 +174,7 @@ fun choiceCounts(preferred: RouteChoice?, chosen: RouteChoice): Boolean = prefer
 
 /** A change AI 비서 can offer, with its question and the answer that accepts it. */
 enum class Adaptation(val question: String, val yes: String) {
-    BIG_BUTTONS("버튼 옆을 누르셨다가 다시 누르시는 일이 몇 번 있었어요. 버튼을 더 크게 바꿔 드릴까요?", "크게 바꿔 줘"),
+    MISSED_TAPS("버튼 옆을 누르셨다가 다시 누르시는 일이 몇 번 있었어요. 글씨를 더 크게 바꿔 드릴까요?", "글씨 크게"),
     BIG_TEXT("요즘 지도를 자주 크게 보시네요. 글씨를 더 크게 바꿔 드릴까요?", "글씨 크게"),
     BIGGER_TEXT("아직 글씨가 작으신가요? 한 단계 더 크게 바꿔 드릴까요?", "더 크게"),
     CALENDAR("캘린더에 장소가 적힌 일정이 있으면 미리 길을 알려 드릴까요? 일정은 폰 안에서만 봐요.", "좋아요"),
@@ -186,7 +186,7 @@ fun nextTextBoost(current: Float): Float? = TEXT_BOOST_STEPS.firstOrNull { it > 
 /** Whether recent presses show the buttons are hard to hit (see [PRESSES_KEPT]). */
 fun buttonsHardToHit(usage: Usage): Boolean {
     val misses = usage.presses.takeLast(PRESSES_KEPT).mapNotNull { it.missedAt }.sorted()
-    return misses.size >= MISSES_FOR_BIG_BUTTONS && Duration.between(misses.first(), misses.last()).toHours() >= MISS_SPREAD_HOURS
+    return misses.size >= MISSES_FOR_BIGGER_TEXT && Duration.between(misses.first(), misses.last()).toHours() >= MISS_SPREAD_HOURS
 }
 
 /** Days with a close zoom-in in the last [ZOOM_WINDOW_DAYS] days. */
@@ -196,7 +196,9 @@ fun recentZoomDays(usage: Usage, today: LocalDate): Int =
 /** The change to offer now, if any (one at a time, each asked once). */
 fun adaptationToOffer(usage: Usage, today: LocalDate = LocalDate.now()): Adaptation? = when {
     !usage.adapt -> null
-    !usage.bigButtons && !usage.askedBigButtons && buttonsHardToHit(usage) -> Adaptation.BIG_BUTTONS
+    // Missing the buttons: bigger text (said no to bigger text already: not asked again for this either).
+    !usage.askedMissedTaps && !usage.askedBigText && buttonsHardToHit(usage) && nextTextBoost(usage.textBoost) != null ->
+        Adaptation.MISSED_TAPS
     // Zoomed in close on several days since the last answer, and the text can still grow.
     !usage.askedBigText && recentZoomDays(usage, today) >= ZOOM_DAYS_FOR_BIG_TEXT && nextTextBoost(usage.textBoost) != null ->
         if (usage.textBoost > 1f) Adaptation.BIGGER_TEXT else Adaptation.BIG_TEXT
@@ -287,11 +289,10 @@ fun returnHint(usage: Usage, here: LatLon, now: LocalDateTime, home: Place?): Ma
 
 class UsageRepository(private val context: Context) {
     private val adaptKey = booleanPreferencesKey("adapt_on")
-    private val bigButtonsKey = booleanPreferencesKey("big_buttons")
     private val nearbyKey = stringPreferencesKey("nearby_taps")
     private val pressesKey = stringPreferencesKey("presses")
     private val zoomDaysKey = stringPreferencesKey("zoom_days")
-    private val askedButtonsKey = booleanPreferencesKey("asked_big_buttons")
+    private val askedMissedKey = booleanPreferencesKey("asked_missed_taps")
     private val askedTextKey = booleanPreferencesKey("asked_big_text")
     private val routeChoicesKey = stringPreferencesKey("route_choices")
     private val arrivalKey = stringPreferencesKey("last_arrival")
@@ -304,18 +305,19 @@ class UsageRepository(private val context: Context) {
 
     /** Keys of the first version (11/8 morning), no longer read; removed by [reset]. */
     private val oldKeys = listOf("retaps", "zoom_ins", "stays").map { stringPreferencesKey(it) }
+    /** The first version's big buttons (11/8 morning, taken out: only the text grows), removed by [reset]. */
+    private val oldFlags = listOf("big_buttons", "asked_big_buttons").map { booleanPreferencesKey(it) }
 
     val usage: Flow<Usage> = context.settingsDataStore.data.map(::read)
 
     private fun read(p: Preferences) = Usage(
         adapt = p[adaptKey] ?: true,
-        bigButtons = p[bigButtonsKey] ?: false,
         nearbyTaps = p[nearbyKey].orEmpty().split(',').mapNotNull { e ->
             e.split('=').takeIf { it.size == 2 }?.let { (k, v) -> v.toIntOrNull()?.let { k to it } }
         }.toMap(),
         presses = p[pressesKey].orEmpty().split(',').mapNotNull { Press.decode(it) },
         zoomDays = p[zoomDaysKey].orEmpty().split(',').mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() },
-        askedBigButtons = p[askedButtonsKey] ?: false,
+        askedMissedTaps = p[askedMissedKey] ?: false,
         askedBigText = p[askedTextKey] ?: false,
         textBoost = p[textBoostKey]?.toFloatOrNull() ?: 1f,
         routeChoices = p[routeChoicesKey].orEmpty().split(',').mapNotNull { runCatching { RouteChoice.valueOf(it) }.getOrNull() },
@@ -358,9 +360,10 @@ class UsageRepository(private val context: Context) {
     suspend fun answer(adaptation: Adaptation, yes: Boolean) = change { p, m ->
         if (yes) m[lastChangeKey] = "${adaptation.name}@${LocalDateTime.now().withNano(0)}"
         when (adaptation) {
-            Adaptation.BIG_BUTTONS -> {
-                m[askedButtonsKey] = true
-                if (yes) m[bigButtonsKey] = true
+            Adaptation.MISSED_TAPS -> {
+                // Yes: one step bigger. Either way the misses are counted again from here.
+                m[askedMissedKey] = true
+                if (yes) nextTextBoost(read(p).textBoost)?.let { m[textBoostKey] = it.toString() }
                 m.remove(pressesKey)
             }
             Adaptation.BIG_TEXT, Adaptation.BIGGER_TEXT -> {
@@ -405,15 +408,20 @@ class UsageRepository(private val context: Context) {
 
     suspend fun setAdapt(on: Boolean) = change { _, m -> m[adaptKey] = on }
 
-    suspend fun setBigButtons(on: Boolean) = change { _, m -> m[bigButtonsKey] = on }
+    /** One step of AI 비서's text enlargement back ("방금 거 원래대로"). */
+    suspend fun stepBackTextBoost() = change { p, m ->
+        val back = TEXT_BOOST_STEPS.lastOrNull { it < read(p).textBoost - 0.001f } ?: 1f
+        if (back <= 1f) m.remove(textBoostKey) else m[textBoostKey] = back.toString()
+    }
 
     suspend fun setCalendar(on: Boolean) = change { _, m -> m[calendarKey] = on; m[askedCalendarKey] = true }
 
     /** Back to how the app first was: everything learned is forgotten (the switch stays as it is). */
     suspend fun reset() = change { _, m ->
-        listOf(bigButtonsKey, askedButtonsKey, askedTextKey, textBoostKey, calendarKey, askedCalendarKey).forEach { m.remove(it) }
+        listOf(askedMissedKey, askedTextKey, textBoostKey, calendarKey, askedCalendarKey).forEach { m.remove(it) }
         listOf(nearbyKey, pressesKey, zoomDaysKey, routeChoicesKey, arrivalKey, staysKey, tripsKey).forEach { m.remove(it) }
         oldKeys.forEach { m.remove(it) }
+        oldFlags.forEach { m.remove(it) }
         m.remove(lastChangeKey)
     }
 

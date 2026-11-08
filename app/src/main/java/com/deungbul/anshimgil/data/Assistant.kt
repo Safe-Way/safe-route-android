@@ -38,8 +38,9 @@ sealed interface AssistantAction {
         val addMapItems: Set<String> = emptySet(),
         val removeMapItems: Set<String> = emptySet(),
         /** 쓰는 대로 맞추기, also to take back an answer pressed by mistake in a bubble. */
-        val bigButtons: Boolean? = null,
         val undoTextBoost: Boolean = false,
+        /** One step of the AI's text enlargement back. */
+        val textBoostStepBack: Boolean = false,
         val calendar: Boolean? = null,
         val adapt: Boolean? = null,
     ) : AssistantAction
@@ -179,8 +180,6 @@ internal fun undoAdaptation(s: String, usage: Usage, now: java.time.LocalDateTim
     val on = has("켜", "알려줘", "봐줘", "써줘")
     val smaller = has("작게", "줄여", "너무커", "너무크")
     return when {
-        has("버튼") && (back || smaller) -> ChangeSettingsUndo("버튼을 원래 크기로 돌릴게요.", bigButtons = false)
-        has("버튼") && has("크게", "키워") -> ChangeSettingsUndo("버튼을 크게 바꿀게요.", bigButtons = true)
         has("글씨", "글자") && (back || smaller) && usage.textBoost > 1f ->
             ChangeSettingsUndo("AI가 키운 글씨를 원래대로 돌릴게요. 설정의 글자 크기는 그대로예요.", undoTextBoost = true)
         has("캘린더", "일정", "달력") && off -> ChangeSettingsUndo("캘린더 일정 알림을 끌게요.", calendar = false)
@@ -190,8 +189,8 @@ internal fun undoAdaptation(s: String, usage: Usage, now: java.time.LocalDateTim
             // The change made a moment ago.
             val last = usage.lastChange?.takeIf { java.time.Duration.between(it.second, now).toMinutes() in 0..UNDO_RECENT_MIN }
             when (last?.first) {
-                Adaptation.BIG_BUTTONS -> ChangeSettingsUndo("방금 크게 바꾼 버튼을 원래대로 돌릴게요.", bigButtons = false)
-                Adaptation.BIG_TEXT, Adaptation.BIGGER_TEXT -> ChangeSettingsUndo("방금 키운 글씨를 원래대로 돌릴게요.", undoTextBoost = true)
+                Adaptation.MISSED_TAPS, Adaptation.BIG_TEXT, Adaptation.BIGGER_TEXT ->
+                    ChangeSettingsUndo("방금 키운 글씨를 한 단계 전으로 돌릴게요.", textBoostStepBack = true).takeIf { usage.textBoost > 1f }
                 Adaptation.CALENDAR -> ChangeSettingsUndo("방금 켠 캘린더 일정 알림을 끌게요.", calendar = false)
                 null -> null
             }
@@ -203,11 +202,11 @@ internal fun undoAdaptation(s: String, usage: Usage, now: java.time.LocalDateTim
 @Suppress("FunctionName")
 private fun ChangeSettingsUndo(
     say: String,
-    bigButtons: Boolean? = null,
     undoTextBoost: Boolean = false,
+    textBoostStepBack: Boolean = false,
     calendar: Boolean? = null,
     adapt: Boolean? = null,
-) = AssistantAction.ChangeSettings(say, bigButtons = bigButtons, undoTextBoost = undoTextBoost, calendar = calendar, adapt = adapt)
+) = AssistantAction.ChangeSettings(say, undoTextBoost = undoTextBoost, textBoostStepBack = textBoostStepBack, calendar = calendar, adapt = adapt)
 
 internal fun textTooSmall(s: String): Boolean {
     val aboutText = listOf("글씨", "글자", "화면", "글이").any { s.contains(it) }

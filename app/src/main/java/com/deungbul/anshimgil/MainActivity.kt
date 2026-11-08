@@ -351,8 +351,8 @@ fun AppRoot(
                                 change.sosButton?.let { settingsRepository.setSosButton(it) }
                                 change.addMapItems.forEach { settingsRepository.setExtraMapItem(it, true) }
                                 change.removeMapItems.forEach { settingsRepository.setExtraMapItem(it, false) }
-                                change.bigButtons?.let { usageRepository?.setBigButtons(it) }
                                 if (change.undoTextBoost) usageRepository?.resetTextBoost()
+                                if (change.textBoostStepBack) usageRepository?.stepBackTextBoost()
                                 change.adapt?.let { usageRepository?.setAdapt(it) }
                             }
                         },
@@ -455,11 +455,9 @@ fun AppRoot(
                         },
                         onClearTrips = { (tripLog?.clearAll(mode) ?: true).also { if (it) tripCount = 0 } },
                         adapt = usage.adapt,
-                        bigButtons = usage.bigButtons,
                         textBoost = usage.textBoost,
                         onResetTextBoost = { scope.launch { usageRepository?.resetTextBoost() } },
                         onAdaptChange = { on -> scope.launch { usageRepository?.setAdapt(on) } },
-                        onBigButtonsChange = { on -> scope.launch { usageRepository?.setBigButtons(on) } },
                         calendarOn = usage.calendarOn,
                         onCalendarChange = { on -> useCalendar(on) },
                         onResetAdapt = { scope.launch { usageRepository?.reset() } },

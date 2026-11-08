@@ -189,9 +189,8 @@ fun HomeScreen(
     var zoom by remember { mutableIntStateOf(WALK_ZOOM) }
     val scope = rememberCoroutineScope()
     var hint by remember { mutableStateOf<MapHint?>(null) }
-    // 쓰는 대로 맞추기: bigger buttons when asked for. Where each button is on screen, so that a tap just beside
-    // one (which does nothing) followed by a tap on it is noticed as a miss; pressing a button again is not.
-    val big = if (usage.bigButtons) BIG_SCALE else 1f
+    // 쓰는 대로 맞추기: where each button is on screen, so that a tap just beside one (which does nothing)
+    // followed by a tap on it is noticed as a miss; pressing a button again is not.
     val density = androidx.compose.ui.platform.LocalDensity.current
     val buttonBoxes = remember { mutableMapOf<String, ButtonBox>() }
     val missDetector = remember(density) { MissDetector(nearPx = with(density) { MISS_NEAR_DP.dp.toPx() }) }
@@ -434,7 +433,6 @@ fun HomeScreen(
                         icon = icon,
                         onClick = { onNearbyTap(query); goToNearest(query, label) },
                         modifier = Modifier.weight(1f).tracked(query),
-                        scale = big,
                     )
                 }
             }
@@ -444,7 +442,7 @@ fun HomeScreen(
                 shape = RoundedCornerShape(14.dp),
                 color = Color.White,
                 shadowElevation = 4.dp,
-                modifier = Modifier.align(Alignment.End).size(56.dp * big).tracked("report"),
+                modifier = Modifier.align(Alignment.End).size(56.dp).tracked("report"),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Icon(Icons.Filled.Campaign, contentDescription = "불편 신고", tint = Color(0xFFB45309), modifier = Modifier.size(24.dp))
@@ -470,7 +468,7 @@ fun HomeScreen(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp, bottom = 48.dp)
-                .size(52.dp * big)
+                .size(52.dp)
                 .tracked("locate"),
         ) {
             Box(contentAlignment = Alignment.Center) {
@@ -566,7 +564,7 @@ fun HomeScreen(
             color = Color(0xFF1F6B42),
             contentColor = Color.White,
             shadowElevation = 6.dp,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp).heightIn(min = 56.dp * big).tracked("ai"),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp).heightIn(min = 56.dp).tracked("ai"),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp)) {
                 Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(22.dp))
@@ -579,23 +577,23 @@ fun HomeScreen(
 }
 
 @Composable
-private fun NearbyButton(text: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier, scale: Float = 1f) {
+private fun NearbyButton(text: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
         shadowElevation = 3.dp,
-        modifier = modifier.heightIn(min = 56.dp * scale),
+        modifier = modifier.heightIn(min = 56.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
         ) {
-            Icon(icon, contentDescription = null, tint = Color(0xFF1F6B42), modifier = Modifier.size(22.dp * scale))
+            Icon(icon, contentDescription = null, tint = Color(0xFF1F6B42), modifier = Modifier.size(22.dp))
             Column {
-                Text("가까운", fontSize = 12.sp * scale, color = Color(0xFF4A564E), maxLines = 1)
-                Text(text, fontSize = 16.sp * scale, fontWeight = FontWeight.Bold, color = Ink, maxLines = 1)
+                Text("가까운", fontSize = 12.sp, color = Color(0xFF4A564E), maxLines = 1)
+                Text(text, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink, maxLines = 1)
             }
         }
     }
@@ -748,7 +746,6 @@ private fun NearbyBusCard(at: LatLon?, mode: UserMode, onClose: () -> Unit, modi
 private const val HINT_CELL_DEG = 0.003
 
 /** Buttons this much bigger when the walker said yes to bigger buttons. */
-private const val BIG_SCALE = 1.25f
 
 /** The walker's own zooming in on the map (not the app moving it). */
 private val HAND_ZOOMS = setOf(
