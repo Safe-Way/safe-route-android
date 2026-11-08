@@ -22,7 +22,13 @@ class GuideReplayTest {
     private val dir = (System.getProperty("replay.dir") ?: System.getenv("REPLAY_DIR"))?.let(::File)
 
     private data class Step(val at: LatLon, val modifier: String, val type: String)
-    private data class Route(val name: String, val path: List<LatLon>, val steps: List<Step>, val distance: Double)
+    /** A turn the server's route engine lists (`turns` in /api/route): meters along, left/right, degrees. */
+    private data class EngineTurn(val atM: Double, val left: Boolean, val angle: Int, val crossing: Boolean)
+    private data class Route(
+        val name: String, val path: List<LatLon>, val steps: List<Step>, val distance: Double,
+        val engineTurns: List<EngineTurn>? = null,
+        val crossings: List<LatLon>? = null,
+    )
 
     private fun load(f: File): Route {
         val r = JSONObject(f.readText()).getJSONArray("routes").getJSONObject(0)
@@ -38,7 +44,17 @@ class GuideReplayTest {
                 steps += Step(LatLon(loc.getDouble(1), loc.getDouble(0)), m.optString("modifier"), m.getString("type"))
             }
         }
-        return Route(f.nameWithoutExtension, path, steps, r.getDouble("distance"))
+        // A route from our server is read the way the app reads it (ends tidied, crossings placed).
+        val server = r.optJSONObject("server")?.let { parseRouteResult(JSONObject().put("routes", org.json.JSONArray().put(it))).routes.firstOrNull() }
+        val line = server?.path ?: path
+        val g = Guidance(line, emptyList())
+        val engine = r.optJSONArray("serverTurns")?.let { a ->
+            (0 until a.length()).map { a.getJSONObject(it) }.map {
+                // The engine counts meters along the line as sent; placed on the tidied line through its point.
+                EngineTurn(along(g, pointAtMeters(path, it.getDouble("atM"))), it.getString("direction") == "left", it.optInt("angle"), it.optBoolean("crossing"))
+            }
+        }
+        return Route(f.nameWithoutExtension, line, steps, r.getDouble("distance"), engine, server?.crossings)
     }
 
     /** The turns the app announces along the route: (meters along, LEFT/RIGHT). */
@@ -59,7 +75,7 @@ class GuideReplayTest {
     private fun along(g: Guidance, p: LatLon) = g.update(p).progressM
 
     private fun turnReport(r: Route): String {
-        val g = Guidance(r.path, emptyList())
+        val g = Guidance(r.path, emptyList(), r.crossings)
         val ours = appTurns(g)
         // Real turns: left/right (and sharp); slight bends are optional.
         val ref = r.steps.filter { it.type != "depart" && it.type != "arrive" }
@@ -77,6 +93,20 @@ class GuideReplayTest {
         return "${r.name}: ${r.distance.toInt()}m, 실제 꺾는 곳 ${must.size} (살짝 ${ref.size - must.size}), 앱 안내 ${ours.size} | " +
             "빠짐 ${missed.size}${missed.joinToString("") { " [${it.first.toInt()}m ${it.second}]" }} | " +
             "반대 ${wrongSide.size} | 없는 데서 안내 ${extra.size}${extra.joinToString("") { " [${it.first.toInt()}m ${it.second}]" }}"
+    }
+
+    /** The app's turns against the route engine's own list for the same line (when the route came from our server). */
+    private fun engineReport(r: Route): String {
+        val ours = appTurns(Guidance(r.path, emptyList(), r.crossings))
+        val ref = r.engineTurns!!
+        val near = 15.0
+        val missed = ref.filter { t -> ours.none { abs(it.first - t.atM) <= near && (it.second == Turn.LEFT) == t.left } }
+        val wrong = missed.filter { t -> ours.any { abs(it.first - t.atM) <= near } }
+        val extra = ours.filter { (at, _) -> ref.none { abs(it.atM - at) <= near } }
+        fun side(l: Boolean) = if (l) "L" else "R"
+        return "${r.name}: 엔진 꺾는 곳 ${ref.size}, 앱 안내 ${ours.size}, 같음 ${ref.size - missed.size} | " +
+            "앱이 빠뜨림 ${missed.size - wrong.size}${(missed - wrong.toSet()).joinToString("") { " [${it.atM.toInt()}m ${side(it.left)} ${it.angle}°${if (it.crossing) " 건넘" else ""}]" }} | " +
+            "반대 ${wrong.size} | 앱만 안내 ${extra.size}${extra.joinToString("") { " [${it.first.toInt()}m ${it.second}]" }}"
     }
 
     private data class Fix(val p: LatLon, val accuracy: Float, val t: Long, val truthM: Double)
@@ -170,7 +200,7 @@ class GuideReplayTest {
         assumeTrue("replay.dir 없음", dir?.isDirectory == true)
         val out = StringBuilder("== 상황 재현 (구간마다 10번)\n")
         dir!!.listFiles { f -> f.extension == "json" }!!.sortedBy { it.name }.map(::load).forEach { r ->
-            val g = Guidance(r.path, emptyList())
+            val g = Guidance(r.path, emptyList(), r.crossings)
             val wrong = mutableListOf<Long>(); val busOn = mutableListOf<Long>(); val busOff = mutableListOf<Long>()
             var busOffFalse = 0; var waitDrift = 0.0; var waitBack = 0.0
             for (seed in 1..10) {
@@ -241,9 +271,14 @@ class GuideReplayTest {
         report.appendLine("== 꺾는 곳 안내: 앱 vs OpenStreetMap 도보 경로 안내")
         routes.forEach { report.appendLine(turnReport(it)) }
         report.appendLine()
+        if (routes.any { it.engineTurns != null }) {
+            report.appendLine("== 꺾는 곳 안내: 앱 vs 우리 서버 길 엔진의 turns (같은 선)")
+            routes.filter { it.engineTurns != null }.forEach { report.appendLine(engineReport(it)) }
+            report.appendLine()
+        }
         report.appendLine("== 보통 걷기 재현 (구간마다 10번, GPS 흔들림 6m, 40초에 한 번쯤 35m 튐)")
         routes.forEach { r ->
-            val g = Guidance(r.path, emptyList())
+            val g = Guidance(r.path, emptyList(), r.crossings)
             val runs = (1..10).map { seed -> replay(g, walk(g, Random(seed))) }
             report.appendLine(
                 "${r.name}: 도착 ${runs.count { it.arrived }}/10, 길 벗어남 오판 ${runs.sumOf { it.offEpisodes }}번, " +

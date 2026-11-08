@@ -64,6 +64,16 @@ private const val TURN_CLUSTER_M = 8.0
 /** …unless the way out lies this far to the side of the way in: that is crossing over, two turns. */
 private const val SIDESTEP_M = 5.0
 
+/**
+ * When the server lists where the route crosses roads, a jog up to this far aside with no crossing there is the
+ * pavement shifting (a wider kerb, a bus stop), not two turns (11/9: 3 of 4 such jogs on our server's routes
+ * around 조선대 had no crossing, and the route engine did not count them as turns).
+ */
+private const val SIDESTEP_NO_CROSSING_M = 10.0
+
+/** A crossing this close to a jog is where it crosses. */
+private const val CROSSING_NEAR_M = 12.0
+
 /** Where the walker is looked for first: from this far behind the last place on the route… */
 private const val NEAR_BACK_M = 30.0
 
@@ -90,7 +100,12 @@ private const val TURN_MARK_GAP_M = 25.0
  * Turn-by-turn guidance along a fixed route (issue #7, FR-29·30·34).
  * Uses a flat-earth approximation, which is accurate enough over a few kilometers.
  */
-class Guidance(private val path: List<LatLon>, private val facilities: List<Facility>) {
+class Guidance(
+    private val path: List<LatLon>,
+    private val facilities: List<Facility>,
+    /** [RouteOption.crossings]: null when not known. */
+    private val crossings: List<LatLon>? = null,
+) {
     private val origin = path.first()
     private val points = path.map { toXY(it) }
     private val legLengths = points.zipWithNext { a, b -> dist(a, b) }
@@ -132,6 +147,7 @@ class Guidance(private val path: List<LatLon>, private val facilities: List<Faci
      *   as several small bends), told at the sharpest of them;
      * - a bend one way and back the other way within [TURN_CLUSTER_M] that moves the line less than [SIDESTEP_M]
      *   to the side is a step aside on the pavement, not told; crossing over to the other side is two turns;
+ *   when the server lists the crossings, a jog under [SIDESTEP_NO_CROSSING_M] with no crossing there is a step aside too;
      * - what adds up to less than [TURN_DEGREES] is the road curving, not told.
      */
     private val turns: List<RouteTurn> by lazy {
@@ -152,7 +168,11 @@ class Guidance(private val path: List<LatLon>, private val facilities: List<Faci
         }
         // A step aside: one way, then straight back the other within a few meters, ending up beside the old line.
         val aside = mutableSetOf<Int>()
+        val crossingXY = crossings?.map { toXY(it) }
         groups.zipWithNext().forEachIndexed { i, (a, b) ->
+            // A bend already taken as half of a step aside is not paired again: a left, right, left would otherwise
+            // lose its real left turn as well.
+            if (i in aside) return@forEachIndexed
             if ((a.degrees > 0) == (b.degrees > 0) || cumulative[b.first] - cumulative[a.last] > TURN_CLUSTER_M) return@forEachIndexed
             if (abs(a.degrees + b.degrees) >= TURN_DEGREES) return@forEachIndexed
             val inA = points[maxOf(0, a.first - 1)]
@@ -160,7 +180,9 @@ class Guidance(private val path: List<LatLon>, private val facilities: List<Faci
             val out = points[minOf(points.lastIndex, b.last + 1)]
             val len = dist(inA, inB)
             val side = if (len < 0.5) 0.0 else abs((inB.first - inA.first) * (out.second - inA.second) - (inB.second - inA.second) * (out.first - inA.first)) / len
-            if (side < SIDESTEP_M) { aside += i; aside += i + 1 }
+            val crossing = crossingXY?.any { c -> dist(c, points[a.first]) <= CROSSING_NEAR_M || dist(c, points[b.last]) <= CROSSING_NEAR_M }
+            val limit = if (crossing == false) SIDESTEP_NO_CROSSING_M else SIDESTEP_M
+            if (side < limit) { aside += i; aside += i + 1 }
         }
         groups.filterIndexed { i, g -> i !in aside && abs(g.degrees) >= TURN_DEGREES }
             .map { RouteTurn(cumulative[it.sharpest], if (it.degrees > 0) Turn.LEFT else Turn.RIGHT, it.degrees, it.sharpest) }

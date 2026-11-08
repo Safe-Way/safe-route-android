@@ -107,6 +107,28 @@ class GuidanceTest {
     }
 
     @Test
+    fun aJogWithoutACrossingIsNoTurnWhenTheServerListsCrossings() {
+        // The pavement shifts 7 m over (90° right, 7 m, 90° left), as on our server's routes near 조선대.
+        val jog = listOf(m(0.0, 0.0), m(0.0, 100.0), m(7.0, 100.0), m(7.0, 200.0))
+        // Crossings not known (an older server): told as before.
+        assertEquals(listOf(Turn.RIGHT, Turn.LEFT), turnsOf(Guidance(jog, emptyList())).map { it.second })
+        // The server lists crossings, none here: walk on.
+        assertTrue(turnsOf(Guidance(jog, emptyList(), crossings = listOf(m(0.0, 50.0)))).isEmpty())
+        // The server lists a crossing right here: crossing over, two turns.
+        assertEquals(
+            listOf(Turn.RIGHT, Turn.LEFT),
+            turnsOf(Guidance(jog, emptyList(), crossings = listOf(m(3.5, 100.0)))).map { it.second },
+        )
+    }
+
+    @Test
+    fun aZigzagKeepsItsRealTurn() {
+        // Left 78°, right 81° 5 m on, left 88° 4 m on (back_hospital near 1117 m): the line ends up turned left.
+        val path = listOf(m(0.0, 0.0), m(0.0, 100.0), m(-5.0, 101.0), m(-5.5, 105.0), m(-9.5, 105.3), m(-60.0, 106.0))
+        assertEquals(listOf(Turn.LEFT), turnsOf(Guidance(path, emptyList())).map { it.second })
+    }
+
+    @Test
     fun aGentleBendIsNoTurn() {
         // A road curving 40° over 30 m (OSM's walking steps do not call it a turn either).
         val path = listOf(m(0.0, 0.0), m(0.0, 100.0), m(3.0, 110.0), m(8.0, 120.0), m(12.0, 128.0), m(70.0, 200.0))

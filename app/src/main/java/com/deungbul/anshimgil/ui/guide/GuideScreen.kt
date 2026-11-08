@@ -196,7 +196,7 @@ fun GuideScreen(
     // The route being followed; replaced by a new one from where the walker is when they leave it.
     var active by remember { mutableStateOf(result) }
     val route = active.route(type) ?: active.routes.first()
-    val guidance = remember(route) { Guidance(route.path, active.facilitiesOn(route.type)) }
+    val guidance = remember(route) { Guidance(route.path, active.facilitiesOn(route.type), route.crossings) }
     val destination = remember { (result.route(type) ?: result.routes.first()).path.last() }
     var fix by remember { mutableStateOf<LatLon?>(null) }
     var demoProgress by remember { mutableDoubleStateOf(0.0) }

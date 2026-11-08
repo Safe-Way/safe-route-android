@@ -22,6 +22,11 @@ data class RouteOption(
     val covered: Map<String, Int> = emptyMap(),
     /** Which side the pavement is on along stretches beside a road (OSM sidewalk tag). */
     val sidewalks: List<Sidewalk> = emptyList(),
+    /**
+     * Where the route crosses a road (the middle of each crossing the server lists); null when the server did not
+     * say. Guidance uses it to tell crossing over from the pavement jogging aside a few meters.
+     */
+    val crossings: List<LatLon>? = null,
 )
 
 enum class SidewalkSide { LEFT, RIGHT, BOTH, NONE, UNKNOWN }
