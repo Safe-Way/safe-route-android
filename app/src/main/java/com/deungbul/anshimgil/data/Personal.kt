@@ -411,6 +411,12 @@ class UsageRepository(private val context: Context) {
 
     suspend fun setAdapt(on: Boolean) = change { _, m -> m[adaptKey] = on }
 
+    /** One step more of AI 비서's text enlargement ("글씨가 작아" when the setting is already 크게). */
+    suspend fun stepUpTextBoost() = change { p, m ->
+        nextTextBoost(read(p).textBoost)?.let { m[textBoostKey] = it.toString() }
+        m[lastChangeKey] = "${Adaptation.BIG_TEXT.name}@${LocalDateTime.now().withNano(0)}"
+    }
+
     /** One step of AI 비서's text enlargement back ("방금 거 원래대로"). */
     suspend fun stepBackTextBoost() = change { p, m ->
         val back = TEXT_BOOST_STEPS.lastOrNull { it < read(p).textBoost - 0.001f } ?: 1f

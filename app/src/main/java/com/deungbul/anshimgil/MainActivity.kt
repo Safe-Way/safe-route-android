@@ -360,6 +360,7 @@ fun AppRoot(
                                 change.removeMapItems.forEach { settingsRepository.setExtraMapItem(it, false) }
                                 if (change.undoTextBoost) usageRepository?.resetTextBoost()
                                 if (change.textBoostStepBack) usageRepository?.stepBackTextBoost()
+                                if (change.textBoostUp) usageRepository?.stepUpTextBoost()
                                 change.adapt?.let { usageRepository?.setAdapt(it) }
                             }
                         },

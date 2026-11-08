@@ -41,6 +41,8 @@ sealed interface AssistantAction {
         val undoTextBoost: Boolean = false,
         /** One step of the AI's text enlargement back. */
         val textBoostStepBack: Boolean = false,
+        /** One step more of the AI's text enlargement (the setting is already 크게). */
+        val textBoostUp: Boolean = false,
         val calendar: Boolean? = null,
         val adapt: Boolean? = null,
     ) : AssistantAction
@@ -120,8 +122,13 @@ object RuleAppAssistant : AppAssistant {
         return when {
             // Only about the words on screen: "글씨가 안 보여", "화면이 잘 안 보여", or just "잘 안 보여".
             // "편의점이 안 보여" is about a place, not the text size.
-            textTooSmall(s) ->
-                AssistantAction.ChangeSettings("글씨를 크게 바꿀게요.", textSize = TextSize.LARGE)
+            // Bigger step by step: the setting up to 크게, then AI 비서's own enlargement, then say it is the biggest.
+            textTooSmall(s) -> when {
+                context.settings.textSize != TextSize.LARGE -> AssistantAction.ChangeSettings("글씨를 크게 바꿀게요.", textSize = TextSize.LARGE)
+                nextTextBoost(context.usage.textBoost) != null ->
+                    AssistantAction.ChangeSettings("글씨를 한 단계 더 크게 할게요.", textBoostUp = true)
+                else -> AssistantAction.Answer("지금이 앱에서 가장 큰 글씨예요. 폰 설정에서 글자 크기를 키우면 더 커져요.")
+            }
             has("글씨", "글자") && has("작게", "커", "너무 커") -> AssistantAction.ChangeSettings("글씨를 작게 바꿀게요.", textSize = TextSize.SMALL)
             has("음성", "소리", "말소리") && has("꺼", "끄", "시끄") -> AssistantAction.ChangeSettings("음성 안내를 끌게요.", voiceGuide = false)
             has("음성", "소리", "읽어") && has("켜", "들려") -> AssistantAction.ChangeSettings("음성 안내를 켤게요.", voiceGuide = true)

@@ -320,4 +320,18 @@ class AssistantTest {
         val small = runBlocking { RuleAppAssistant.reply(listOf(ChatLine(true, "글씨 작게 해줘")), now) }
         assertEquals(TextSize.SMALL, (small as AssistantAction.ChangeSettings).textSize)
     }
+
+    @Test
+    fun textTooSmallGrowsStepByStep() {
+        fun said(settings: AppSettings, usage: Usage = Usage()) =
+            runBlocking { RuleAppAssistant.reply(listOf(ChatLine(true, "글씨가 너무 작아 안 보여")), AssistantContext(UserMode.SENIOR, settings, usage = usage)) }
+        assertEquals(TextSize.LARGE, (said(AppSettings()) as AssistantAction.ChangeSettings).textSize)
+        // Already 크게: AI 비서's own enlargement, the setting stays.
+        val up = said(AppSettings(textSize = TextSize.LARGE)) as AssistantAction.ChangeSettings
+        assertTrue(up.textBoostUp)
+        assertNull(up.textSize)
+        assertTrue((said(AppSettings(textSize = TextSize.LARGE), Usage(textBoost = 1.15f)) as AssistantAction.ChangeSettings).textBoostUp)
+        // The biggest: said so, nothing pretends to change.
+        assertTrue(said(AppSettings(textSize = TextSize.LARGE), Usage(textBoost = 1.3f)) is AssistantAction.Answer)
+    }
 }
