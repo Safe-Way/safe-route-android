@@ -469,31 +469,30 @@ internal fun drawPicture(canvas: Canvas, kind: FacilityKind, color: Int) {
             canvas.drawCircle(12f, 20.3f, 2f, fill)
             canvas.drawCircle(12f, 2.6f, 1.3f, fill)
         }
-        FacilityKind.HEAT_SHELTER -> {
-            // The sun.
-            canvas.drawCircle(12f, 12f, 4.6f, fill)
-            val ray = line(2f)
-            for (i in 0 until 8) {
-                val a = Math.toRadians(i * 45.0)
-                val c = kotlin.math.cos(a).toFloat()
-                val s = kotlin.math.sin(a).toFloat()
-                canvas.drawLine(12f + 7f * c, 12f + 7f * s, 12f + 10f * c, 12f + 10f * s, ray)
-            }
-        }
-        FacilityKind.COLD_SHELTER -> {
-            // A snowflake.
-            val arm = line(2f)
-            for (i in 0 until 6) {
-                val a = Math.toRadians(i * 60.0 - 90.0)
-                val c = kotlin.math.cos(a).toFloat()
-                val s = kotlin.math.sin(a).toFloat()
-                canvas.drawLine(12f, 12f, 12f + 9.5f * c, 12f + 9.5f * s, arm)
-                // A small V on each arm.
-                val bx = 12f + 6f * c
-                val by = 12f + 6f * s
-                for (d in listOf(-45.0, 45.0)) {
-                    val b = a + Math.toRadians(d)
-                    canvas.drawLine(bx, by, bx + 3f * kotlin.math.cos(b).toFloat(), by + 3f * kotlin.math.sin(b).toFloat(), arm)
+        FacilityKind.HEAT_SHELTER, FacilityKind.COLD_SHELTER -> {
+            // A shelter: a house with the sun (무더위쉼터) or a snowflake (한파쉼터) inside it (11/9: the sun or
+            // snowflake alone read as the weather).
+            canvas.drawPath(path {
+                moveTo(12f, 1.5f); lineTo(23f, 11f); lineTo(20f, 11f); lineTo(20f, 22f)
+                lineTo(4f, 22f); lineTo(4f, 11f); lineTo(1f, 11f); close()
+            }, fill)
+            val cx = 12f
+            val cy = 15.5f
+            val mark = line(1.5f).apply { this.color = 0xFFFFFFFF.toInt() }
+            if (kind == FacilityKind.HEAT_SHELTER) {
+                canvas.drawCircle(cx, cy, 2.3f, white)
+                for (i in 0 until 8) {
+                    val t = Math.toRadians(i * 45.0)
+                    val c = kotlin.math.cos(t).toFloat()
+                    val sn = kotlin.math.sin(t).toFloat()
+                    canvas.drawLine(cx + 3.4f * c, cy + 3.4f * sn, cx + 4.8f * c, cy + 4.8f * sn, mark)
+                }
+            } else {
+                for (i in 0 until 3) {
+                    val t = Math.toRadians(i * 60.0 + 90.0)
+                    val c = kotlin.math.cos(t).toFloat()
+                    val sn = kotlin.math.sin(t).toFloat()
+                    canvas.drawLine(cx - 4.8f * c, cy - 4.8f * sn, cx + 4.8f * c, cy + 4.8f * sn, mark)
                 }
             }
         }
