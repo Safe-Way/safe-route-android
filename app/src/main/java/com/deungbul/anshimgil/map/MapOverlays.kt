@@ -531,11 +531,14 @@ internal fun drawPicture(canvas: Canvas, kind: FacilityKind, color: Int) {
             canvas.drawRect(RectF(17f, 13f, 19.5f, 21f), fill)
         }
         FacilityKind.STAIRS -> {
-            // Steps as a line, not a filled block (11/9: the block was too heavy on the map).
-            canvas.drawPath(path {
-                moveTo(2.5f, 20.5f); lineTo(7.5f, 20.5f); lineTo(7.5f, 15.5f); lineTo(12.5f, 15.5f)
-                lineTo(12.5f, 10.5f); lineTo(17.5f, 10.5f); lineTo(17.5f, 5.5f); lineTo(21.5f, 5.5f)
-            }, line(2.4f))
+            // Steps seen from the side: the block's outline, filled pale (11/9: solid was too heavy, a line alone
+            // read as a wave).
+            val steps = path {
+                moveTo(2.5f, 21f); lineTo(2.5f, 17f); lineTo(7.5f, 17f); lineTo(7.5f, 12.5f); lineTo(12.5f, 12.5f)
+                lineTo(12.5f, 8f); lineTo(17.5f, 8f); lineTo(17.5f, 3.5f); lineTo(21.5f, 3.5f); lineTo(21.5f, 21f); close()
+            }
+            canvas.drawPath(steps, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = (color and 0x00FFFFFF) or 0x40000000 })
+            canvas.drawPath(steps, line(2f))
         }
         FacilityKind.SUBWAY -> {
             // The front of a train.
