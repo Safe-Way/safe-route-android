@@ -34,8 +34,19 @@ class PersonalTest {
         assertEquals(Adaptation.BIG_BUTTONS, adaptationToOffer(Usage(retaps = 3), TextSize.NORMAL))
         assertNull(adaptationToOffer(Usage(retaps = 3, askedBigButtons = true), TextSize.NORMAL))
         assertEquals(Adaptation.BIG_TEXT, adaptationToOffer(Usage(retaps = 3, askedBigButtons = true, zoomIns = 5), TextSize.NORMAL))
-        assertNull(adaptationToOffer(Usage(zoomIns = 9), TextSize.LARGE))
         assertNull(adaptationToOffer(Usage(adapt = false, retaps = 9), TextSize.NORMAL))
+    }
+
+    @Test
+    fun aiTextGrowsStepByStepOnTopOfTheSetting() {
+        // The setting stays 작게·보통·크게; the AI part is separate and can still grow on top of 크게.
+        assertEquals(Adaptation.BIG_TEXT, adaptationToOffer(Usage(zoomIns = 5), TextSize.LARGE))
+        assertEquals(Adaptation.BIGGER_TEXT, adaptationToOffer(Usage(zoomIns = 5, textBoost = 1.15f), TextSize.LARGE))
+        assertNull(adaptationToOffer(Usage(zoomIns = 9, textBoost = 1.3f), TextSize.NORMAL)) // already the biggest
+        assertNull(adaptationToOffer(Usage(zoomIns = 9, askedBigText = true), TextSize.NORMAL)) // said no
+        assertEquals(1.15f, nextTextBoost(1f)!!, 0f)
+        assertEquals(1.3f, nextTextBoost(1.15f)!!, 0f)
+        assertNull(nextTextBoost(1.3f))
     }
 
     private val home = Place(null, "우리집", "", 35.1395, 126.9245, null)

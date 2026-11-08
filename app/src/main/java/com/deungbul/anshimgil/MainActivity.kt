@@ -135,8 +135,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
             val settings by settingsRepository.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
+            // AI 비서's text enlargement, on top of the text size in settings (쓰는 대로 맞추기).
+            val boost by usageRepository.usage.map { if (it.adapt) it.textBoost else 1f }.collectAsStateWithLifecycle(initialValue = 1f)
             SeipjidoTheme {
-                ScaledText(settings.textSize) {
+                ScaledText(settings.textSize, boost) {
                     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                         AppRoot(
                             modeRepository, savedPlaces, placeRepository, facilityRepository, routeRepository,
@@ -160,10 +162,10 @@ class MainActivity : ComponentActivity() {
 
 /** Applies the text size chosen in settings on top of the phone's own font size. */
 @Composable
-private fun ScaledText(size: TextSize, content: @Composable () -> Unit) {
+private fun ScaledText(size: TextSize, boost: Float = 1f, content: @Composable () -> Unit) {
     val density = LocalDensity.current
     CompositionLocalProvider(
-        LocalDensity provides Density(density.density, density.fontScale * size.scale),
+        LocalDensity provides Density(density.density, density.fontScale * size.scale * boost),
         content = content,
     )
 }
@@ -435,6 +437,8 @@ fun AppRoot(
                         onClearTrips = { (tripLog?.clearAll(mode) ?: true).also { if (it) tripCount = 0 } },
                         adapt = usage.adapt,
                         bigButtons = usage.bigButtons,
+                        textBoost = usage.textBoost,
+                        onResetTextBoost = { scope.launch { usageRepository?.resetTextBoost() } },
                         onAdaptChange = { on -> scope.launch { usageRepository?.setAdapt(on) } },
                         onBigButtonsChange = { on -> scope.launch { usageRepository?.setBigButtons(on) } },
                         onResetAdapt = { scope.launch { usageRepository?.reset() } },
@@ -576,7 +580,6 @@ fun AppRoot(
                     onAdaptation = { a, yes ->
                         scope.launch {
                             usageRepository?.answer(a, yes)
-                            if (yes && a == Adaptation.BIG_TEXT) settingsRepository.setTextSize(TextSize.LARGE)
                         }
                     },
                     onNearbyTap = { k -> scope.launch { usageRepository?.tapNearby(k) } },

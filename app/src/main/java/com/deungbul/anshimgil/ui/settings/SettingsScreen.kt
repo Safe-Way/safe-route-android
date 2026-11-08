@@ -100,6 +100,9 @@ fun SettingsScreen(
     onAdaptChange: (Boolean) -> Unit = {},
     onBigButtonsChange: (Boolean) -> Unit = {},
     onResetAdapt: () -> Unit = {},
+    /** How much AI 비서 has made the text bigger on top of the 글자 크기 below (1 = none). */
+    textBoost: Float = 1f,
+    onResetTextBoost: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var addingGuardian by remember { mutableStateOf(false) }
@@ -179,6 +182,14 @@ fun SettingsScreen(
             onAdaptChange,
         )
         SwitchRow("큰 버튼", "지도 화면의 버튼을 더 크게 보여 줘요", bigButtons, onBigButtonsChange)
+        if (textBoost > 1.001f) {
+            // The AI part is separate from 글자 크기 (작게·보통·크게), which stays as chosen.
+            LinkRow(
+                "AI가 더 키운 글씨 · ${"%.2f".format(textBoost).trimEnd('0').trimEnd('.')}배",
+                "아래 '글자 크기' 위에 더해져요. 누르면 AI가 키운 만큼을 되돌려요",
+                onResetTextBoost,
+            )
+        }
         var confirmResetAdapt by remember { mutableStateOf(false) }
         LinkRow("맞춘 것 처음대로", "버튼 순서·고르는 길·큰 버튼을 처음 상태로 돌려요") { confirmResetAdapt = true }
         if (confirmResetAdapt) {

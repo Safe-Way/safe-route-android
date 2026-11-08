@@ -14,7 +14,9 @@ import java.time.LocalDateTime
 
 /*
  * 쓰는 대로 맞추기 (11/8): the app watches how it is used — on this phone only, never sent — and
- *  - offers bigger buttons when buttons are tapped again and again, bigger text when the map is zoomed a lot;
+ *  - offers bigger buttons when buttons are tapped again and again, and bigger text when the map is zoomed a
+ *    lot — the text one step at a time on top of the text size in settings ([TEXT_BOOST_STEPS]), which stays
+ *    작게·보통·크게 (11/8);
  *  - puts the nearby buttons used most first;
  *  - picks the kind of route the walker keeps choosing (safe, shortest, transit) first;
  *  - after arriving somewhere, offers the way home once the usual stay there is over.
@@ -38,6 +40,12 @@ const val ZOOMS_FOR_BIG_TEXT = 5
 const val ROUTE_CHOICES_KEPT = 4
 const val ROUTE_CHOICES_AGREE = 3
 
+/**
+ * How much AI 비서 has made the text bigger, on top of the text size in settings: one step each time it is
+ * offered and accepted (11/8: the settings keep 작게·보통·크게, the AI part is separate and can go further).
+ */
+val TEXT_BOOST_STEPS = listOf(1f, 1.15f, 1.3f)
+
 /** Kinds of route the walker can choose. */
 enum class RouteChoice { SAFE, SHORTEST, TRANSIT }
 
@@ -50,7 +58,10 @@ data class Usage(
     val retaps: Int = 0,
     val zoomIns: Int = 0,
     val askedBigButtons: Boolean = false,
+    /** Said no to bigger text: not asked again (until 처음대로). */
     val askedBigText: Boolean = false,
+    /** AI 비서's text enlargement ([TEXT_BOOST_STEPS]); 1 = none. */
+    val textBoost: Float = 1f,
     /** Most recent last. */
     val routeChoices: List<RouteChoice> = emptyList(),
     val lastArrival: Arrival? = null,
@@ -87,13 +98,19 @@ fun preferredRoute(usage: Usage): RouteChoice? {
 enum class Adaptation(val question: String, val yes: String) {
     BIG_BUTTONS("버튼을 여러 번 누르시는 것 같아요. 버튼을 더 크게 바꿔 드릴까요?", "크게 바꿔 줘"),
     BIG_TEXT("지도를 자주 크게 보시네요. 글씨를 더 크게 바꿔 드릴까요?", "글씨 크게"),
+    BIGGER_TEXT("아직 글씨가 작으신가요? 한 단계 더 크게 바꿔 드릴까요?", "더 크게"),
 }
+
+/** The next text enlargement, or null when it is already the biggest. */
+fun nextTextBoost(current: Float): Float? = TEXT_BOOST_STEPS.firstOrNull { it > current + 0.001f }
 
 /** The change to offer now, if any (one at a time, each asked once). */
 fun adaptationToOffer(usage: Usage, textSize: TextSize): Adaptation? = when {
     !usage.adapt -> null
     !usage.bigButtons && !usage.askedBigButtons && usage.retaps >= RETAPS_FOR_BIG_BUTTONS -> Adaptation.BIG_BUTTONS
-    textSize != TextSize.LARGE && !usage.askedBigText && usage.zoomIns >= ZOOMS_FOR_BIG_TEXT -> Adaptation.BIG_TEXT
+    // Zoomed in a lot since the last answer, and the text can still grow.
+    !usage.askedBigText && usage.zoomIns >= ZOOMS_FOR_BIG_TEXT && nextTextBoost(usage.textBoost) != null ->
+        if (usage.textBoost > 1f) Adaptation.BIGGER_TEXT else Adaptation.BIG_TEXT
     else -> null
 }
 
@@ -140,6 +157,7 @@ class UsageRepository(private val context: Context) {
     private val routeChoicesKey = stringPreferencesKey("route_choices")
     private val arrivalKey = stringPreferencesKey("last_arrival")
     private val staysKey = stringPreferencesKey("stays")
+    private val textBoostKey = stringPreferencesKey("text_boost")
 
     val usage: Flow<Usage> = context.settingsDataStore.data.map(::read)
 
@@ -153,6 +171,7 @@ class UsageRepository(private val context: Context) {
         zoomIns = p[zoomsKey]?.toIntOrNull() ?: 0,
         askedBigButtons = p[askedButtonsKey] ?: false,
         askedBigText = p[askedTextKey] ?: false,
+        textBoost = p[textBoostKey]?.toFloatOrNull() ?: 1f,
         routeChoices = p[routeChoicesKey].orEmpty().split(',').mapNotNull { runCatching { RouteChoice.valueOf(it) }.getOrNull() },
         lastArrival = Arrival.decode(p[arrivalKey]),
         stays = p[staysKey].orEmpty().split(',').mapNotNull { it.toIntOrNull() },
@@ -172,12 +191,19 @@ class UsageRepository(private val context: Context) {
 
     suspend fun zoomIn() = change { p, m -> m[zoomsKey] = (read(p).zoomIns + 1).toString() }
 
-    suspend fun answer(adaptation: Adaptation, yes: Boolean) = change { _, m ->
+    suspend fun answer(adaptation: Adaptation, yes: Boolean) = change { p, m ->
         when (adaptation) {
             Adaptation.BIG_BUTTONS -> { m[askedButtonsKey] = true; if (yes) m[bigButtonsKey] = true }
-            Adaptation.BIG_TEXT -> m[askedTextKey] = true
+            Adaptation.BIG_TEXT, Adaptation.BIGGER_TEXT -> {
+                // Yes: one step bigger, and the zooming is counted again for the next step. No: not asked again.
+                if (yes) nextTextBoost(read(p).textBoost)?.let { m[textBoostKey] = it.toString() } else m[askedTextKey] = true
+                m[zoomsKey] = "0"
+            }
         }
     }
+
+    /** Takes back AI 비서's text enlargement. */
+    suspend fun resetTextBoost() = change { _, m -> m.remove(textBoostKey) }
 
     suspend fun chooseRoute(choice: RouteChoice) = change { p, m ->
         m[routeChoicesKey] = (read(p).routeChoices + choice).takeLast(ROUTE_CHOICES_KEPT).joinToString(",")
@@ -204,7 +230,7 @@ class UsageRepository(private val context: Context) {
 
     /** Back to how the app first was: everything learned is forgotten (the switch stays as it is). */
     suspend fun reset() = change { _, m ->
-        listOf(bigButtonsKey, askedButtonsKey, askedTextKey).forEach { m.remove(it) }
+        listOf(bigButtonsKey, askedButtonsKey, askedTextKey, textBoostKey).forEach { m.remove(it) }
         listOf(nearbyKey, retapsKey, zoomsKey, routeChoicesKey, arrivalKey, staysKey).forEach { m.remove(it) }
     }
 
