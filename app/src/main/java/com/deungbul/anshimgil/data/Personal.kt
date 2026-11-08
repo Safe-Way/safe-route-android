@@ -118,6 +118,8 @@ data class Usage(
     /** 캘린더 일정으로 길 알려 주기 ([CalendarTrips.kt]): off until the walker says yes. */
     val calendarOn: Boolean = false,
     val askedCalendar: Boolean = false,
+    /** The last change accepted in a bubble and when, for "방금 거 원래대로" in AI 비서. */
+    val lastChange: Pair<Adaptation, LocalDateTime>? = null,
 ) {
     val misses: List<Press> get() = presses.filter { it.missed }
 }
@@ -297,6 +299,7 @@ class UsageRepository(private val context: Context) {
     private val textBoostKey = stringPreferencesKey("text_boost")
     private val tripsKey = stringPreferencesKey("trips_local")
     private val calendarKey = booleanPreferencesKey("calendar_on")
+    private val lastChangeKey = stringPreferencesKey("last_change")
     private val askedCalendarKey = booleanPreferencesKey("asked_calendar")
 
     /** Keys of the first version (11/8 morning), no longer read; removed by [reset]. */
@@ -324,6 +327,9 @@ class UsageRepository(private val context: Context) {
         trips = TripRecord.decodeAll(p[tripsKey]),
         calendarOn = p[calendarKey] ?: false,
         askedCalendar = p[askedCalendarKey] ?: false,
+        lastChange = p[lastChangeKey]?.split('@')?.takeIf { it.size == 2 }?.let { (a, t) ->
+            runCatching { Adaptation.valueOf(a) to LocalDateTime.parse(t) }.getOrNull()
+        },
     )
 
     private suspend fun change(block: (Preferences, androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
@@ -350,6 +356,7 @@ class UsageRepository(private val context: Context) {
     }
 
     suspend fun answer(adaptation: Adaptation, yes: Boolean) = change { p, m ->
+        if (yes) m[lastChangeKey] = "${adaptation.name}@${LocalDateTime.now().withNano(0)}"
         when (adaptation) {
             Adaptation.BIG_BUTTONS -> {
                 m[askedButtonsKey] = true
@@ -407,6 +414,7 @@ class UsageRepository(private val context: Context) {
         listOf(bigButtonsKey, askedButtonsKey, askedTextKey, textBoostKey, calendarKey, askedCalendarKey).forEach { m.remove(it) }
         listOf(nearbyKey, pressesKey, zoomDaysKey, routeChoicesKey, arrivalKey, staysKey, tripsKey).forEach { m.remove(it) }
         oldKeys.forEach { m.remove(it) }
+        m.remove(lastChangeKey)
     }
 
     suspend fun current(): Usage = usage.first()

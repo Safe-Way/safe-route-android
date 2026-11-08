@@ -37,6 +37,11 @@ sealed interface AssistantAction {
         val sosButton: Boolean? = null,
         val addMapItems: Set<String> = emptySet(),
         val removeMapItems: Set<String> = emptySet(),
+        /** 쓰는 대로 맞추기, also to take back an answer pressed by mistake in a bubble. */
+        val bigButtons: Boolean? = null,
+        val undoTextBoost: Boolean = false,
+        val calendar: Boolean? = null,
+        val adapt: Boolean? = null,
     ) : AssistantAction
 
     /** Route to the nearest place of a kind ([NEARBY_KINDS] key). */
@@ -69,6 +74,8 @@ sealed interface AssistantAction {
 data class AssistantContext(
     val mode: UserMode,
     val settings: AppSettings,
+    /** What 쓰는 대로 맞추기 has changed, so that it can be taken back by asking. */
+    val usage: Usage = Usage(),
     /** The phone's position when there is a real fix; asked only by the server assistant. */
     val where: suspend () -> LatLon? = { null },
 )
@@ -108,6 +115,7 @@ object RuleAppAssistant : AppAssistant {
         NEARBY_KINDS.entries.firstOrNull { (_, name) -> s.contains(name) }?.let { (kind, name) ->
             if (wantsGo || s.length <= name.length + 3) return AssistantAction.GoNearby("가까운 ${name}으로 길을 찾을게요.", kind)
         }
+        undoAdaptation(s, context.usage)?.let { return it }
         return when {
             // Only about the words on screen: "글씨가 안 보여", "화면이 잘 안 보여", or just "잘 안 보여".
             // "편의점이 안 보여" is about a place, not the text size.
@@ -156,6 +164,51 @@ fun reportAction(said: String, say: String? = null): AssistantAction.OpenReport 
 }
 
 /** Whether [s] (spaces removed) says the text is too small to read. */
+/** How long after a change "방금 거 원래대로" still means that change. */
+const val UNDO_RECENT_MIN = 30L
+
+/**
+ * Taking back what 쓰는 대로 맞추기 changed, by asking AI 비서 (an answer in a bubble pressed by mistake):
+ * "버튼 원래대로", "글씨 원래대로" (the AI's enlargement first), "캘린더 알림 꺼 줘", "알아서 바꾸지 마", or just
+ * "방금 거 잘못 눌렀어, 원래대로" for the change made in the last [UNDO_RECENT_MIN] minutes. [s] has no spaces.
+ */
+internal fun undoAdaptation(s: String, usage: Usage, now: java.time.LocalDateTime = java.time.LocalDateTime.now()): AssistantAction.ChangeSettings? {
+    fun has(vararg w: String) = w.any { s.contains(it) }
+    val back = has("원래", "되돌", "돌려", "취소", "잘못눌", "실수로", "처음대로", "이전대로", "전대로")
+    val off = has("꺼", "끄", "그만", "지마", "지말", "싫어", "필요없")
+    val on = has("켜", "알려줘", "봐줘", "써줘")
+    val smaller = has("작게", "줄여", "너무커", "너무크")
+    return when {
+        has("버튼") && (back || smaller) -> ChangeSettingsUndo("버튼을 원래 크기로 돌릴게요.", bigButtons = false)
+        has("버튼") && has("크게", "키워") -> ChangeSettingsUndo("버튼을 크게 바꿀게요.", bigButtons = true)
+        has("글씨", "글자") && (back || smaller) && usage.textBoost > 1f ->
+            ChangeSettingsUndo("AI가 키운 글씨를 원래대로 돌릴게요. 설정의 글자 크기는 그대로예요.", undoTextBoost = true)
+        has("캘린더", "일정", "달력") && off -> ChangeSettingsUndo("캘린더 일정 알림을 끌게요.", calendar = false)
+        has("캘린더", "일정", "달력") && on && has("알림", "길", "캘린더") -> ChangeSettingsUndo("캘린더 일정으로 길을 알려 드릴게요.", calendar = true)
+        has("알아서", "자동으로", "맞추기", "맞춰") && off -> ChangeSettingsUndo("쓰는 대로 맞추기를 끌게요. 설정에서 다시 켤 수 있어요.", adapt = false)
+        back && !has("길", "지도", "모드", "소리", "음성") -> {
+            // The change made a moment ago.
+            val last = usage.lastChange?.takeIf { java.time.Duration.between(it.second, now).toMinutes() in 0..UNDO_RECENT_MIN }
+            when (last?.first) {
+                Adaptation.BIG_BUTTONS -> ChangeSettingsUndo("방금 크게 바꾼 버튼을 원래대로 돌릴게요.", bigButtons = false)
+                Adaptation.BIG_TEXT, Adaptation.BIGGER_TEXT -> ChangeSettingsUndo("방금 키운 글씨를 원래대로 돌릴게요.", undoTextBoost = true)
+                Adaptation.CALENDAR -> ChangeSettingsUndo("방금 켠 캘린더 일정 알림을 끌게요.", calendar = false)
+                null -> null
+            }
+        }
+        else -> null
+    }
+}
+
+@Suppress("FunctionName")
+private fun ChangeSettingsUndo(
+    say: String,
+    bigButtons: Boolean? = null,
+    undoTextBoost: Boolean = false,
+    calendar: Boolean? = null,
+    adapt: Boolean? = null,
+) = AssistantAction.ChangeSettings(say, bigButtons = bigButtons, undoTextBoost = undoTextBoost, calendar = calendar, adapt = adapt)
+
 internal fun textTooSmall(s: String): Boolean {
     val aboutText = listOf("글씨", "글자", "화면", "글이").any { s.contains(it) }
     val cannotSee = listOf("안보여", "작아", "크게", "흐려", "안보이").any { s.contains(it) }

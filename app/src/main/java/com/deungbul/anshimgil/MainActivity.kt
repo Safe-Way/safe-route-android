@@ -339,9 +339,11 @@ fun AppRoot(
                         listenAtStart = assistantListen,
                         chat = assistantChat,
                         assistant = appAssistant,
-                        context = AssistantContext(mode, settings, where = { currentLocation(appContext, 4_000) }),
+                        context = AssistantContext(mode, settings, usage = usage, where = { currentLocation(appContext, 4_000) }),
                         placeRepository = placeRepository,
                         onChangeSettings = { change ->
+                            // On asks for the calendar permission first.
+                            change.calendar?.let { useCalendar(it) }
                             scope.launch {
                                 change.mode?.let { modeRepository.save(it) }
                                 change.textSize?.let { settingsRepository.setTextSize(it) }
@@ -349,6 +351,9 @@ fun AppRoot(
                                 change.sosButton?.let { settingsRepository.setSosButton(it) }
                                 change.addMapItems.forEach { settingsRepository.setExtraMapItem(it, true) }
                                 change.removeMapItems.forEach { settingsRepository.setExtraMapItem(it, false) }
+                                change.bigButtons?.let { usageRepository?.setBigButtons(it) }
+                                if (change.undoTextBoost) usageRepository?.resetTextBoost()
+                                change.adapt?.let { usageRepository?.setAdapt(it) }
                             }
                         },
                         onRoute = { place -> screen = Screen.Route(place, fromHome = true) },
