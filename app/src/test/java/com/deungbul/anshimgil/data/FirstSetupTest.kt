@@ -27,10 +27,22 @@ class FirstSetupTest {
     }
 
     @Test
-    fun readableTextStaysNormalWithoutTheAiPart() {
+    fun readableTextIsLeftAsItIs() {
+        // "잘 보여요" leaves the text as it is, also for a walker already on 크게.
         val (_, a) = answerSetup(SetupStep.TEXT, 0, SetupAnswers())
-        assertEquals(TextSize.NORMAL, a.textSize)
+        assertNull(a.textSize)
         assertNull(a.textBoost)
+        assertEquals(
+            "이렇게 맞췄어요: 글씨 그대로, 음성 안내 끔, SOS 버튼 켬. 설정에서나 저에게 말해서 언제든 바꿀 수 있어요.",
+            setupSummary(a.copy(voiceGuide = false, sosButton = true)),
+        )
         assertEquals(TextSize.LARGE, answerSetup(SetupStep.TEXT, 1, SetupAnswers()).second.textSize)
+    }
+
+    @Test
+    fun aChangedModeIsAskedTheSameWay() {
+        assertEquals(SetupStep.TEXT, answerSetup(SetupStep.CHANGED, 0, SetupAnswers()).first)
+        assertNull(answerSetup(SetupStep.CHANGED, 1, SetupAnswers()).first)
+        assertEquals(SetupAnswers(), answerSetup(SetupStep.CHANGED, 1, SetupAnswers()).second)
     }
 }

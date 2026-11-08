@@ -406,8 +406,10 @@ fun AppRoot(
                     ModeSelectScreen(
                         initial = mode,
                         onStart = { picked ->
-                            // The first pick on a new install: AI 비서 offers to set up the rest.
+                            // The first pick on a new install, or another mode later: AI 비서 offers to set up the rest.
                             if (mode == null) setupStep = SetupStep.START
+                            else if (picked != mode) setupStep = SetupStep.CHANGED
+                            setupAnswers = SetupAnswers()
                             scope.launch {
                                 modeRepository.save(picked)
                                 changingMode = false
@@ -614,7 +616,7 @@ fun AppRoot(
                             val (next, answers) = answerSetup(step, i, setupAnswers)
                             setupAnswers = answers
                             setupStep = next
-                            if (step == SetupStep.START && next == null) {
+                            if ((step == SetupStep.START || step == SetupStep.CHANGED) && next == null) {
                                 assistantChat.note(false, "알겠어요. 필요하면 설정에서나 저에게 말해서 언제든 바꿀 수 있어요.")
                             }
                             // Applied at once, so the walker sees the text change.
