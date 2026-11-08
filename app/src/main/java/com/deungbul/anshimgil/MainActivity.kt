@@ -79,6 +79,12 @@ import kotlinx.coroutines.flow.first
 import androidx.compose.runtime.LaunchedEffect
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
+import com.deungbul.anshimgil.ui.common.LOADING_PAGE
+import com.deungbul.anshimgil.ui.common.PageReveal
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.repeatOnLifecycle
 import com.deungbul.anshimgil.ui.assistant.AssistantScreen
 import com.deungbul.anshimgil.ui.theme.SeipjidoTheme
@@ -335,6 +341,26 @@ fun AppRoot(
         if (screen == Screen.Settings && tripConsent == TripConsent.YES) tripCount = runCatching { tripLog?.count() }.getOrNull()
     }
 
+    // 화면 전환: the page shown, and where the walker last tapped, for the reveal over it ([PageReveal]).
+    var lastTap by remember { mutableStateOf<androidx.compose.ui.geometry.Offset?>(null) }
+    val pageKey = when (val s = saved) {
+        SavedMode.Loading -> LOADING_PAGE
+        is SavedMode.Ready -> when {
+            (s.mode == null || changingMode) && talking -> "talk"
+            s.mode == null || changingMode -> "mode"
+            else -> screen::class.java.simpleName
+        }
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            // Notes every touch without taking it.
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    lastTap = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial).position
+                }
+            },
+    ) {
     when (val state = saved) {
         SavedMode.Loading -> Box(modifier.fillMaxSize())
         is SavedMode.Ready -> {
@@ -642,6 +668,8 @@ fun AppRoot(
                 )
             }
         }
+    }
+    PageReveal(pageKey, lastTap, Modifier.fillMaxSize())
     }
 }
 
