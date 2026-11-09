@@ -122,9 +122,9 @@ class MainActivity : ComponentActivity() {
         val savedPlaces = SavedPlacesRepository(applicationContext)
         val placeRepository = PlaceRepository.create()
         val facilityRepository = FacilityRepository.create()
-        val routeRepository = RouteRepository.create()
         val settingsRepository = SettingsRepository(applicationContext)
         val walkSpeedRepository = WalkSpeedRepository(applicationContext)
+        val routeRepository = RouteRepository.create(guestId = { walkSpeedRepository.guestId() })
         val tripLog = TripLogRepository(applicationContext, guestId = { walkSpeedRepository.guestId() })
         val myInfoRepository = com.deungbul.anshimgil.data.MyInfoRepository(guestId = { walkSpeedRepository.guestId() })
         val usageRepository = UsageRepository(applicationContext)
@@ -277,7 +277,7 @@ fun AppRoot(
         MapHintSource(
             EventRepository.create(),
             guestId = { walkSpeedRepository.guestId() },
-            openLog = AppOpenLog(appContext),
+            openLog = AppOpenLog(appContext, keep = { tripLog?.consent?.first() == TripConsent.YES }),
             usage = { usageRepository?.current() },
             home = { savedPlaces.favorites.first().firstOrNull { it.name == "집" }?.place },
             calendar = { here, now -> calendarHint(appContext, placeRepository, here, now) },
@@ -315,11 +315,12 @@ fun AppRoot(
         guideStartedAt = java.time.LocalDateTime.now()
         tripId = null
         tripDestination = destination
+        // Only with a yes to keeping trips (팀 결정 11-09): nothing about places is kept on the phone otherwise.
+        if (tripConsent != TripConsent.YES) return
         // Leaving the place last arrived at: how long the walker stays there is learned (for "집으로 갈까요?").
         // Also kept for the habits (이동 패턴): where to and when.
         scope.launch { runCatching { usageRepository?.leaving(lastKnownLocation(appContext), destination, transit, guideStartedAt) } }
         val log = tripLog ?: return
-        if (tripConsent != TripConsent.YES) return
         val route = result?.let { r -> type?.let { r.route(it) } ?: r.routes.firstOrNull() }
         scope.launch {
             tripId = runCatching {
@@ -339,7 +340,7 @@ fun AppRoot(
     var learnedSay by remember { mutableStateOf<String?>(null) }
     /** At the end: close the record (arrived or stopped), or ask the first time. */
     fun finishTrip(arrived: Boolean) {
-        if (arrived) tripDestination?.let { place ->
+        if (arrived && tripConsent == TripConsent.YES) tripDestination?.let { place ->
             scope.launch { runCatching { usageRepository?.arrived(place, java.time.LocalDateTime.now()) } }
         }
         val log = tripLog ?: return
@@ -357,6 +358,16 @@ fun AppRoot(
     }
     // How many trips the server keeps, for settings.
     var tripCount by remember { mutableStateOf<Int?>(null) }
+    // Places are learned on the phone only with a yes to keeping trips (팀 결정 11-09): without it (not asked yet, or
+    // no) whatever was kept before is forgotten. Read from the saved value, not the screen's starting guess.
+    LaunchedEffect(tripLog) {
+        tripLog?.consent?.collect { consent ->
+            if (consent != TripConsent.YES) runCatching {
+                usageRepository?.forgetPlaces()
+                AppOpenLog(appContext).clear()
+            }
+        }
+    }
     LaunchedEffect(screen, tripConsent) {
         if (screen == Screen.Settings && tripConsent == TripConsent.YES) tripCount = runCatching { tripLog?.count() }.getOrNull()
     }
@@ -365,6 +376,11 @@ fun AppRoot(
         SavedMode.Loading -> Box(modifier.fillMaxSize())
         is SavedMode.Ready -> {
             val mode = state.mode
+            // The server keeps this phone's guest number and mode (진행표 10); quietly, and again next time if offline.
+            LaunchedEffect(mode) {
+                val m = mode ?: return@LaunchedEffect
+                if (com.deungbul.anshimgil.data.ServerApi.isConfigured) runCatching { myInfoRepository.syncMode(m) }
+            }
             // AI 비서, as its own screen from the map or laid over walking guidance (which keeps running underneath).
             val assistantPanel: @Composable (UserMode, () -> Unit) -> Unit = { mode, onClose ->
                     AssistantScreen(

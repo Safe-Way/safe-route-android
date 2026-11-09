@@ -10,22 +10,32 @@ interface RouteRepository {
     /** Throws [ApiException]. */
     suspend fun findRoutes(request: RouteRequest): RouteResult
 
+    /** This phone's guest number, sent with route and transit requests so the server uses the walker's own choices. */
+    suspend fun guestId(): String? = null
+
     companion object {
-        fun create(): RouteRepository = if (ServerApi.isConfigured) ServerRouteRepository() else FakeRouteRepository()
+        fun create(guestId: suspend () -> String? = { null }): RouteRepository =
+            if (ServerApi.isConfigured) ServerRouteRepository(guestId) else FakeRouteRepository()
     }
 }
 
-/** Talks to `POST /api/route` (requirements 8.3, server Safe-Way/safe-route#33). */
-class ServerRouteRepository : RouteRepository {
+/**
+ * Talks to `POST /api/route` (requirements 8.3, server Safe-Way/safe-route#33). With the guest number (진행표 10,
+ * server #111·#115) the route follows that walker's stairs, detour and rest choices kept in the server's user_profile.
+ */
+class ServerRouteRepository(private val guest: suspend () -> String? = { null }) : RouteRepository {
+    override suspend fun guestId(): String? = runCatching { guest() }.getOrNull()
+
     override suspend fun findRoutes(request: RouteRequest): RouteResult {
         val stops = request.stops.take(MAX_WALK_STOPS)
-        val whole = parseRouteResult(ServerApi.post("/api/route", request.toJson()), request.mode)
+        val guestId = guestId()
+        val whole = parseRouteResult(ServerApi.post("/api/route", request.toJson(guestId)), request.mode)
         // The engine takes stops itself once w10 is in; until then each stretch is found and joined here
         // (as 채림 advised, #121).
         if (stops.isEmpty() || whole.routes.any { it.stops.isNotEmpty() }) return whole
         val points = listOf(request.origin) + stops.map { it.point } + request.destination
         val parts = points.zipWithNext().map { (a, b) ->
-            parseRouteResult(ServerApi.post("/api/route", request.copy(origin = a, destination = b, stops = emptyList()).toJson()), request.mode)
+            parseRouteResult(ServerApi.post("/api/route", request.copy(origin = a, destination = b, stops = emptyList()).toJson(guestId)), request.mode)
         }
         return joinStretches(parts, stops)
     }
@@ -80,11 +90,12 @@ internal fun joinStretches(parts: List<RouteResult>, stops: List<StopPlace>): Ro
     )
 }
 
-internal fun RouteRequest.toJson(): JSONObject = JSONObject()
+internal fun RouteRequest.toJson(guestId: String? = null): JSONObject = JSONObject()
     .put("origin", JSONObject().put("lat", origin.lat).put("lon", origin.lon))
     .put("destination", JSONObject().put("lat", destination.lat).put("lon", destination.lon))
     .put("mode", mode.key)
     .put("night", night)
+    .apply { guestId?.let { put("guestId", it) } }
     .apply { stopsJson(stops.take(MAX_WALK_STOPS))?.let { put("stops", it) } }
 
 /** Comparison rows built from each route's `counts`, in the server's group order. */

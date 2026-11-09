@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.guide
 
+import com.deungbul.anshimgil.data.withIeyo
 import com.deungbul.anshimgil.data.TransitRepository
 import com.deungbul.anshimgil.data.TransitRoute
 import com.deungbul.anshimgil.data.TransitStop
@@ -374,7 +375,7 @@ private fun RidePart(
     LaunchedEffect(near) {
         if (near && !warned) {
             warned = true
-            if (voiceByDefault) tts.speak("곧 ${leg.to.name ?: "내릴 곳"}이에요. 내릴 준비를 하세요.", TextToSpeech.QUEUE_FLUSH, null, "alight")
+            if (voiceByDefault) tts.speak("곧 ${withIeyo(leg.to.name ?: "내릴 곳")}. 내릴 준비를 하세요.", TextToSpeech.QUEUE_FLUSH, null, "alight")
         }
     }
 
@@ -393,7 +394,7 @@ private fun RidePart(
         if (near) {
             Surface(shape = RoundedCornerShape(14.dp), color = Color(0xFFFFF4E5)) {
                 Text(
-                    "곧 ${leg.to.name ?: "내릴 곳"}이에요. 내릴 준비를 하세요.",
+                    "곧 ${withIeyo(leg.to.name ?: "내릴 곳")}. 내릴 준비를 하세요.",
                     fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7A5310),
                     modifier = Modifier.padding(14.dp),
                 )

@@ -74,6 +74,9 @@ private const val SIDESTEP_NO_CROSSING_M = 10.0
 /** A crossing this close to a jog is where it crosses. */
 private const val CROSSING_NEAR_M = 12.0
 
+/** A crossing this far from the route still counts as on it (for [Guidance.crossingsAlongM]). */
+private const val CROSSING_ON_ROUTE_M = 15.0
+
 /** Where the walker is looked for first: from this far behind the last place on the route… */
 private const val NEAR_BACK_M = 30.0
 
@@ -313,6 +316,20 @@ class Guidance(
                 val cross = heading.first * (xy.second - here.second) - heading.second * (xy.first - here.first)
                 HelpPoint(f.kind, d.roundToInt(), if (abs(cross) < 1e-6) Turn.STRAIGHT else if (cross > 0) Turn.LEFT else Turn.RIGHT)
             }
+    }
+
+    /** How far along the route each road crossing is, in order; crossings not on the route are left out. */
+    val crossingsAlongM: List<Double> by lazy {
+        crossings.orEmpty().mapNotNull { c ->
+            val p = toXY(c)
+            var best = Double.MAX_VALUE
+            var along = 0.0
+            for (i in legLengths.indices) {
+                val (t, d) = projectOnLeg(p, i)
+                if (d < best) { best = d; along = cumulative[i] + legLengths[i] * t }
+            }
+            along.takeIf { best <= CROSSING_ON_ROUTE_M }
+        }.sorted()
     }
 
     /**

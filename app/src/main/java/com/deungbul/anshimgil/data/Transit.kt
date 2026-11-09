@@ -42,11 +42,19 @@ data class TransitResult(val routes: List<TransitRoute>, val hiddenForWheelchair
 
 object TransitRepository {
     /** Throws [ApiException], e.g. TOO_CLOSE (walk instead), NO_ROUTE, DAILY_LIMIT, TRANSIT_UNAVAILABLE. */
-    suspend fun find(origin: LatLon, destination: LatLon, mode: UserMode, stops: List<StopPlace> = emptyList()): TransitResult {
+    suspend fun find(
+        origin: LatLon,
+        destination: LatLon,
+        mode: UserMode,
+        stops: List<StopPlace> = emptyList(),
+        guestId: String? = null,
+    ): TransitResult {
         val body = JSONObject()
             .put("origin", JSONObject().put("lat", origin.lat).put("lon", origin.lon))
             .put("destination", JSONObject().put("lat", destination.lat).put("lon", destination.lon))
             .put("mode", mode.key)
+            // The walking parts follow the walker's own choices (server #115).
+            .apply { guestId?.let { put("guestId", it) } }
             .apply { stopsJson(stops)?.let { put("stops", it) } }
         return parseTransit(ServerApi.post("/api/transit", body))
     }
