@@ -272,20 +272,11 @@ fun favoriteIn(said: String, favorites: List<Favorite>): Favorite? = favorites.f
     }
 }
 
-/** "집이", "학교가": the subject particle for [word]. */
-internal fun withSubject(word: String): String = word + if (hasBatchim(word)) "이" else "가"
+/** "집이", "학교가", "GATE3이": the subject particle for [word], as it is read out (Josa.kt). */
+internal fun withSubject(word: String): String = withIGa(word)
 
-/** "집으로", "학교로": the direction particle for [word] (ㄹ takes 로). */
-internal fun withDirection(word: String): String {
-    val last = word.lastOrNull() ?: return word
-    val code = last.code - 0xAC00
-    return word + if (code in 0..11171 && code % 28 != 0 && code % 28 != 8) "으로" else "로"
-}
-
-private fun hasBatchim(word: String): Boolean {
-    val code = (word.lastOrNull()?.code ?: return false) - 0xAC00
-    return code in 0..11171 && code % 28 != 0
-}
+/** "집으로", "학교로", "GATE3으로": the direction particle for [word] (ㄹ takes 로), as it is read out. */
+internal fun withDirection(word: String): String = withRo(word)
 
 /**
  * Saved places first: "집에 가자" goes home even when the server is down (the phone's own assistant would
