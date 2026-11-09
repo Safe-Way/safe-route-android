@@ -18,6 +18,7 @@ import com.deungbul.anshimgil.data.distanceMeters
 import com.deungbul.anshimgil.data.schoolZoneCircle
 import com.deungbul.anshimgil.data.TurnMark
 import com.deungbul.anshimgil.data.TransitRoute
+import com.deungbul.anshimgil.data.TransitLeg
 import com.deungbul.anshimgil.data.LegType
 import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.LatLng
@@ -287,6 +288,10 @@ private fun turnSignBitmap(density: Float, left: Boolean): Bitmap {
 }
 
 private val TURN_INK = 0xFF1F6B42.toInt()
+
+/** A ride's line: its stops in order, or just where to get on and off. */
+internal fun ridePoints(leg: TransitLeg): List<LatLon> =
+    leg.stops.map { it.point }.takeIf { it.size >= 2 } ?: listOf(leg.from.point, leg.to.point)
 
 /** A small zebra-crossing sign at each crosswalk on the route. */
 fun KakaoMap.addCrosswalks(context: Context, points: List<LatLon>) {
@@ -647,8 +652,9 @@ fun KakaoMap.showTransit(context: Context, route: TransitRoute, destinationName:
     route.legs.forEach { leg ->
         val (points, color) = when (leg.type) {
             LegType.WALK -> (leg.path.ifEmpty { listOf(leg.from.point, leg.to.point) }) to 0xFF1F6B42.toInt()
-            LegType.BUS -> listOf(leg.from.point, leg.to.point) to 0xFF2F5BB7.toInt()
-            LegType.SUBWAY -> listOf(leg.from.point, leg.to.point) to 0xFF6D28D9.toInt()
+            // Through every stop on the way (#110) when known, so the line follows the bus, not a straight cut.
+            LegType.BUS -> ridePoints(leg) to 0xFF2F5BB7.toInt()
+            LegType.SUBWAY -> ridePoints(leg) to 0xFF6D28D9.toInt()
         }
         all += points
         val style = RouteLineStyle.from((if (leg.type == LegType.WALK) 6f else 7f) * density, color, 1.5f * density, 0xFFFFFFFF.toInt())
