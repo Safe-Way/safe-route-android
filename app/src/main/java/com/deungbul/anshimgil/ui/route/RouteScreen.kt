@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.route
 
+import com.deungbul.anshimgil.data.withEulReul
 import com.deungbul.anshimgil.data.firstWait
 import com.deungbul.anshimgil.data.FirstWait
 import androidx.compose.ui.text.style.TextAlign
@@ -316,7 +317,7 @@ fun RouteScreen(
         if (!transitTab || transit is TransitState.Ready) return@LaunchedEffect
         transit = TransitState.Loading
         transit = try {
-            val r = TransitRepository.find(from.point, LatLon(destination.lat, destination.lon), mode)
+            val r = TransitRepository.find(from.point, LatLon(destination.lat, destination.lon), mode, routeRepository.guestId())
             if (r.routes.isEmpty()) TransitState.Failed(r.note ?: "대중교통 경로가 없어요", null) else TransitState.Ready(r)
         } catch (e: ApiException) {
             TransitState.Failed(e.message, e.code)
@@ -831,7 +832,7 @@ private fun LegRow(leg: TransitLeg, wait: FirstWait?) {
             live?.let { Text(it, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color) }
             wait?.let {
                 Text(
-                    if (it.waitMin == 0) "도착하면 바로 ${it.catches}를 탈 수 있어요" else "정류장에서 약 ${it.waitMin}분 기다려 ${it.catches}를 타요",
+                    if (it.waitMin == 0) "도착하면 바로 ${withEulReul(it.catches)} 탈 수 있어요" else "정류장에서 약 ${it.waitMin}분 기다려 ${withEulReul(it.catches)} 타요",
                     fontSize = 14.sp, color = Muted,
                 )
             }

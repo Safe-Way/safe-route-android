@@ -72,12 +72,40 @@ fun bearingDeg(a: LatLon, b: LatLon): Float {
 }
 
 /**
- * Which way the arrow and the map should face. While walking on the route: the route ahead (it cannot
- * flip). Walking off the route: the way they are actually going (GPS). Standing still: the compass,
- * which shows where the phone points; without one, the route ahead.
+ * Which way the arrow and the map should face. On the route, walking or not: the route ahead (it cannot flip,
+ * and switching to the compass whenever the walker slowed at a corner swung the map about, 11/9 video).
+ * Walking off the route: the way they are actually going (GPS). Standing still off it: the compass, which
+ * shows where the phone points; without one, the route ahead.
  */
 fun guideHeading(onRoute: Boolean, moving: Boolean, routeAhead: Float, course: Float?, compass: Float?): Float = when {
-    moving && onRoute -> routeAhead
+    onRoute -> routeAhead
     moving && course != null -> course
     else -> compass ?: routeAhead
+}
+
+/** Moving from this speed (m/s) up… */
+const val MOVING_ON_MPS = 0.6
+
+/** …and still moving until slower than this for [STILL_AFTER_MS]: a short pause at a corner is not stopping. */
+const val MOVING_OFF_MPS = 0.3
+const val STILL_AFTER_MS = 3_000L
+
+/** Whether the walker is moving, with the hysteresis above, so it does not flick on and off at one speed. */
+class MovingState {
+    var moving = false
+        private set
+    private var slowSince: Long? = null
+
+    fun update(speedMps: Double?, timeMs: Long): Boolean {
+        val v = speedMps ?: 0.0
+        when {
+            v >= MOVING_ON_MPS -> { moving = true; slowSince = null }
+            v < MOVING_OFF_MPS -> {
+                val since = slowSince ?: timeMs.also { slowSince = it }
+                if (timeMs - since >= STILL_AFTER_MS) moving = false
+            }
+            else -> slowSince = null
+        }
+        return moving
+    }
 }

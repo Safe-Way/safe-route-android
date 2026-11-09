@@ -1,5 +1,8 @@
 package com.deungbul.anshimgil.ui.guide
 
+import com.deungbul.anshimgil.map.WALK_TILT_DEGREES
+import com.deungbul.anshimgil.data.MovingState
+import com.kakao.vectormap.camera.CameraPosition
 import com.deungbul.anshimgil.data.RunDetector
 import com.deungbul.anshimgil.data.runAlert
 import android.hardware.Sensor
@@ -168,16 +171,10 @@ private const val CROSSWALK_ON_ROUTE_M = 8.0
 /** Position updates come about once a second; moving over slightly less keeps the marker gliding. */
 private const val FOLLOW_MS = 900
 private val FOLLOW = CameraAnimation.from(FOLLOW_MS, false, true)
-/** How long the map and the arrow take to turn. */
-private const val TURN_MS = 300
 /** The map turns only when the walker turns by at least this much. */
 private const val MAP_TURN_DEGREES = 25f
 
-/** How long the map takes to turn to a new direction. */
-private const val MAP_TURN_MS = 800
 
-/** Faster than this (about 2 km/h) the walker is moving, so the heading follows the way they go. */
-private const val MOVING_MPS = 0.6
 
 /**
  * Walking guidance along the chosen route (issue #7): next turn, nearest help, remaining distance,
@@ -250,6 +247,7 @@ fun GuideScreen(
     val motion = remember { MotionTracker() }
     var inVehicle by remember { mutableStateOf(false) }
     var moving by remember { mutableStateOf(false) }
+    val movingState = remember { MovingState() }
     var course by remember { mutableStateOf<Float?>(null) }
     // 뛰기 경고 (어린이 모드): running told from the phone's shaking, backed by GPS speed.
     val runDetector = remember { RunDetector() }
@@ -273,7 +271,7 @@ fun GuideScreen(
         runDetector.addSpeed(motion.speedMps)
         running = runDetector.running
         inVehicle = motion.inVehicle
-        moving = (motion.speedMps ?: 0.0) >= MOVING_MPS
+        moving = movingState.update(motion.speedMps, now)
         course = motion.courseDeg
         fix = it
         // A ride is not a walk: it would make the personal walking speed far too fast.
@@ -354,11 +352,6 @@ fun GuideScreen(
         }
         m.addCrosswalks(context, crossings)
     }
-    LaunchedEffect(map, state.snapped) {
-        // Glide to each new position over about the time until the next fix, instead of jumping.
-        me?.moveTo(state.snapped.toLatLng(), FOLLOW_MS)
-        map?.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM), FOLLOW)
-    }
 
     // The way the walker faces. Walking on the route: the route ahead, which cannot flip round as the
     // compass did when the phone was held upright (11/8). Off the route: the GPS course. Standing still:
@@ -372,12 +365,27 @@ fun GuideScreen(
     // for a real change of direction and slowly, so it does not swing about (11/8).
     var mapBearing by remember { mutableFloatStateOf(heading) }
     LaunchedEffect(heading) { if (angleBetween(mapBearing, heading) >= MAP_TURN_DEGREES) mapBearing = heading }
-    // Kakao turns the map the other way round from a compass bearing, hence the minus.
-    LaunchedEffect(map, mapBearing) {
-        map?.moveCamera(CameraUpdateFactory.rotateTo(Math.toRadians(-mapBearing.toDouble())), CameraAnimation.from(MAP_TURN_MS, false, true))
+    // Moving and turning in one camera move: two moves sent apart cut each other off, so the map jerked at
+    // every fix while it turned (11/9 video). Kakao turns the map the other way round from a compass bearing,
+    // hence the minus.
+    LaunchedEffect(map, state.snapped, mapBearing) {
+        // Glide to each new position over about the time until the next fix, instead of jumping.
+        me?.moveTo(state.snapped.toLatLng(), FOLLOW_MS)
+        val m = map ?: return@LaunchedEffect
+        val now = m.cameraPosition
+        m.moveCamera(
+            CameraUpdateFactory.newCameraPosition(
+                CameraPosition.from(
+                    state.snapped.lat, state.snapped.lon, GUIDE_ZOOM,
+                    now?.tiltAngle ?: Math.toRadians(WALK_TILT_DEGREES), Math.toRadians(((360 - mapBearing) % 360).toDouble()), now?.height ?: 0.0,
+                ),
+            ),
+            FOLLOW,
+        )
     }
-    // Marker rotation is measured on the screen, not the map, so take off the map's own turn.
-    LaunchedEffect(me, heading, mapBearing) { me?.pointTo(heading - mapBearing, TURN_MS) }
+    // Marker rotation is measured on the screen, not the map, so take off the map's own turn; it turns over
+    // the same time as the map, so the two stay together.
+    LaunchedEffect(me, heading, mapBearing) { me?.pointTo(heading - mapBearing, FOLLOW_MS) }
 
     // 귀가 지킴이: off the planned route for a while, offer to tell the guardians (once per stretch off route).
     // In a car or bus the route is left on purpose: no off-route warning, no new route.
