@@ -316,7 +316,7 @@ fun RouteScreen(
         if (!transitTab || transit is TransitState.Ready) return@LaunchedEffect
         transit = TransitState.Loading
         transit = try {
-            val r = TransitRepository.find(from.point, LatLon(destination.lat, destination.lon), mode)
+            val r = TransitRepository.find(from.point, LatLon(destination.lat, destination.lon), mode, routeRepository.guestId())
             if (r.routes.isEmpty()) TransitState.Failed(r.note ?: "대중교통 경로가 없어요", null) else TransitState.Ready(r)
         } catch (e: ApiException) {
             TransitState.Failed(e.message, e.code)

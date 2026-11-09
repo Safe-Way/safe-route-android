@@ -192,4 +192,11 @@ class RouteRepositoryTest {
         assertEquals("인도가 없어요. 차 조심하세요", sidewalkHint(walks, 10))
         assertEquals(null, sidewalkHint(walks, 12))
     }
+
+    @Test
+    fun guestNumberGoesWithTheRouteOnlyWhenKnown() {
+        val req = RouteRequest(LatLon(35.14, 126.93), LatLon(35.142, 126.93), UserMode.SENIOR)
+        assertEquals("abc-123", req.toJson("abc-123").getString("guestId"))
+        assertEquals(false, req.toJson().has("guestId"))
+    }
 }

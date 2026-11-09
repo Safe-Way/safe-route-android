@@ -77,6 +77,15 @@ class MyInfoRepository(private val guestId: suspend () -> String) {
         return parseMyInfo(ServerApi.patch("/api/me", body))
     }
 
+    /**
+     * Tells the server this phone's guest number and mode (진행표 10): the number is made on the phone and kept in the
+     * server's user_profile, so the server's mode is the phone's (it said 어린이 while the phone was 어르신, 11/9).
+     * No trips or places go with it. Throws [ApiException].
+     */
+    suspend fun syncMode(mode: UserMode) {
+        ServerApi.patch("/api/me", JSONObject().put("guestId", guestId()).put("mode", mode.key))
+    }
+
     /** consent.md §5. Throws [ApiException]. */
     suspend fun deleteAll() {
         ServerApi.delete("/api/me", mapOf("guestId" to guestId()))
