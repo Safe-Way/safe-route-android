@@ -312,6 +312,9 @@ fun GuideScreen(
     }
     // A running child near a crossing or where roads meet: vibrate, beep and say it, once for each place.
     val runWarned = remember(guidance) { mutableSetOf<String>() }
+    // The warning on the screen too, for a few seconds (the buzz alone was easy to miss; 11/9 emulator check).
+    var runShown by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(runShown) { if (runShown != null) { delay(RUN_SHOWN_MS); runShown = null } }
     val runNow = if (mode == UserMode.CHILD && running && !inVehicle && !state.arrived) {
         runAlert(state.progressM, guidance.crossingsAlongM, state.nextTurn, state.metersToNextTurn, runWarned)
     } else {
@@ -320,6 +323,7 @@ fun GuideScreen(
     LaunchedEffect(runNow?.key) {
         val alert = runNow ?: return@LaunchedEffect
         runWarned += alert.key
+        runShown = alert.text
         warnRunning(context)
         onLive(false, alert.text)
         if (voiceOn) tts.speak(alert.text, TextToSpeech.QUEUE_FLUSH, null, "run")
@@ -500,6 +504,7 @@ fun GuideScreen(
                 }
                 if (rerouting) StatusPill("길을 다시 찾는 중…", Color(0xFF2F6FDB))
                 if (inVehicle) StatusPill("차로 이동 중 · 걸으면 다시 안내해요", Color(0xFF6D28D9))
+                runShown?.let { RunWarningBar(it) }
                 // Which side to walk on beside a road, when the map knows it.
                 sidewalkHint(route.sidewalks, guidance.pointIndexAt(state.progressM))?.let { hint ->
                     StatusPill(hint, if (hint.startsWith("인도가 없어요")) Color(0xFFB45309) else Color(0xFF2F6FDB))
@@ -756,6 +761,20 @@ internal fun rememberTts(context: Context): TextToSpeech {
 
 private fun formatDistance(meters: Int): String =
     if (meters < 1000) "${meters}m" else "%.1fkm".format(meters / 1000.0)
+
+/** How long the running warning stays on the screen. */
+private const val RUN_SHOWN_MS = 6_000L
+
+/** The running warning, big and red under the instruction card. */
+@Composable
+private fun RunWarningBar(text: String) {
+    Surface(shape = RoundedCornerShape(14.dp), color = Color(0xFFB42318), modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Icon(Icons.Filled.WarningAmber, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
+            Text(text, fontSize = 19.sp, fontWeight = FontWeight.Black, color = Color.White, lineHeight = 25.sp, modifier = Modifier.padding(start = 10.dp))
+        }
+    }
+}
 
 /** Two strong buzzes and a beep, for a running child (뛰기 경고). */
 private suspend fun warnRunning(context: Context) {
