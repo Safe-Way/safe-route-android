@@ -286,6 +286,8 @@ class FavoriteAppAssistant(
         val said = history.lastOrNull { it.fromUser }?.text.orEmpty()
         val rule = RuleAppAssistant.reply(history, context)
         if (rule is AssistantAction.Emergency) return rule
+        // With stops on the way, AI 비서 on the server plans the trip (and its answer carries the saved place too).
+        if (mentionsStops(said)) return inner.reply(history, context)
         val favorite = runCatching { favoriteIn(said, favorites()) }.getOrNull() ?: return inner.reply(history, context)
         val place = favorite.place ?: return AssistantAction.Answer(
             "${withSubject(favorite.name)} 아직 등록되지 않았어요. 설정의 '자주 가는 곳'에서 등록하면 바로 안내해 드릴게요.",
@@ -384,7 +386,7 @@ internal fun serverAssistantRequest(
     favorites: List<Pair<String, LatLon>>,
 ): JSONObject = JSONObject()
     .put("guestId", guestId ?: JSONObject.NULL)
-    .put("text", text)
+    .put("text", withStopWordsFixed(text))
     // Not read by the server yet (it asks instead); sent so it can use the app's mode once it does.
     .put("mode", mode.key)
     .put("lat", where?.lat ?: JSONObject.NULL)

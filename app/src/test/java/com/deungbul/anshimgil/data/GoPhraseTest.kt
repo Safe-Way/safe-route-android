@@ -40,4 +40,15 @@ class GoPhraseTest {
         assertTrue(a is AssistantAction.GoTo && a.onPhone && a.query == "문화전당")
         assertEquals("문화전당으로 길을 찾을게요.", a.say)
     }
+
+    @Test
+    fun stopsOnTheWayGoToTheServer() {
+        // 11/9 on the phone: the words came out as "드렸다", and the phone went straight home.
+        assertTrue(mentionsStops("다이소 드렸다 집에 갈래"))
+        assertTrue(mentionsStops("다이소 들렀다가 집에 갈래"))
+        assertTrue(mentionsStops("퇴근길에 다이소 들르고 택배 찾고 집 갈래"))
+        assertNull(placeToGo("다이소 들렀다가 충장로 가자"))
+        assertEquals("다이소 들렀다 집에 갈래", withStopWordsFixed("다이소 드렸다 집에 갈래"))
+        assertTrue(!mentionsStops("집에 갈래"))
+    }
 }
