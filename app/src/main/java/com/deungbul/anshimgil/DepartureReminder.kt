@@ -86,9 +86,11 @@ class DepartureWorker(context: Context, params: WorkerParameters) : CoroutineWor
         if (!usage.adapt) return Result.success()
         val now = java.time.LocalDateTime.now(ZoneId.of("Asia/Seoul"))
         val here = runCatching { lastKnownLocation(ctx, maxAgeMs = 30 * 60_000L) }.getOrNull()
-        // First the habit learned on this phone (이동 패턴): from the first week, nothing sent. Only with a recent
-        // position: a habit is not proof the walker has not already gone there without guidance.
-        if (here != null) habitNow(usage.trips, now, here, before = REMIND_BEFORE_MIN.toInt() + 5, after = 5)?.let { h ->
+        // First the habit learned on this phone (이동 패턴): from the first week, nothing sent. With a recent position
+        // it is not sent while already there; without one (the phone keeps no fresh fix while the app is closed, so
+        // waiting for one meant the reminder never came, 11/9 on the phone) it is still sent, once a day, unless
+        // that trip was already started today.
+        habitNow(usage.trips, now, here, before = REMIND_BEFORE_MIN.toInt() + 5, after = 5)?.let { h ->
             val reminder = Reminder(
                 key = "${now.toLocalDate()}-habit-${h.place.name}",
                 text = "보통 ${sayTime(h.time)}쯤 ${h.place.name}에 가셨어요. 길 안내할까요?",
