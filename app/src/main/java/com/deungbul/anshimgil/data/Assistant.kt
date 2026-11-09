@@ -114,6 +114,8 @@ object RuleAppAssistant : AppAssistant {
         if (has("넘어", "다쳤", "다쳐", "아파", "아퍼", "쓰러", "위험", "따라와", "따라오", "살려", "무서워", "도와주세요")) {
             return AssistantAction.Emergency("괜찮으세요? 112에 전화하거나 보호자에게 알릴까요?")
         }
+        // "집에 하트 그려진 아이콘 뭐야?": before the places, so "화장실 아이콘 뭐야" is told, not routed to.
+        iconAnswer(said)?.let { return AssistantAction.Answer(it) }
         val wantsGo = has("안내", "가고싶", "가자", "가줘", "어디", "가까운", "근처", "찾아", "길")
         NEARBY_KINDS.entries.firstOrNull { (_, name) -> s.contains(name) }?.let { (kind, name) ->
             if (wantsGo || s.length <= name.length + 3) return AssistantAction.GoNearby("가까운 ${name}으로 길을 찾을게요.", kind)
@@ -329,6 +331,8 @@ class ServerAppAssistant(
         // The phone's word rules first: they need no network and catch anything urgent.
         val rule = RuleAppAssistant.reply(history, context)
         if (rule.staysOnPhone()) return rule
+        // The server does not know the app's pictures.
+        iconAnswer(history.lastOrNull { it.fromUser }?.text.orEmpty())?.let { return rule }
         if (history.count { it.fromUser } <= 1) {
             conversationId = null
             offered = emptyMap()
@@ -442,6 +446,8 @@ internal fun parseServerAssistantReply(json: JSONObject): ServerAssistantReply? 
 /** Gemini picks the action in a fixed JSON shape; anything unusable falls back to the rules. */
 class GeminiAppAssistant(private val fallback: AppAssistant) : AppAssistant {
     override suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction {
+        // Gemini does not know the app's pictures.
+        if (iconAnswer(history.lastOrNull { it.fromUser }?.text.orEmpty()) != null) return fallback.reply(history, context)
         val action = runCatching { ask(history, context) }.getOrNull() ?: return fallback.reply(history, context)
         // Gemini says "report" without the kind; fill it in from the words.
         return if (action is AssistantAction.OpenReport) reportAction(history.lastOrNull { it.fromUser }?.text.orEmpty()) else action

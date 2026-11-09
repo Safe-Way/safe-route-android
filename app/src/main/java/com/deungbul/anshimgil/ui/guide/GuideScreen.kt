@@ -100,6 +100,7 @@ import com.deungbul.anshimgil.location.LOCATION_PERMISSIONS
 import com.deungbul.anshimgil.location.LocationUpdates
 import com.deungbul.anshimgil.ui.route.arrivalTime
 import com.deungbul.anshimgil.location.hasLocationPermission
+import com.deungbul.anshimgil.data.Facility
 import com.deungbul.anshimgil.data.Guidance
 import com.deungbul.anshimgil.data.GuidanceState
 import com.deungbul.anshimgil.data.LatLon
@@ -111,6 +112,7 @@ import com.deungbul.anshimgil.data.RouteType
 import com.deungbul.anshimgil.data.Turn
 import com.deungbul.anshimgil.data.UserMode
 import com.deungbul.anshimgil.map.KakaoMapView
+import com.deungbul.anshimgil.ui.home.PlaceDetailCard
 import com.deungbul.anshimgil.map.addMyLocation
 import com.deungbul.anshimgil.map.pointTo
 import com.deungbul.anshimgil.map.tiltForWalking
@@ -145,6 +147,9 @@ private const val OFF_ROUTE_ALERT_MS = 20_000L
 private const val DEMO_STEP_M = 8.0
 /** Close-up for walking: the next few buildings, with the map tilted so the street ahead shows. */
 private const val GUIDE_ZOOM = 19
+
+/** How long a tapped picture's card stays before closing by itself. */
+private const val TAPPED_CARD_MS = 15_000L
 /** A crosswalk this close to the route line is one the route crosses. */
 private const val CROSSWALK_ON_ROUTE_M = 8.0
 /** Position updates come about once a second; moving over slightly less keeps the marker gliding. */
@@ -202,6 +207,8 @@ fun GuideScreen(
     var demoProgress by remember { mutableDoubleStateOf(0.0) }
     var voiceOn by rememberSaveable { mutableStateOf(voiceByDefault) }
     var map by remember { mutableStateOf<KakaoMap?>(null) }
+    // A picture on the map the walker tapped, told in a card.
+    var tapped by remember { mutableStateOf<Facility?>(null) }
     var me by remember { mutableStateOf<Label?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -280,6 +287,11 @@ fun GuideScreen(
     // Drawn again whenever the route changes (after finding a new one).
     LaunchedEffect(map, route) {
         val m = map ?: return@LaunchedEffect
+        // A tapped picture on the way says what it is (11/9).
+        m.setOnLabelClickListener { _, _, label ->
+            (label.tag as? Facility)?.let { tapped = it }
+            true
+        }
         m.showRoutes(context, active.copy(routes = listOf(route)), route.type, destinationName)
         if (showTurnSigns) m.addTurnArrows(context, guidance.turnMarks)
         me = m.addMyLocation(context, state.snapped, sizeDp = 24f)
@@ -412,6 +424,9 @@ fun GuideScreen(
         m.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
     }
 
+    // Closes by itself after a while, so it does not stay over the map while walking.
+    LaunchedEffect(tapped) { if (tapped != null) { delay(TAPPED_CARD_MS); tapped = null } }
+
     Box(modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -466,6 +481,12 @@ fun GuideScreen(
                 } ?: aiNotice?.let { AiNotice(it, onDismiss = { aiNotice = null }) }
             }
             if (showSos) SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp))
+            tapped?.let { place ->
+                PlaceDetailCard(
+                    place, exits = emptyList(), onClose = { tapped = null },
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                )
+            }
             // The mode on the instruction card's top left corner.
             ModeBadge(mode, Modifier.align(Alignment.TopStart).padding(start = 4.dp, top = 4.dp))
             onOpenAssistant?.let { open ->

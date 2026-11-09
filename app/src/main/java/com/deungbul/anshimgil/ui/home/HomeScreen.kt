@@ -19,6 +19,7 @@ import com.deungbul.anshimgil.data.MapLayers
 import androidx.compose.runtime.mutableIntStateOf
 import com.deungbul.anshimgil.data.stationExits
 import com.deungbul.anshimgil.data.FacilityKind
+import com.deungbul.anshimgil.data.meaning
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.IconButton
 import com.deungbul.anshimgil.data.Facility
@@ -624,11 +625,11 @@ private fun KakaoMap.visibleBbox(): Bbox? {
 }
 
 /**
- * Details of a tapped place, one item per line: for a station, which exits have elevators,
+ * A tapped place: what its picture means, then its details one item per line: for a station, which exits have elevators,
  * accessible toilets, wheelchair chargers and train hours, as the server words them.
  */
 @Composable
-private fun PlaceDetailCard(place: Facility, exits: List<String>, onClose: () -> Unit, modifier: Modifier = Modifier) {
+internal fun PlaceDetailCard(place: Facility, exits: List<String>, onClose: () -> Unit, modifier: Modifier = Modifier) {
     val parts = place.detail.orEmpty().split(" · ").map { it.trim() }.filter { it.isNotEmpty() }
     // The first part repeats the kind ("지하철역"), so it goes next to the name instead.
     val kindText = parts.firstOrNull()?.takeIf { place.name != null && parts.size > 1 }
@@ -663,6 +664,11 @@ private fun PlaceDetailCard(place: Facility, exits: List<String>, onClose: () ->
                 }
                 IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Ink) }
             }
+            // What the picture means, for anyone who does not know it (11/9).
+            Text(
+                place.kind.meaning, fontSize = 15.sp, lineHeight = 21.sp, color = Color(0xFF3F4A43),
+                modifier = Modifier.padding(end = 12.dp, bottom = 4.dp),
+            )
             if (place.kind == FacilityKind.SUBWAY) {
                 val next = trains
                 when {

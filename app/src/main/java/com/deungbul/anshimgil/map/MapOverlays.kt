@@ -89,9 +89,10 @@ fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
             if (placed.any { android.graphics.Rect.intersects(it, box) }) return@forEach
             placed += box
         }
-        // Places with more to say (e.g. a station's elevator exits) can be tapped; the tag carries the place.
+        // Every place can be tapped to tell what its picture means (11/9), and more where the server says more
+        // (e.g. a station's elevator exits); the tag carries the place.
         val options = LabelOptions.from(facility.latLng).setStyles(style).setRank(tagRank(facility))
-        if (facility.detail != null) options.setClickable(true).setTag(facility)
+            .setClickable(true).setTag(facility)
         labelLayer?.addLabel(options)
     }
 }
@@ -424,15 +425,12 @@ internal fun drawPicture(canvas: Canvas, kind: FacilityKind, color: Int) {
     }
     when (kind) {
         FacilityKind.CCTV -> {
-            // Wall plate and arm on the right, the camera body tilted down to the left with its lens.
-            canvas.drawRoundRect(RectF(19.5f, 5f, 22.5f, 15f), 1f, 1f, fill)
-            canvas.drawLine(20f, 10f, 16f, 12.5f, line())
-            canvas.save()
-            canvas.rotate(22f, 10f, 10f)
-            canvas.drawRoundRect(RectF(2.5f, 6.5f, 17.5f, 13.5f), 2.5f, 2.5f, fill)
-            canvas.drawRect(RectF(1f, 7.5f, 3.5f, 12.5f), fill)
-            canvas.drawCircle(5.2f, 10f, 1.6f, white)
-            canvas.restore()
+            // A dome camera under its ceiling plate, the lens in the middle (11/9: the bullet camera on an arm read
+            // as a tadpole on the map).
+            canvas.drawRoundRect(RectF(2f, 6.5f, 22f, 9.5f), 1.2f, 1.2f, fill)
+            canvas.drawArc(RectF(3.5f, 1f, 20.5f, 18f), 0f, 180f, true, fill)
+            canvas.drawCircle(12f, 14f, 3f, white)
+            canvas.drawCircle(12f, 14f, 1.4f, fill)
         }
         FacilityKind.CONVENIENCE_STORE -> {
             // Awning with stripes, the shop below it and its door.
