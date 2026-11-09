@@ -68,6 +68,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kakao.map)
     implementation(libs.androidx.datastore.preferences)
+    // 출발 시간 알림: a check every 15 minutes, also when the app is closed.
+    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.compose.material.icons.extended)
     testImplementation(libs.junit)
     // Android's org.json is a stub in local unit tests; use the real one there.

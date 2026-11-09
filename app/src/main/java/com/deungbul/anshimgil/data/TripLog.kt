@@ -104,6 +104,23 @@ class TripLogRepository(private val context: Context, private val guestId: suspe
         }
     }
 
+    /**
+     * The walker's word after arriving (good, or bad and why), sent with the trip again; what the server learned
+     * from it, in its own words ("앞으로 계단이 적은 길로 안내할게요"), empty when nothing changed or offline.
+     */
+    suspend fun feedback(id: Long, arrived: Boolean, actualMin: Int?, feedback: String, reason: String?): List<String> {
+        if (!ServerApi.isConfigured) return emptyList()
+        return runCatching {
+            val json = ServerApi.patch(
+                "/api/me/trips/$id",
+                JSONObject().put("guestId", guestId()).put("result", if (arrived) "arrived" else "stopped")
+                    .put("actualMin", actualMin ?: JSONObject.NULL)
+                    .put("feedback", feedback).put("feedbackReason", reason ?: JSONObject.NULL),
+            )
+            learnedSays(json)
+        }.getOrDefault(emptyList())
+    }
+
     /** How many trips the server keeps for this phone; null when it could not be asked. */
     suspend fun count(): Int? {
         if (!ServerApi.isConfigured) return null
@@ -125,9 +142,17 @@ class TripLogRepository(private val context: Context, private val guestId: suspe
 }
 
 /** AI 비서's question in its live bubble on the map, after the first finished guidance. */
+// The team's words (docs/assistant/consent.md §1), after the first finished guidance.
 const val TRIP_CONSENT_QUESTION =
-    "길 안내를 마쳤어요. 자주 가는 길을 기억해 둘까요? 다음에 먼저 길을 알려 드릴게요. " +
-        "(도착한 곳 약 100m 범위와 시간만 저장, 출발지·걸은 길은 저장하지 않아요)"
+    "길 안내를 마쳤어요. 다닌 기록을 남겨도 될까요? 기록을 남기면 비서가 더 잘 도와드려요. " +
+        "남기는 것: 간 곳의 이름, 나간 요일과 시간대(30분 단위), 걸어갔는지 버스를 탔는지, 그날 날씨, 다녀와서 남긴 한마디. " +
+        "남기지 않는 것: 이름, 전화번호, 집 주소, 지나온 길, 정확한 시각."
 
-const val TRIP_CONSENT_YES = "좋아요, 기억해 줘"
-const val TRIP_CONSENT_NO = "괜찮아요"
+const val TRIP_CONSENT_YES = CONSENT_YES
+const val TRIP_CONSENT_NO = CONSENT_NO
+
+/** The sentences in the server's answer to a finished trip (learned[].say). */
+internal fun learnedSays(json: JSONObject): List<String> {
+    val a = json.optJSONArray("learned") ?: return emptyList()
+    return (0 until a.length()).mapNotNull { a.optJSONObject(it)?.optString("say")?.takeIf { s -> s.isNotBlank() } }
+}

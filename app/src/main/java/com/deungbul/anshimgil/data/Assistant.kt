@@ -37,13 +37,21 @@ sealed interface AssistantAction {
         val sosButton: Boolean? = null,
         val addMapItems: Set<String> = emptySet(),
         val removeMapItems: Set<String> = emptySet(),
+        /** 쓰는 대로 맞추기, also to take back an answer pressed by mistake in a bubble. */
+        val undoTextBoost: Boolean = false,
+        /** One step of the AI's text enlargement back. */
+        val textBoostStepBack: Boolean = false,
+        /** One step more of the AI's text enlargement (the setting is already 크게). */
+        val textBoostUp: Boolean = false,
+        val calendar: Boolean? = null,
+        val adapt: Boolean? = null,
     ) : AssistantAction
 
     /** Route to the nearest place of a kind ([NEARBY_KINDS] key). */
     data class GoNearby(override val say: String, val kind: String) : AssistantAction
 
-    /** Search for a place by name and route there. */
-    data class GoTo(override val say: String, val query: String) : AssistantAction
+    /** Search for a place by name and route there. [onPhone]: the phone's own ("문화전당 가자"), not the server's. */
+    data class GoTo(override val say: String, val query: String, val onPhone: Boolean = false) : AssistantAction
 
     /**
      * Route to a place the server already found (its recommendation or a nearby place) or a saved place.
@@ -55,20 +63,22 @@ sealed interface AssistantAction {
     /** Open 불편 신고 filled in from what was said: the kind of problem when it is clear, and the words as the memo. */
     data class OpenReport(override val say: String, val type: ReportType? = null, val memo: String = "") : AssistantAction
 
-    /** Ask back, with ready answers. */
-    data class Ask(override val say: String, val choices: List<String>) : AssistantAction
+    /** Ask back, with ready answers. [onPhone]: the phone's own question, whose answer it handles too. */
+    data class Ask(override val say: String, val choices: List<String>, val onPhone: Boolean = false) : AssistantAction
 
     /** Something urgent (a fall, pain, danger): ask first whether to call 112 or tell a guardian. */
     data class Emergency(override val say: String) : AssistantAction
 
-    /** Just an answer, nothing to do. */
-    data class Answer(override val say: String) : AssistantAction
+    /** Just an answer, nothing to do. [onPhone]: the phone's own, not to be asked of the server. */
+    data class Answer(override val say: String, val onPhone: Boolean = false) : AssistantAction
 }
 
 /** What the assistant knows about the app right now, so "글씨 더 크게" builds on the current setting. */
 data class AssistantContext(
     val mode: UserMode,
     val settings: AppSettings,
+    /** What 쓰는 대로 맞추기 has changed, so that it can be taken back by asking. */
+    val usage: Usage = Usage(),
     /** The phone's position when there is a real fix; asked only by the server assistant. */
     val where: suspend () -> LatLon? = { null },
 )
@@ -101,22 +111,34 @@ object RuleAppAssistant : AppAssistant {
         val said = history.lastOrNull { it.fromUser }?.text.orEmpty()
         val s = said.replace(" ", "")
         fun has(vararg w: String) = w.any { s.contains(it.replace(" ", "")) }
+        // Who walks and how ("다리를 다쳐서 휠체어 타", "오늘은 휠체어 안 타"): before the emergency words, which
+        // would take "다쳐서" for a fall; walkerChange leaves anything urgent to them.
+        walkerChange(said, history, context.mode)?.let { return it }
         if (has("넘어", "다쳤", "다쳐", "아파", "아퍼", "쓰러", "위험", "따라와", "따라오", "살려", "무서워", "도와주세요")) {
             return AssistantAction.Emergency("괜찮으세요? 112에 전화하거나 보호자에게 알릴까요?")
         }
+        // "집에 하트 그려진 아이콘 뭐야?": before the places, so "화장실 아이콘 뭐야" is told, not routed to.
+        iconAnswer(said)?.let { return AssistantAction.Answer(it) }
         val wantsGo = has("안내", "가고싶", "가자", "가줘", "어디", "가까운", "근처", "찾아", "길")
         NEARBY_KINDS.entries.firstOrNull { (_, name) -> s.contains(name) }?.let { (kind, name) ->
-            if (wantsGo || s.length <= name.length + 3) return AssistantAction.GoNearby("가까운 ${name}으로 길을 찾을게요.", kind)
+            if (wantsGo || s.length <= name.length + 3) return AssistantAction.GoNearby("가까운 ${withDirection(name)} 길을 찾을게요.", kind)
         }
+        undoAdaptation(s, context.usage)?.let { return it }
+        // "문화전당 가자": straight to the route (사용성 점검표 5번).
+        placeToGo(said)?.let { place -> return AssistantAction.GoTo("${withDirection(place)} 길을 찾을게요.", place, onPhone = true) }
         return when {
             // Only about the words on screen: "글씨가 안 보여", "화면이 잘 안 보여", or just "잘 안 보여".
             // "편의점이 안 보여" is about a place, not the text size.
-            textTooSmall(s) ->
-                AssistantAction.ChangeSettings("글씨를 크게 바꿀게요.", textSize = TextSize.LARGE)
+            // Bigger step by step: the setting up to 크게, then AI 비서's own enlargement, then say it is the biggest.
+            textTooSmall(s) -> when {
+                context.settings.textSize != TextSize.LARGE -> AssistantAction.ChangeSettings("글씨를 크게 바꿀게요.", textSize = TextSize.LARGE)
+                nextTextBoost(context.usage.textBoost) != null ->
+                    AssistantAction.ChangeSettings("글씨를 한 단계 더 크게 할게요.", textBoostUp = true)
+                else -> AssistantAction.Answer("지금이 앱에서 가장 큰 글씨예요. 폰 설정에서 글자 크기를 키우면 더 커져요.")
+            }
             has("글씨", "글자") && has("작게", "커", "너무 커") -> AssistantAction.ChangeSettings("글씨를 작게 바꿀게요.", textSize = TextSize.SMALL)
             has("음성", "소리", "말소리") && has("꺼", "끄", "시끄") -> AssistantAction.ChangeSettings("음성 안내를 끌게요.", voiceGuide = false)
             has("음성", "소리", "읽어") && has("켜", "들려") -> AssistantAction.ChangeSettings("음성 안내를 켤게요.", voiceGuide = true)
-            has("휠체어") -> AssistantAction.ChangeSettings("장애인(휠체어) 모드로 바꿀게요.", mode = UserMode.DISABLED)
             has("버스") -> AssistantAction.ShowBuses("가까운 정류장에 곧 오는 버스를 보여 드릴게요.")
             reportTypeIn(said) != null || has("신고", "불편") -> reportAction(said)
             else -> AssistantAction.Ask(
@@ -156,6 +178,49 @@ fun reportAction(said: String, say: String? = null): AssistantAction.OpenReport 
 }
 
 /** Whether [s] (spaces removed) says the text is too small to read. */
+/** How long after a change "방금 거 원래대로" still means that change. */
+const val UNDO_RECENT_MIN = 30L
+
+/**
+ * Taking back what 쓰는 대로 맞추기 changed, by asking AI 비서 (an answer in a bubble pressed by mistake):
+ * "버튼 원래대로", "글씨 원래대로" (the AI's enlargement first), "캘린더 알림 꺼 줘", "알아서 바꾸지 마", or just
+ * "방금 거 잘못 눌렀어, 원래대로" for the change made in the last [UNDO_RECENT_MIN] minutes. [s] has no spaces.
+ */
+internal fun undoAdaptation(s: String, usage: Usage, now: java.time.LocalDateTime = java.time.LocalDateTime.now()): AssistantAction.ChangeSettings? {
+    fun has(vararg w: String) = w.any { s.contains(it) }
+    val back = has("원래", "되돌", "돌려", "취소", "잘못눌", "실수로", "처음대로", "이전대로", "전대로")
+    val off = has("꺼", "끄", "그만", "지마", "지말", "싫어", "필요없")
+    val on = has("켜", "알려줘", "봐줘", "써줘")
+    val smaller = has("작게", "줄여", "너무커", "너무크")
+    return when {
+        has("글씨", "글자") && (back || smaller) && usage.textBoost > 1f ->
+            ChangeSettingsUndo("AI가 키운 글씨를 원래대로 돌릴게요. 설정의 글자 크기는 그대로예요.", undoTextBoost = true)
+        has("캘린더", "일정", "달력") && off -> ChangeSettingsUndo("캘린더 일정 알림을 끌게요.", calendar = false)
+        has("캘린더", "일정", "달력") && on && has("알림", "길", "캘린더") -> ChangeSettingsUndo("캘린더 일정으로 길을 알려 드릴게요.", calendar = true)
+        has("알아서", "자동으로", "맞추기", "맞춰") && off -> ChangeSettingsUndo("쓰는 대로 맞추기를 끌게요. 설정에서 다시 켤 수 있어요.", adapt = false)
+        back && !has("길", "지도", "모드", "소리", "음성") -> {
+            // The change made a moment ago.
+            val last = usage.lastChange?.takeIf { java.time.Duration.between(it.second, now).toMinutes() in 0..UNDO_RECENT_MIN }
+            when (last?.first) {
+                Adaptation.MISSED_TAPS, Adaptation.BIG_TEXT, Adaptation.BIGGER_TEXT ->
+                    ChangeSettingsUndo("방금 키운 글씨를 한 단계 전으로 돌릴게요.", textBoostStepBack = true).takeIf { usage.textBoost > 1f }
+                Adaptation.CALENDAR -> ChangeSettingsUndo("방금 켠 캘린더 일정 알림을 끌게요.", calendar = false)
+                null -> null
+            }
+        }
+        else -> null
+    }
+}
+
+@Suppress("FunctionName")
+private fun ChangeSettingsUndo(
+    say: String,
+    undoTextBoost: Boolean = false,
+    textBoostStepBack: Boolean = false,
+    calendar: Boolean? = null,
+    adapt: Boolean? = null,
+) = AssistantAction.ChangeSettings(say, undoTextBoost = undoTextBoost, textBoostStepBack = textBoostStepBack, calendar = calendar, adapt = adapt)
+
 internal fun textTooSmall(s: String): Boolean {
     val aboutText = listOf("글씨", "글자", "화면", "글이").any { s.contains(it) }
     val cannotSee = listOf("안보여", "작아", "크게", "흐려", "안보이").any { s.contains(it) }
@@ -248,7 +313,9 @@ class FavoriteAppAssistant(
 /** Actions the phone does itself; the server assistant is not asked about these. */
 private fun AssistantAction.staysOnPhone(): Boolean = this is AssistantAction.Emergency ||
     this is AssistantAction.ChangeSettings || this is AssistantAction.ShowBuses ||
-    this is AssistantAction.OpenReport || this is AssistantAction.GoNearby
+    this is AssistantAction.OpenReport || this is AssistantAction.GoNearby ||
+    (this is AssistantAction.Ask && onPhone) || (this is AssistantAction.Answer && onPhone) ||
+    (this is AssistantAction.GoTo && onPhone)
 
 /** Server tools that save settings on the server, which the app does not read; the phone does these. */
 private val SERVER_SETTING_TOOLS = setOf("update_my_info", "set_map_layers")
@@ -270,6 +337,8 @@ class ServerAppAssistant(
         // The phone's word rules first: they need no network and catch anything urgent.
         val rule = RuleAppAssistant.reply(history, context)
         if (rule.staysOnPhone()) return rule
+        // The server does not know the app's pictures.
+        iconAnswer(history.lastOrNull { it.fromUser }?.text.orEmpty())?.let { return rule }
         if (history.count { it.fromUser } <= 1) {
             conversationId = null
             offered = emptyMap()
@@ -383,6 +452,10 @@ internal fun parseServerAssistantReply(json: JSONObject): ServerAssistantReply? 
 /** Gemini picks the action in a fixed JSON shape; anything unusable falls back to the rules. */
 class GeminiAppAssistant(private val fallback: AppAssistant) : AppAssistant {
     override suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction {
+        // The phone's own: who walks and how (asked back first), and the app's pictures.
+        walkerChange(history.lastOrNull { it.fromUser }?.text.orEmpty(), history, context.mode)?.let { return it }
+        // Gemini does not know the app's pictures.
+        if (iconAnswer(history.lastOrNull { it.fromUser }?.text.orEmpty()) != null) return fallback.reply(history, context)
         val action = runCatching { ask(history, context) }.getOrNull() ?: return fallback.reply(history, context)
         // Gemini says "report" without the kind; fill it in from the words.
         return if (action is AssistantAction.OpenReport) reportAction(history.lastOrNull { it.fromUser }?.text.orEmpty()) else action

@@ -84,14 +84,15 @@ internal fun parseRouteResult(json: JSONObject, mode: UserMode? = null): RouteRe
     val routes = json.optJSONArray("routes").objects().mapNotNull { route ->
         val type = runCatching { RouteType.valueOf(route.getString("kind").uppercase()) }.getOrNull() ?: return@mapNotNull null
         val geometry = route.optJSONArray("geometry")
+        val line = if (geometry == null) emptyList() else (0 until geometry.length()).map { i ->
+            geometry.getJSONArray(i).let { LatLon(it.getDouble(1), it.getDouble(0)) }
+        }
         RouteOption(
             type = type,
             distanceM = route.optInt("distanceM"),
             durationMin = route.optInt("durationMin"),
             // GeoJSON order: [lon, lat]
-            path = if (geometry == null) emptyList() else (0 until geometry.length()).map { i ->
-                geometry.getJSONArray(i).let { LatLon(it.getDouble(1), it.getDouble(0)) }
-            },
+            path = line,
             counts = route.optJSONObject("counts").ints(),
             covered = route.optJSONObject("covered").ints(),
             sidewalks = route.optJSONArray("sidewalks").objects().map { w ->
@@ -105,6 +106,24 @@ internal fun parseRouteResult(json: JSONObject, mode: UserMode? = null): RouteRe
                         "no" -> SidewalkSide.NONE
                         else -> SidewalkSide.UNKNOWN
                     },
+                )
+            },
+            // Meters along the line as sent, so placed before the ends are tidied.
+            crossings = route.optJSONArray("crossings")?.objects()?.map { c ->
+                pointAtMeters(line, (c.optDouble("fromM") + c.optDouble("toM")) / 2)
+            },
+            events = route.optJSONArray("events").objects().mapNotNull { e ->
+                fun text(k: String) = e.optString(k).takeIf { !e.isNull(k) && it.isNotBlank() }
+                RouteEvent(
+                    kind = text("kind") ?: "행사",
+                    title = text("title") ?: return@mapNotNull null,
+                    place = text("place"),
+                    message = text("message"),
+                    endsAt = text("endsAt"),
+                    fromM = e.optInt("fromM"),
+                    toM = e.optInt("toM"),
+                    avoid = e.optBoolean("avoid"),
+                    near = text("near"),
                 )
             },
         ).withoutEndDetours()
@@ -266,4 +285,15 @@ fun pointAlong(path: List<LatLon>, fraction: Double): LatLon {
         remaining -= leg
     }
     return path.last()
+}
+
+/** The point [meters] along [line] (its end when the line is shorter). */
+internal fun pointAtMeters(line: List<LatLon>, meters: Double): LatLon {
+    var left = meters
+    for ((a, b) in line.zipWithNext()) {
+        val d = metersBetween(a, b)
+        if (left <= d && d > 0) return LatLon(a.lat + (b.lat - a.lat) * left / d, a.lon + (b.lon - a.lon) * left / d)
+        left -= d
+    }
+    return line.last()
 }

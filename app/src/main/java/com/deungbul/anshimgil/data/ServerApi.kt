@@ -27,6 +27,9 @@ object ServerApi {
 
     suspend fun patch(path: String, body: JSONObject): JSONObject = request("PATCH", path, body)
 
+    suspend fun delete(path: String, query: Map<String, Any?> = emptyMap()): JSONObject =
+        request("DELETE", path + queryString(query), body = null)
+
     /** A file sent in a multipart form, e.g. a photo. */
     class Part(val name: String, val fileName: String, val contentType: String, val bytes: ByteArray)
 
@@ -65,7 +68,7 @@ object ServerApi {
                     outputStream.use { it.write(body) }
                 }
             } catch (e: IOException) {
-                throw ApiException("NETWORK", "서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.")
+                throw ApiException("NETWORK", NETWORK_MESSAGE)
             }
             readResponse(connection)
         }
@@ -85,7 +88,7 @@ object ServerApi {
                     }
                 }
             } catch (e: IOException) {
-                throw ApiException("NETWORK", "서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.")
+                throw ApiException("NETWORK", NETWORK_MESSAGE)
             }
             readResponse(connection)
         }
@@ -104,7 +107,7 @@ object ServerApi {
                 }
                 json
             } catch (e: IOException) {
-                throw ApiException("NETWORK", "서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.")
+                throw ApiException("NETWORK", NETWORK_MESSAGE)
             } finally {
                 connection.disconnect()
             }
@@ -115,3 +118,6 @@ object ServerApi {
         return if (parts.isEmpty()) "" else "?" + parts.joinToString("&")
     }
 }
+
+/** In words anyone knows (사용성 점검표 19번): no "서버", and what to check. */
+const val NETWORK_MESSAGE = "인터넷이 안 돼요. 와이파이나 데이터가 켜져 있는지 보고 다시 해 주세요."

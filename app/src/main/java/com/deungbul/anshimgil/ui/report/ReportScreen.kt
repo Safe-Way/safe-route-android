@@ -138,7 +138,7 @@ fun ReportScreen(
                         selected = type == t,
                         onClick = { type = t },
                         label = { Text(t.label, fontSize = 16.sp) },
-                        modifier = Modifier.heightIn(min = 44.dp),
+                        modifier = Modifier.heightIn(min = 48.dp),
                     )
                 }
             }

@@ -55,15 +55,23 @@ fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
 
     // One style per distinct tag, since text and look can differ within a kind.
     val styles = mutableMapOf<List<Any>, Pair<LabelStyles, Bitmap>>()
+    // A dot or a bare picture sits on the place itself; a tag stands above it.
+    fun centered(facility: Facility) = facility.look == FacilityLook.DOT ||
+        (facility.look == FacilityLook.NORMAL && tagWords(facility).isEmpty() && !facility.elevator)
     fun styleOf(facility: Facility) = styles.getOrPut(listOf(facility.kind, facility.label, facility.look, facility.elevator)) {
         val bitmap = when (facility.look) {
-            FacilityLook.NORMAL -> pillBitmap(facility.label, facility.kind.color.toInt(), density, elevator = facility.elevator)
-            FacilityLook.GRAY -> pillBitmap(facility.label, GRAY, density)
+            // Every kind as a picture instead of a word (11/8); what only words can say (an exit number, no
+            // elevator) follows the picture in a tag.
+            FacilityLook.NORMAL -> tagWords(facility).let { words ->
+                if (centered(facility)) pictureBitmap(facility.kind, facility.kind.color.toInt(), density)
+                else pillBitmap(words, facility.kind.color.toInt(), density, elevator = facility.elevator, picture = facility.kind)
+            }
+            FacilityLook.GRAY -> pillBitmap(tagWords(facility), GRAY, density, picture = facility.kind)
             FacilityLook.DOT -> dotBitmap(GRAY, density, sizeDp = 10f)
         }
         LabelStyles.from(
             LabelStyle.from(bitmap)
-                .setAnchorPoint(0.5f, if (facility.look == FacilityLook.DOT) 0.5f else 1f)
+                .setAnchorPoint(0.5f, if (centered(facility)) 0.5f else 1f)
                 .setApplyDpScale(false),
         ) to bitmap
     }
@@ -76,14 +84,15 @@ fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
         val (style, bitmap) = styleOf(facility)
         val p = runCatching { toScreenPoint(facility.latLng) }.getOrNull()
         if (p != null) {
-            val top = if (facility.look == FacilityLook.DOT) p.y - bitmap.height / 2 else p.y - bitmap.height
+            val top = if (centered(facility)) p.y - bitmap.height / 2 else p.y - bitmap.height
             val box = android.graphics.Rect(p.x - bitmap.width / 2 - gap, top - gap, p.x + bitmap.width / 2 + gap, top + bitmap.height + gap)
             if (placed.any { android.graphics.Rect.intersects(it, box) }) return@forEach
             placed += box
         }
-        // Places with more to say (e.g. a station's elevator exits) can be tapped; the tag carries the place.
+        // Every place can be tapped to tell what its picture means (11/9), and more where the server says more
+        // (e.g. a station's elevator exits); the tag carries the place.
         val options = LabelOptions.from(facility.latLng).setStyles(style).setRank(tagRank(facility))
-        if (facility.detail != null) options.setClickable(true).setTag(facility)
+            .setClickable(true).setTag(facility)
         labelLayer?.addLabel(options)
     }
 }
@@ -357,11 +366,216 @@ fun dotBitmap(color: Int, density: Float, sizeDp: Float = 18f): Bitmap {
     return bitmap
 }
 
+/** The words a tag still needs next to its picture: its own text without the kind's name ("지하철역 · …"). */
+internal fun tagWords(facility: Facility): String =
+    (facility.text ?: "").removePrefix(facility.kind.label).trim().removePrefix("·").trim()
+
+/**
+ * The kind's picture ([drawPicture]) on its own, in its color: no round tag behind it (11/9, the user's call:
+ * the map reads more cleanly without the white circles). Only the walker's own position keeps its disc.
+ */
+internal fun pictureBitmap(kind: FacilityKind, color: Int, density: Float): Bitmap {
+    val size = PICTURE_DP * density
+    val bitmap = Bitmap.createBitmap(size.toInt() + 1, size.toInt() + 1, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    canvas.scale(size / 24f, size / 24f)
+    drawPicture(canvas, kind, color)
+    return bitmap
+}
+
+/** How big a bare picture is on the map: a little bigger than inside the old 30 dp tag (18 dp), to read alone. */
+private const val PICTURE_DP = 24f
+
+/**
+ * Draws [kind]'s picture in [color] on a 24-unit grid at the canvas's origin (scale the canvas first):
+ * the same pictures as the home screen's buttons where there is one, simple signs elsewhere.
+ */
+internal fun drawPicture(canvas: Canvas, kind: FacilityKind, color: Int) {
+    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color }
+    val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = 0xFFFFFFFF.toInt() }
+    fun line(width: Float = 2.2f) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = color
+        style = Paint.Style.STROKE
+        strokeWidth = width
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    fun path(block: android.graphics.Path.() -> Unit) = android.graphics.Path().apply(block)
+    fun star(cx: Float, cy: Float, r: Float) = path {
+        for (i in 0 until 10) {
+            val a = Math.toRadians(-90.0 + i * 36.0)
+            val rr = if (i % 2 == 0) r else r * 0.45f
+            val x = cx + (rr * kotlin.math.cos(a)).toFloat()
+            val y = cy + (rr * kotlin.math.sin(a)).toFloat()
+            if (i == 0) moveTo(x, y) else lineTo(x, y)
+        }
+        close()
+    }
+    // Bold enough to read on the map without a tag behind it (11/9).
+    fun person(cx: Float, paint: Paint, dress: Boolean) {
+        canvas.drawCircle(cx, 4f, 2.7f, paint)
+        if (dress) {
+            canvas.drawPath(path { moveTo(cx - 1.6f, 7.5f); lineTo(cx + 1.6f, 7.5f); lineTo(cx + 4.8f, 16f); lineTo(cx - 4.8f, 16f); close() }, paint)
+        } else {
+            canvas.drawRoundRect(RectF(cx - 3.4f, 7.5f, cx + 3.4f, 16f), 1.6f, 1.6f, paint)
+        }
+        val leg = line(2.6f).apply { this.color = paint.color; strokeCap = Paint.Cap.BUTT }
+        canvas.drawLine(cx - 1.6f, 15.5f, cx - 1.6f, 22.5f, leg)
+        canvas.drawLine(cx + 1.6f, 15.5f, cx + 1.6f, 22.5f, leg)
+    }
+    when (kind) {
+        FacilityKind.CCTV -> {
+            // A dome camera under its ceiling plate, the lens in the middle (11/9: the bullet camera on an arm read
+            // as a tadpole on the map).
+            canvas.drawRoundRect(RectF(2f, 6.5f, 22f, 9.5f), 1.2f, 1.2f, fill)
+            canvas.drawArc(RectF(3.5f, 1f, 20.5f, 18f), 0f, 180f, true, fill)
+            canvas.drawCircle(12f, 14f, 3f, white)
+            canvas.drawCircle(12f, 14f, 1.4f, fill)
+        }
+        FacilityKind.CONVENIENCE_STORE -> {
+            // Awning with stripes, the shop below it and its door.
+            canvas.drawPath(path { moveTo(4f, 3.5f); lineTo(20f, 3.5f); lineTo(22f, 9f); lineTo(2f, 9f); close() }, fill)
+            canvas.drawRect(RectF(7.6f, 3.5f, 9.2f, 9f), white)
+            canvas.drawRect(RectF(14.8f, 3.5f, 16.4f, 9f), white)
+            canvas.drawRect(RectF(4f, 10.5f, 20f, 21f), line())
+            canvas.drawRect(RectF(9.5f, 14f, 14.5f, 21f), fill)
+        }
+        FacilityKind.POLICE -> {
+            // A shield with a star, as on the map's 파출소 button.
+            canvas.drawPath(path {
+                moveTo(12f, 2f); lineTo(20f, 5f); lineTo(20f, 11f)
+                cubicTo(20f, 16f, 16.5f, 20f, 12f, 22f); cubicTo(7.5f, 20f, 4f, 16f, 4f, 11f); lineTo(4f, 5f); close()
+            }, fill)
+            canvas.drawPath(star(12f, 11.5f, 4.6f), white)
+        }
+        FacilityKind.GUARD_HOUSE -> {
+            // A house with a heart: a shop or home that keeps children safe.
+            canvas.drawPath(path {
+                moveTo(12f, 2.5f); lineTo(22.5f, 11.5f); lineTo(19.5f, 11.5f); lineTo(19.5f, 21f)
+                lineTo(4.5f, 21f); lineTo(4.5f, 11.5f); lineTo(1.5f, 11.5f); close()
+            }, fill)
+            canvas.drawCircle(10.4f, 13.6f, 1.9f, white)
+            canvas.drawCircle(13.6f, 13.6f, 1.9f, white)
+            canvas.drawPath(path { moveTo(8.6f, 14.3f); lineTo(15.4f, 14.3f); lineTo(12f, 18.6f); close() }, white)
+        }
+        FacilityKind.EMERGENCY_BELL -> {
+            // A bell.
+            canvas.drawPath(path {
+                moveTo(12f, 3f); cubicTo(8f, 3f, 6f, 6f, 6f, 10f); lineTo(6f, 15f); lineTo(3.5f, 18f)
+                lineTo(20.5f, 18f); lineTo(18f, 15f); lineTo(18f, 10f); cubicTo(18f, 6f, 16f, 3f, 12f, 3f); close()
+            }, fill)
+            canvas.drawCircle(12f, 20.3f, 2f, fill)
+            canvas.drawCircle(12f, 2.6f, 1.3f, fill)
+        }
+        FacilityKind.HEAT_SHELTER, FacilityKind.COLD_SHELTER -> {
+            // A shelter: a house with the sun (무더위쉼터) or a snowflake (한파쉼터) inside it (11/9: the sun or
+            // snowflake alone read as the weather).
+            canvas.drawPath(path {
+                moveTo(12f, 1.5f); lineTo(23f, 11f); lineTo(20f, 11f); lineTo(20f, 22f)
+                lineTo(4f, 22f); lineTo(4f, 11f); lineTo(1f, 11f); close()
+            }, fill)
+            val cx = 12f
+            val cy = 15.5f
+            val mark = line(1.5f).apply { this.color = 0xFFFFFFFF.toInt() }
+            if (kind == FacilityKind.HEAT_SHELTER) {
+                canvas.drawCircle(cx, cy, 2.3f, white)
+                for (i in 0 until 8) {
+                    val t = Math.toRadians(i * 45.0)
+                    val c = kotlin.math.cos(t).toFloat()
+                    val sn = kotlin.math.sin(t).toFloat()
+                    canvas.drawLine(cx + 3.4f * c, cy + 3.4f * sn, cx + 4.8f * c, cy + 4.8f * sn, mark)
+                }
+            } else {
+                for (i in 0 until 3) {
+                    val t = Math.toRadians(i * 60.0 + 90.0)
+                    val c = kotlin.math.cos(t).toFloat()
+                    val sn = kotlin.math.sin(t).toFloat()
+                    canvas.drawLine(cx - 4.8f * c, cy - 4.8f * sn, cx + 4.8f * c, cy + 4.8f * sn, mark)
+                }
+            }
+        }
+        FacilityKind.TOILET -> {
+            // A man and a woman, as on the map's 화장실 button.
+            person(5.8f, fill, dress = false)
+            person(18.2f, fill, dress = true)
+            canvas.drawLine(12f, 2.5f, 12f, 22f, line(1.6f))
+        }
+        FacilityKind.ACCESSIBLE_TOILET -> {
+            // A person in a wheelchair.
+            canvas.drawCircle(10.5f, 3.8f, 2.1f, fill)
+            val body = line(2.4f)
+            canvas.drawPath(path { moveTo(10.5f, 7.5f); lineTo(10.5f, 13.5f); lineTo(16f, 13.5f); lineTo(18.5f, 19.5f) }, body)
+            canvas.drawLine(10.5f, 10f, 15f, 10f, body)
+            canvas.drawArc(RectF(4f, 10.5f, 15f, 21.5f), 20f, 250f, false, line(2f))
+        }
+        FacilityKind.CURB_RAMP -> {
+            // Crossing stripes over a ramp.
+            for (x in listOf(3.5f, 8f, 12.5f, 17f)) canvas.drawRect(RectF(x, 4f, x + 3f, 15f), fill)
+            canvas.drawPath(path { moveTo(2f, 21f); lineTo(22f, 21f); lineTo(22f, 17.5f); close() }, fill)
+        }
+        FacilityKind.ELEVATOR -> {
+            // An elevator sign: up and down.
+            canvas.drawRoundRect(RectF(4f, 3f, 20f, 21f), 3f, 3f, fill)
+            canvas.drawPath(path { moveTo(12f, 5.5f); lineTo(16f, 10.8f); lineTo(8f, 10.8f); close() }, white)
+            canvas.drawPath(path { moveTo(12f, 18.5f); lineTo(16f, 13.2f); lineTo(8f, 13.2f); close() }, white)
+        }
+        FacilityKind.OVERPASS -> {
+            // A bridge over the road: deck, railing and legs.
+            canvas.drawRect(RectF(1.5f, 10f, 22.5f, 13f), fill)
+            canvas.drawLine(2.5f, 6f, 21.5f, 6f, line(1.6f))
+            for (x in listOf(5f, 10f, 14f, 19f)) canvas.drawLine(x, 6f, x, 10f, line(1.4f))
+            canvas.drawRect(RectF(4.5f, 13f, 7f, 21f), fill)
+            canvas.drawRect(RectF(17f, 13f, 19.5f, 21f), fill)
+        }
+        FacilityKind.STAIRS -> {
+            // Steps seen from the side: the block's outline, filled pale (11/9: solid was too heavy, a line alone
+            // read as a wave).
+            val steps = path {
+                moveTo(2.5f, 21f); lineTo(2.5f, 17f); lineTo(7.5f, 17f); lineTo(7.5f, 12.5f); lineTo(12.5f, 12.5f)
+                lineTo(12.5f, 8f); lineTo(17.5f, 8f); lineTo(17.5f, 3.5f); lineTo(21.5f, 3.5f); lineTo(21.5f, 21f); close()
+            }
+            canvas.drawPath(steps, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = (color and 0x00FFFFFF) or 0x40000000 })
+            canvas.drawPath(steps, line(2f))
+        }
+        FacilityKind.SUBWAY -> {
+            // The front of a train.
+            canvas.drawRoundRect(RectF(5f, 2.5f, 19f, 17f), 3.5f, 3.5f, fill)
+            canvas.drawRoundRect(RectF(7.3f, 5f, 16.7f, 10.5f), 1f, 1f, white)
+            canvas.drawCircle(8.7f, 13.7f, 1.3f, white)
+            canvas.drawCircle(15.3f, 13.7f, 1.3f, white)
+            val leg = line(2f)
+            canvas.drawLine(8f, 17.5f, 5.5f, 21.5f, leg)
+            canvas.drawLine(16f, 17.5f, 18.5f, 21.5f, leg)
+        }
+        FacilityKind.SUBWAY_ENTRANCE -> {
+            // Going down: an arrow into steps.
+            canvas.drawPath(path {
+                moveTo(10f, 2.5f); lineTo(14f, 2.5f); lineTo(14f, 8f); lineTo(17.5f, 8f); lineTo(12f, 13.5f)
+                lineTo(6.5f, 8f); lineTo(10f, 8f); close()
+            }, fill)
+            canvas.drawPath(path {
+                moveTo(2.5f, 15.5f); lineTo(8f, 15.5f); lineTo(8f, 18.2f); lineTo(14f, 18.2f); lineTo(14f, 21f)
+                lineTo(21.5f, 21f)
+            }, line(2f))
+        }
+        FacilityKind.SCHOOL_ZONE -> {
+            // A child walking.
+            canvas.drawCircle(12f, 4.5f, 2.6f, fill)
+            canvas.drawRoundRect(RectF(9.2f, 8f, 14.8f, 15f), 2f, 2f, fill)
+            val limb = line(2f)
+            canvas.drawLine(10.8f, 15f, 9f, 21f, limb)
+            canvas.drawLine(13.2f, 15f, 15f, 21f, limb)
+            canvas.drawLine(9.2f, 9.5f, 6.5f, 13f, limb)
+            canvas.drawLine(14.8f, 9.5f, 17.5f, 13f, limb)
+        }
+    }
+}
+
 /**
  * A white rounded tag with a colored border and bold text, like the design mockup.
  * With [elevator], a small elevator sign follows the text (a station or exit with an elevator).
  */
-internal fun pillBitmap(text: String, color: Int, density: Float, elevator: Boolean = false): Bitmap {
+internal fun pillBitmap(text: String, color: Int, density: Float, elevator: Boolean = false, picture: FacilityKind? = null): Bitmap {
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         this.color = color
         textSize = 13f * density
@@ -372,7 +586,11 @@ internal fun pillBitmap(text: String, color: Int, density: Float, elevator: Bool
     val height = 30f * density
     val iconSize = 18f * density
     val iconGap = 6f * density
-    val width = textPaint.measureText(text) + padX * 2 + if (elevator) iconSize + iconGap else 0f
+    // [picture] goes first, the words after it.
+    val pictureSize = 20f * density
+    val leading = if (picture != null) pictureSize + if (text.isNotEmpty()) iconGap else 0f else 0f
+    val trailingGap = if (elevator && (text.isNotEmpty() || picture != null)) iconGap else 0f
+    val width = leading + textPaint.measureText(text) + padX * 2 + if (elevator) iconSize + trailingGap else 0f
 
     val bitmap = Bitmap.createBitmap(width.toInt() + 1, height.toInt() + 1, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
@@ -388,7 +606,14 @@ internal fun pillBitmap(text: String, color: Int, density: Float, elevator: Bool
         },
     )
     val baseline = height / 2 - (textPaint.descent() + textPaint.ascent()) / 2
-    canvas.drawText(text, padX, baseline, textPaint)
+    picture?.let { kind ->
+        canvas.save()
+        canvas.translate(padX - 2f * density, (height - pictureSize) / 2)
+        canvas.scale(pictureSize / 24f, pictureSize / 24f)
+        drawPicture(canvas, kind, color)
+        canvas.restore()
+    }
+    canvas.drawText(text, padX + leading, baseline, textPaint)
     if (elevator) {
         // Elevator sign: a filled rounded square with an up and a down triangle.
         val left = width - padX - iconSize

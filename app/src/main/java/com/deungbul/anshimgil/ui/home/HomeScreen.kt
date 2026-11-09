@@ -19,6 +19,7 @@ import com.deungbul.anshimgil.data.MapLayers
 import androidx.compose.runtime.mutableIntStateOf
 import com.deungbul.anshimgil.data.stationExits
 import com.deungbul.anshimgil.data.FacilityKind
+import com.deungbul.anshimgil.data.meaning
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.IconButton
 import com.deungbul.anshimgil.data.Facility
@@ -37,6 +38,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalPolice
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Work
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.Tune
@@ -49,6 +54,20 @@ import androidx.compose.runtime.LaunchedEffect
 import com.deungbul.anshimgil.data.ShownHints
 import com.deungbul.anshimgil.data.MapHintSource
 import com.deungbul.anshimgil.data.MapHint
+import com.deungbul.anshimgil.data.ButtonBox
+import com.deungbul.anshimgil.data.MISS_NEAR_DP
+import com.deungbul.anshimgil.data.MissDetector
+import com.deungbul.anshimgil.data.TAP_MAX_MS
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.positionInRoot
+import com.deungbul.anshimgil.data.nearbyOrder
+import com.deungbul.anshimgil.data.Adaptation
+import com.deungbul.anshimgil.data.Usage
 import com.deungbul.anshimgil.data.TRIP_CONSENT_NO
 import com.deungbul.anshimgil.data.TRIP_CONSENT_YES
 import com.deungbul.anshimgil.data.TRIP_CONSENT_QUESTION
@@ -140,6 +159,35 @@ fun HomeScreen(
     /** AI 비서 asks in its live bubble whether to keep trips; [onTripConsent] gets the answer. */
     askTripConsent: Boolean = false,
     onTripConsent: (Boolean) -> Unit = {},
+    /** What has been learned on this phone (쓰는 대로 맞추기). */
+    usage: Usage = Usage(),
+    /** A change AI 비서 offers now (bigger buttons or text), answered with [onAdaptation]. */
+    adaptation: Adaptation? = null,
+    onAdaptation: (Adaptation, Boolean) -> Unit = { _, _ -> },
+    /**
+     * Signals for 쓰는 대로 맞추기: a nearby button used; a press of one of the map's buttons (true when it came
+     * right after a tap that missed it, see [MissDetector]); the map zoomed in close by hand.
+     */
+    onNearbyTap: (String) -> Unit = {},
+    onPress: (Boolean) -> Unit = {},
+    onZoomIn: () -> Unit = {},
+    /** [바로 출발] on a suggestion: guidance at once with the usual kind of route. */
+    onStartNow: (Place, Boolean) -> Unit = { _, _ -> },
+    /** 처음 맞추기: AI 비서's question and its answers, answered with [onSetupAnswer] (the answer's index). */
+    setupAsk: Pair<String, List<String>>? = null,
+    /** The index meant by words said to the current 처음 맞추기 question; null when unclear. */
+    setupFromSpeech: (String) -> Int? = { null },
+    onSetupAnswer: (Int) -> Unit = {},
+    /** Saved places with a place set (집, 학교, …): one tap each finds the way there (사용성 점검표 7번). */
+    saved: List<com.deungbul.anshimgil.data.Favorite> = emptyList(),
+    /** 도착 뒤 한마디 (m07): AI 비서's question after arriving and its answers, answered with [onFeedbackAnswer]. */
+    feedbackAsk: Pair<String, List<String>>? = null,
+    onFeedbackAnswer: (Int) -> Unit = {},
+    /** A change just made from a bubble, told with 좋아요 / 되돌리기 ([onUndoAnswer] true to take it back). */
+    undoAsk: String? = null,
+    onUndoAnswer: (Boolean) -> Unit = {},
+    /** AI 비서's live words here and the walker's answers, for the chat (fromUser, text). */
+    onLive: (Boolean, String) -> Unit = { _, _ -> },
 ) {
     var sos by remember { mutableStateOf(startWithSos) }
     LaunchedEffect(Unit) { if (startWithSos) onSosShown() }
@@ -148,6 +196,8 @@ fun HomeScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var finding by remember { mutableStateOf<String?>(null) }
     var nearbyMessage by remember { mutableStateOf<String?>(null) }
+    // When the internet was the trouble: the same search again, offered as [다시 하기] (사용성 점검표 19번).
+    var nearbyRetry by remember { mutableStateOf<(() -> Unit)?>(null) }
     var bbox by remember { mutableStateOf<Bbox?>(null) }
     var mapNote by remember { mutableStateOf<String?>(null) }
     // The tapped place whose details are shown, e.g. a station's elevator exits.
@@ -159,6 +209,17 @@ fun HomeScreen(
     var zoom by remember { mutableIntStateOf(WALK_ZOOM) }
     val scope = rememberCoroutineScope()
     var hint by remember { mutableStateOf<MapHint?>(null) }
+    // 쓰는 대로 맞추기: where each button is on screen, so that a tap just beside one (which does nothing)
+    // followed by a tap on it is noticed as a miss; pressing a button again is not.
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val buttonBoxes = remember { mutableMapOf<String, ButtonBox>() }
+    val missDetector = remember(density) { MissDetector(nearPx = with(density) { MISS_NEAR_DP.dp.toPx() }) }
+    var screenOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    // Kept in the window's root coordinates; a tap is turned into them with [screenOrigin].
+    fun Modifier.tracked(key: String) = onGloballyPositioned { c ->
+        val r = c.boundsInRoot()
+        buttonBoxes[key] = ButtonBox(r.left, r.top, r.right, r.bottom)
+    }
 
     // The phone's position, kept up to date so the location button moves at once and the dot follows.
     var hasPermission by remember { mutableStateOf(hasLocationPermission(context)) }
@@ -208,8 +269,31 @@ fun HomeScreen(
         if (hint != null) return@LaunchedEffect
         hint = source.next(mode, at)
     }
+    // What AI 비서 says in its bubbles also goes into its chat.
+    LaunchedEffect(askTripConsent) { if (askTripConsent) onLive(false, TRIP_CONSENT_QUESTION) }
+    LaunchedEffect(adaptation) { adaptation?.let { onLive(false, it.question) } }
+    LaunchedEffect(setupAsk?.first) { setupAsk?.let { onLive(false, it.first) } }
+    // 처음 맞추기 by voice (사용성 점검표 2번): the words go to the answer they mean.
+    val setupSpeech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val said = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: return@rememberLauncherForActivityResult
+        onLive(true, said)
+        val index = setupFromSpeech(said)
+        if (index != null) onSetupAnswer(index) else onLive(false, "잘 못 알아들었어요. 버튼을 누르거나 다시 말해 주세요.")
+    }
+    LaunchedEffect(undoAsk) { undoAsk?.let { onLive(false, it) } }
+    LaunchedEffect(feedbackAsk?.first) { feedbackAsk?.let { onLive(false, it.first) } }
     LaunchedEffect(hint) {
         val shown = hint ?: return@LaunchedEffect
+        onLive(false, shown.text)
+        // A suggested trip stays until answered or closed (it went before it could be tapped, 11/6), or until
+        // it is too late for it (past the usual time, the event started).
+        if (shown.startNow) {
+            val until = shown.until ?: return@LaunchedEffect
+            delay(java.time.Duration.between(java.time.LocalDateTime.now(), until).toMillis().coerceAtLeast(0))
+            ShownHints.mark(shown.key)
+            hint = null
+            return@LaunchedEffect
+        }
         delay(HINT_SHOW_MS)
         ShownHints.mark(shown.key)
         hint = null
@@ -234,6 +318,7 @@ fun HomeScreen(
         if (finding != null) return
         finding = kind
         nearbyMessage = null
+        nearbyRetry = null
         scope.launch {
             // Outside Gwangju the server has no places, so the demo point is used as for routes.
             val from = here?.let { chooseOrigin(it).point } ?: phoneOrigin(context).point
@@ -244,6 +329,7 @@ fun HomeScreen(
                 else nearbyMessage = result.message ?: "가까운 ${label}을(를) 찾지 못했어요"
             } catch (e: ApiException) {
                 nearbyMessage = e.message
+                if (e.code == "NETWORK") nearbyRetry = { goToNearest(kind, label) }
             }
             finding = null
         }
@@ -254,11 +340,16 @@ fun HomeScreen(
         val m = map ?: return@LaunchedEffect
         m.tiltForWalking()
         bbox = m.visibleBbox()
-        m.setOnCameraMoveEndListener { moved, position, _ ->
+        m.setOnCameraMoveEndListener { moved, position, gesture ->
+            // Zooming in close (past the walking view) is a sign the map is hard to read.
+            // Only the walker's own zooming counts, not the app moving the map (내 위치, a found place).
+            if (gesture in HAND_ZOOMS && position.zoomLevel > zoom && position.zoomLevel >= WALK_ZOOM + 2) onZoomIn()
             zoom = position.zoomLevel
             moved.visibleBbox()?.let { bbox = it }
         }
         m.setOnLabelClickListener { _, _, label ->
+            // That tap opened something: not a miss even if it was beside a button.
+            missDetector.forget()
             (label.tag as? Facility)?.let { picked = it; showBuses = false }
             true
         }
@@ -288,11 +379,37 @@ fun HomeScreen(
             }
         } catch (e: ApiException) {
             // Kept short and distinct from the shortcut buttons' message, which may show at the same time.
-            if (e.code == "NETWORK") "지도 시설을 불러오지 못했어요 (인터넷 연결 확인)" else e.message
+            if (e.code == "NETWORK") "인터넷이 안 돼서 지도 시설을 못 불러왔어요" else e.message
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .onGloballyPositioned { screenOrigin = it.positionInRoot() }
+            // Watches every tap on the screen without taking it (the map and the buttons still get it).
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    var tap = false
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        // Two fingers (pinching) are no tap.
+                        if (event.changes.size > 1) break
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) break
+                        if (!change.pressed) {
+                            tap = change.uptimeMillis - down.uptimeMillis <= TAP_MAX_MS
+                            break
+                        }
+                    }
+                    if (tap) {
+                        missDetector.tap(down.position.x + screenOrigin.x, down.position.y + screenOrigin.y, down.uptimeMillis, buttonBoxes.toMap())
+                            ?.let { (_, missed) -> onPress(missed) }
+                    }
+                }
+            },
+    ) {
         KakaoMapView(
             modifier = Modifier.fillMaxSize(),
             // Open where the phone already is (in Gwangju), close enough to see the streets around.
@@ -316,7 +433,8 @@ fun HomeScreen(
                     shadowElevation = 4.dp,
                     modifier = Modifier
                         .weight(1f)
-                        .heightIn(min = 52.dp),
+                        .heightIn(min = 52.dp)
+                        .tracked("search"),
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -332,7 +450,7 @@ fun HomeScreen(
                     shape = RoundedCornerShape(16.dp),
                     color = Color.White,
                     shadowElevation = 4.dp,
-                    modifier = Modifier.size(52.dp),
+                    modifier = Modifier.size(52.dp).tracked("settings"),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(Icons.Filled.Tune, contentDescription = "설정", tint = Ink)
@@ -340,13 +458,44 @@ fun HomeScreen(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NEARBY.forEach { (query, label, icon) ->
+                // Most used first (쓰는 대로 맞추기).
+                nearbyOrder(usage).mapNotNull { k -> NEARBY.firstOrNull { it.first == k } }.forEach { (query, label, icon) ->
                     NearbyButton(
                         text = if (finding == query) "찾는 중…" else label,
                         icon = icon,
-                        onClick = { goToNearest(query, label) },
-                        modifier = Modifier.weight(1f),
+                        onClick = { onNearbyTap(query); goToNearest(query, label) },
+                        modifier = Modifier.weight(1f).tracked(query),
                     )
+                }
+            }
+            // 집·학교… saved places, one tap to the route, under the nearby buttons (사용성 점검표 7번).
+            val savedWithPlace = saved.filter { it.place != null }.take(3)
+            if (savedWithPlace.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                savedWithPlace.forEach { fav ->
+                    Surface(
+                        onClick = { onLive(true, "${com.deungbul.anshimgil.data.withDirection(fav.name)} 가기"); onPlaceSelected(fav.place!!.copy(name = fav.name)) },
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.White,
+                        shadowElevation = 4.dp,
+                        modifier = Modifier.heightIn(min = 48.dp).tracked("_saved"),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                            Icon(
+                                when (fav.name) {
+                                    "집" -> Icons.Filled.Home
+                                    "학교" -> Icons.Filled.School
+                                    "직장" -> Icons.Filled.Work
+                                    else -> Icons.Filled.Place
+                                },
+                                contentDescription = null, tint = Color(0xFF1F6B42), modifier = Modifier.size(22.dp),
+                            )
+                            Text(
+                                "${com.deungbul.anshimgil.data.withDirection(fav.name)} 가기",
+                                fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink, maxLines = 1,
+                                modifier = Modifier.padding(start = 6.dp),
+                            )
+                        }
+                    }
                 }
             }
             // 불편 신고: a small icon on the right, under the nearby buttons (team, 11/6).
@@ -355,7 +504,7 @@ fun HomeScreen(
                 shape = RoundedCornerShape(14.dp),
                 color = Color.White,
                 shadowElevation = 4.dp,
-                modifier = Modifier.align(Alignment.End).size(56.dp),
+                modifier = Modifier.align(Alignment.End).size(56.dp).tracked("report"),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Icon(Icons.Filled.Campaign, contentDescription = "불편 신고", tint = Color(0xFFB45309), modifier = Modifier.size(24.dp))
@@ -364,7 +513,15 @@ fun HomeScreen(
             }
             nearbyMessage?.let {
                 Surface(shape = RoundedCornerShape(12.dp), color = Color.White, shadowElevation = 2.dp) {
-                    Text(it, fontSize = 14.sp, color = Color(0xFFB42318), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Text(it, fontSize = 16.sp, color = Color(0xFFB42318))
+                        nearbyRetry?.let { again ->
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { nearbyMessage = null; again() },
+                                modifier = Modifier.padding(top = 6.dp).heightIn(min = 48.dp),
+                            ) { Text("다시 하기", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                        }
+                    }
                 }
             }
         }
@@ -381,7 +538,8 @@ fun HomeScreen(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp, bottom = 48.dp)
-                .size(52.dp),
+                .size(52.dp)
+                .tracked("locate"),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(Icons.Filled.MyLocation, contentDescription = "내 위치로 이동", tint = Color(0xFF2F6FDB))
@@ -410,7 +568,7 @@ fun HomeScreen(
                 at = here?.let { chooseOrigin(it).point },
                 mode = mode,
                 onClose = { showBuses = false },
-                modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 112.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 112.dp).tracked("_buses"),
             )
         }
         picked?.let { place ->
@@ -418,7 +576,7 @@ fun HomeScreen(
                 place,
                 exits = if (place.kind == FacilityKind.SUBWAY) stationExits(place, shownFacilities) else emptyList(),
                 onClose = { picked = null },
-                modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 112.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 112.dp).tracked("_place"),
             )
         }
 
@@ -426,24 +584,79 @@ fun HomeScreen(
 
         // AI 비서's one-line bubble sits just above its button, unless a card is open there.
         // "자주 가는 길을 기억해 둘까요?" comes first, in the same live bubble, with the two answers under it.
-        if (askTripConsent && !showBuses && picked == null) {
-            Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp)) {
+        if (setupAsk != null && !showBuses && picked == null) {
+            // 처음 맞추기 comes before anything else.
+            Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
+                AiAskBubble(
+                    setupAsk.first,
+                    answers = setupAsk.second.mapIndexed { i, a -> a to { onLive(true, a); onSetupAnswer(i) } } +
+                        ("말로 답하기" to {
+                            val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
+                                .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "말씀해 주세요")
+                            runCatching { setupSpeech.launch(intent) }
+                            Unit
+                        }),
+                )
+            }
+        } else if (feedbackAsk != null && !showBuses && picked == null) {
+            Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
+                AiAskBubble(
+                    feedbackAsk.first,
+                    answers = feedbackAsk.second.mapIndexed { i, a -> a to { onLive(true, a); onFeedbackAnswer(i) } },
+                )
+            }
+        } else if (undoAsk != null && !showBuses && picked == null) {
+            Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
+                AiAskBubble(
+                    undoAsk,
+                    answers = listOf(
+                        "좋아요" to { onLive(true, "좋아요"); onUndoAnswer(false) },
+                        "되돌리기" to { onLive(true, "되돌리기"); onUndoAnswer(true) },
+                    ),
+                )
+            }
+        } else if (askTripConsent && !showBuses && picked == null) {
+            Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
                 AiAskBubble(
                     TRIP_CONSENT_QUESTION,
-                    answers = listOf(TRIP_CONSENT_YES to { onTripConsent(true) }, TRIP_CONSENT_NO to { onTripConsent(false) }),
+                    answers = listOf(
+                        TRIP_CONSENT_YES to { onLive(true, TRIP_CONSENT_YES); onTripConsent(true) },
+                        TRIP_CONSENT_NO to { onLive(true, TRIP_CONSENT_NO); onTripConsent(false) },
+                    ),
+                )
+            }
+        } else if (adaptation != null && !showBuses && picked == null) {
+            // 쓰는 대로 맞추기: asked before anything changes.
+            Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
+                AiAskBubble(
+                    adaptation.question,
+                    answers = listOf(
+                        adaptation.yes to { onLive(true, adaptation.yes); onAdaptation(adaptation, true) },
+                        "괜찮아요" to { onLive(true, "괜찮아요"); onAdaptation(adaptation, false) },
+                    ),
                 )
             }
         } else if (!showBuses && picked == null) hint?.let { h ->
-            Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 148.dp)) {
+            Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 148.dp).tracked("_hint")) {
                 HintBubble(
                     h,
                     onOpen = {
                         ShownHints.mark(h.key)
                         hint = null
                         val place = h.place
-                        if (place != null) onPlaceSelected(place) else onAskAssistant(h.text)
+                        if (place != null) { onLive(true, "길 보기"); onPlaceSelected(place) } else onAskAssistant(h.text)
                     },
                     onDismiss = { ShownHints.mark(h.key); hint = null },
+                    onStartNow = h.place?.takeIf { h.startNow }?.let { place ->
+                        {
+                            onLive(true, "바로 출발")
+                            ShownHints.mark(h.key)
+                            hint = null
+                            onStartNow(place, h.transit)
+                        }
+                    },
                 )
             }
         }
@@ -454,7 +667,7 @@ fun HomeScreen(
             color = Color(0xFF1F6B42),
             contentColor = Color.White,
             shadowElevation = 6.dp,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp).heightIn(min = 56.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp).heightIn(min = 56.dp).tracked("ai"),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp)) {
                 Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(22.dp))
@@ -502,11 +715,11 @@ private fun KakaoMap.visibleBbox(): Bbox? {
 }
 
 /**
- * Details of a tapped place, one item per line: for a station, which exits have elevators,
+ * A tapped place: what its picture means, then its details one item per line: for a station, which exits have elevators,
  * accessible toilets, wheelchair chargers and train hours, as the server words them.
  */
 @Composable
-private fun PlaceDetailCard(place: Facility, exits: List<String>, onClose: () -> Unit, modifier: Modifier = Modifier) {
+internal fun PlaceDetailCard(place: Facility, exits: List<String>, onClose: () -> Unit, modifier: Modifier = Modifier) {
     val parts = place.detail.orEmpty().split(" · ").map { it.trim() }.filter { it.isNotEmpty() }
     // The first part repeats the kind ("지하철역"), so it goes next to the name instead.
     val kindText = parts.firstOrNull()?.takeIf { place.name != null && parts.size > 1 }
@@ -541,6 +754,11 @@ private fun PlaceDetailCard(place: Facility, exits: List<String>, onClose: () ->
                 }
                 IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Ink) }
             }
+            // What the picture means, for anyone who does not know it (11/9).
+            Text(
+                place.kind.meaning, fontSize = 15.sp, lineHeight = 21.sp, color = Color(0xFF3F4A43),
+                modifier = Modifier.padding(end = 12.dp, bottom = 4.dp),
+            )
             if (place.kind == FacilityKind.SUBWAY) {
                 val next = trains
                 when {
@@ -635,12 +853,22 @@ private fun NearbyBusCard(at: LatLon?, mode: UserMode, onClose: () -> Unit, modi
 /** About 300 m; moving into another cell of this size looks for a new bubble. */
 private const val HINT_CELL_DEG = 0.003
 
+/** Buttons this much bigger when the walker said yes to bigger buttons. */
+
+/** The walker's own zooming in on the map (not the app moving it). */
+private val HAND_ZOOMS = setOf(
+    com.kakao.vectormap.GestureType.Zoom,
+    com.kakao.vectormap.GestureType.OneFingerZoom,
+    com.kakao.vectormap.GestureType.OneFingerDoubleTap,
+    com.kakao.vectormap.GestureType.RotateZoom,
+)
+
 /** How long the AI 비서 bubble stays when left alone. */
 private const val HINT_SHOW_MS = 15_000L
 
 /** One line from AI 비서 under its button; a route offer has its own button, other lines open AI 비서. */
 @Composable
-private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit) {
+private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit, onStartNow: (() -> Unit)? = null) {
     Surface(
         onClick = onOpen,
         shape = RoundedCornerShape(16.dp),
@@ -657,8 +885,16 @@ private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit)
                 modifier = Modifier.weight(1f).padding(start = 8.dp),
             )
             if (hint.place != null) {
-                androidx.compose.material3.TextButton(onClick = onOpen) {
-                    Text("길 보기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1F6B42))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    // One tap to go: guidance starts with the kind of route the walker usually picks.
+                    onStartNow?.let { start ->
+                        Surface(onClick = start, shape = RoundedCornerShape(14.dp), color = Color(0xFF1F6B42), contentColor = Color.White) {
+                            Text("바로 출발", fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                        }
+                    }
+                    androidx.compose.material3.TextButton(onClick = onOpen) {
+                        Text("길 보기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1F6B42))
+                    }
                 }
             }
             IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Color(0xFF5E6A62)) }
@@ -668,6 +904,7 @@ private fun HintBubble(hint: MapHint, onOpen: () -> Unit, onDismiss: () -> Unit)
 
 
 /** AI 비서 asking in its live bubble, with ready answers to tap right under the words. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun AiAskBubble(text: String, answers: List<Pair<String, () -> Unit>>) {
     Surface(
@@ -681,7 +918,12 @@ private fun AiAskBubble(text: String, answers: List<Pair<String, () -> Unit>>) {
                 Icon(Icons.Filled.AutoAwesome, contentDescription = "AI 비서", tint = Color(0xFF1F6B42), modifier = Modifier.size(18.dp).padding(top = 2.dp))
                 Text(text, fontSize = 15.sp, color = Ink, lineHeight = 21.sp, modifier = Modifier.padding(start = 8.dp))
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(start = 26.dp)) {
+            // Wraps to a second line when the answers do not fit (three answers, big text).
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(start = 26.dp),
+            ) {
                 answers.forEachIndexed { i, (label, onClick) ->
                     Surface(
                         onClick = onClick,
