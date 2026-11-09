@@ -21,6 +21,7 @@ import com.deungbul.anshimgil.data.restArrivedText
 import com.deungbul.anshimgil.data.restOfferText
 import com.deungbul.anshimgil.data.restName
 import com.deungbul.anshimgil.data.restPlace
+import com.deungbul.anshimgil.data.restPlaceOnTheWay
 import com.deungbul.anshimgil.data.asksToRest
 import com.deungbul.anshimgil.data.REST_NOT_NEAR_END_M
 import com.deungbul.anshimgil.data.REST_ASK_AGAIN_MS
@@ -531,7 +532,9 @@ fun GuideScreen(
         if (!asksToRest(mode) || resting != null || restOffer != null || !due || state.remainingM <= REST_NOT_NEAR_END_M) return@LaunchedEffect
         if (!watch.slow) return@LaunchedEffect
         // Where the walker is drawn: in the demo walk that is on the route, not the phone's far-away position.
-        val place = restPlace(active.facilities, if (demo) state.snapped else fix ?: state.snapped) ?: return@LaunchedEffect
+        val place = restPlaceOnTheWay(active.facilities, if (demo) state.snapped else fix ?: state.snapped, state.progressM) {
+            guidance.alongAndOff(LatLon(it.lat, it.lon))
+        } ?: return@LaunchedEffect
         lastRestAsk = now
         restOffer = place
         val said = restOfferText(place)
