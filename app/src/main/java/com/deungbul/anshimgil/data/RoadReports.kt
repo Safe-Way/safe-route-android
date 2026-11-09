@@ -51,7 +51,7 @@ data class RoadReport(
 data class ReportSpot(val type: ReportType, val point: LatLon, val reports: List<RoadReport>) {
     val count: Int get() = reports.size
     val latest: LocalDateTime? get() = reports.mapNotNull { it.createdAt }.maxOrNull()
-    val memos: List<String> get() = reports.mapNotNull { it.memo?.takeIf { m -> m.isNotBlank() } }
+    val memos: List<String> get() = reports.mapNotNull { it.memo?.takeIf { m -> m.isNotBlank() } }.distinct()
 }
 
 /** The school server's times are Korean time. */
@@ -114,7 +114,7 @@ private fun middle(rs: List<RoadReport>) = LatLon(rs.map { it.point.lat }.averag
 fun agoText(at: LocalDateTime?, now: LocalDateTime = koreaNow()): String? {
     val min = Duration.between(at ?: return null, now).toMinutes().coerceAtLeast(0)
     return when {
-        min < 1 -> "방금"
+        min < 1 -> "방금 전"
         min < 60 -> "${min}분 전"
         else -> "${min / 60}시간 전"
     }

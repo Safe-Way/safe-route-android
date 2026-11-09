@@ -75,4 +75,15 @@ class RoadReportsTest {
         assertEquals("공사 신고 2건 · 마지막 신고 20분 전", reportSpotTitle(spot, now.plusMinutes(20)))
         assertEquals("앞 60m에 공사 신고가 2건 있어요. 조심해서 가세요.", reportAheadText(spot, 60))
     }
+
+    @Test
+    fun toldOnlyWhenAheadAndNearTheRoute() {
+        val spot = reportSpots(listOf(r(reporter = "a"), r(reporter = "b")), now)[0]
+        // (along, off) for the spot on a made-up route.
+        fun at(along: Double, off: Double) = reportSpotsAhead(listOf(spot), progressM = 200.0) { along to off }
+        assertEquals(60, at(260.0, 10.0).single().second)
+        assertTrue(at(150.0, 10.0).isEmpty()) // behind
+        assertTrue(at(350.0, 10.0).isEmpty()) // too far ahead yet
+        assertTrue(at(260.0, 45.0).isEmpty()) // not on this road
+    }
 }
