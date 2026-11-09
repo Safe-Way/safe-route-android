@@ -11,6 +11,12 @@ private val GO_ENDINGS = listOf(
     "갈래", "갈래요", "가려고", "데려다 줘", "데려다줘", "안내해 줘", "안내해줘", "안내해 주세요", "길 알려 줘", "길 알려줘",
 )
 
+/** Words that make what is left a wish or a condition, not a place's name. */
+private val NOT_A_NAME = listOf(
+    "비안", "비맞", "안맞", "빠른", "느린", "그냥", "지하철", "버스", "택시", "타고", "걸어서", "내일", "오늘", "모레", "아침",
+    "저녁", "예약", "미리", "계단", "없는", "있는", "말고", "피해", "조용한", "가까운", "먼저", "들렀", "들러",
+)
+
 /** Particles and words left after the place's name ("문화전당으로", "문화전당까지"). */
 private val TRAILING = listOf("으로", "로", "까지", "에", "에게", "쪽으로", "쪽")
 
@@ -27,6 +33,10 @@ fun placeToGo(said: String): String? {
     s = s.removePrefix("나 ").removePrefix("우리 ").trim()
     // Not a place: "집에 가자" is a saved place (asked before this), "같이 가자" and the like are not names.
     if (s.length < 2 || s in setOf("같이", "어디", "어디로", "거기", "저기", "여기", "집", "다른 데", "다른데")) return null
+    // Only a short place name stays on the phone. With a condition, a time, a way of going or a description
+    // ("비 안 맞고 문화전당", "지하철 타고 시청", "오늘은 그냥 빠른 길", "엘베 있는 데") the server assistant reads it
+    // (11/9 test: the phone searched those words as a place name).
+    if (s.split(Regex("\\s+")).size > 3 || NOT_A_NAME.any { s.replace(" ", "").contains(it) } || s.endsWith(" 데") || s.endsWith("데로")) return null
     return s
 }
 

@@ -110,9 +110,7 @@ object RuleAppAssistant : AppAssistant {
         // Who walks and how ("다리를 다쳐서 휠체어 타", "오늘은 휠체어 안 타"): before the emergency words, which
         // would take "다쳐서" for a fall; walkerChange leaves anything urgent to them.
         walkerChange(said, history, context.mode)?.let { return it }
-        if (has("넘어", "다쳤", "다쳐", "아파", "아퍼", "쓰러", "위험", "따라와", "따라오", "살려", "무서워", "도와주세요")) {
-            return AssistantAction.Emergency("괜찮으세요? 112에 전화하거나 보호자에게 알릴까요?")
-        }
+        if (isEmergency(said)) return AssistantAction.Emergency("괜찮으세요? 112에 전화하거나 보호자에게 알릴까요?")
         // "집에 하트 그려진 아이콘 뭐야?": before the places, so "화장실 아이콘 뭐야" is told, not routed to.
         iconAnswer(said)?.let { return AssistantAction.Answer(it) }
         val wantsGo = has("안내", "가고싶", "가자", "가줘", "어디", "가까운", "근처", "찾아", "길")
@@ -136,6 +134,11 @@ object RuleAppAssistant : AppAssistant {
             has("음성", "소리", "말소리") && has("꺼", "끄", "시끄") -> AssistantAction.ChangeSettings("음성 안내를 끌게요.", voiceGuide = false)
             has("음성", "소리", "읽어") && has("켜", "들려") -> AssistantAction.ChangeSettings("음성 안내를 켤게요.", voiceGuide = true)
             has("버스") -> AssistantAction.ShowBuses("가까운 정류장에 곧 오는 버스를 보여 드릴게요.")
+            // "장애인 화장실이랑 보도턱 낮춘 횡단보도 보여 줘" is about the map, not a report of a 턱 (11/9 test).
+            asksToShowOnMap(s) -> AssistantAction.Ask(
+                "무엇을 도와드릴까요?",
+                listOf("근처 화장실로 안내해 줘", "글씨 크게 해 줘", "가까운 버스 보여 줘", "가까운 편의점"),
+            )
             reportTypeIn(said) != null || has("신고", "불편") -> reportAction(said)
             else -> AssistantAction.Ask(
                 "무엇을 도와드릴까요?",
@@ -159,6 +162,29 @@ fun reportTypeIn(said: String): ReportType? {
     val s = said.replace(" ", "")
     return REPORT_WORDS.firstOrNull { (_, words) -> words.any { s.contains(it.replace(" ", "")) } }?.first
 }
+
+/*
+ * Emergency words (11/9 test of 63 sentences): some are urgent on their own; "아파·무서워·어지러" are urgent only
+ * when that is all that is said ("아파", "너무 무서워"). "오늘 무릎이 아파", "다리가 아파서 좀 앉았다 가고 싶어",
+ * "집에 갈 건데 밤이라 무서워" and "넘어질 뻔했어" asked 112 before; "119 불러 줘" and "누가 자꾸 쫓아오는 것 같아" did not.
+ */
+private val URGENT_WORDS = listOf(
+    "넘어졌", "넘어져", "다쳤", "다쳐", "쓰러", "살려", "따라와", "따라오", "쫓아와", "쫓아오", "쫓아온", "위험해",
+    "도와주세요", "119", "112", "피가", "피나",
+)
+private val MAYBE_URGENT_WORDS = listOf("아파", "아퍼", "무서워", "무서워요", "어지러")
+
+/** Whether [said] is an emergency, see above. */
+internal fun isEmergency(said: String): Boolean {
+    val s = said.replace(" ", "")
+    if (URGENT_WORDS.any { s.contains(it) }) return true
+    val words = said.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+    return words.size <= 2 && MAYBE_URGENT_WORDS.any { s.contains(it) }
+}
+
+/** "…보여 줘", "지도에서 빼 줘": the map's pictures, which the server sets (not a report). */
+private fun asksToShowOnMap(s: String): Boolean =
+    listOf("보여줘", "보여주세요", "지도에", "빼줘", "표시해").any { s.contains(it) } && !s.contains("신고")
 
 /** Opens 불편 신고 with the kind and the walker's words filled in; they still check it and press 보내기. */
 fun reportAction(said: String, say: String? = null): AssistantAction.OpenReport {

@@ -311,4 +311,26 @@ class AssistantTest {
         // The biggest: said so, nothing pretends to change.
         assertTrue(said(AppSettings(textSize = TextSize.LARGE), Usage(textBoost = 1.3f)) is AssistantAction.Answer)
     }
+
+    /** From the 11/9 test of 63 sentences (reports/assistant-eval-1109.html). */
+    @Test
+    fun emergencyWordsAreNarrowerAndComplete() {
+        assertTrue(rule("119 불러 줘") is AssistantAction.Emergency)
+        assertTrue(rule("누가 자꾸 쫓아오는 것 같아") is AssistantAction.Emergency)
+        assertTrue(rule("넘어졌어 일어나기가 힘들어") is AssistantAction.Emergency)
+        assertTrue(rule("어지러워 쓰러질 것 같아") is AssistantAction.Emergency)
+        assertTrue(rule("너무 아파") is AssistantAction.Emergency)
+        // A pain or a fear with a wish is not an emergency: the server assistant asks or routes.
+        assertTrue(rule("오늘 무릎이 아파") !is AssistantAction.Emergency)
+        assertTrue(rule("다리가 아파서 좀 앉았다 가고 싶어") !is AssistantAction.Emergency)
+        assertTrue(rule("집에 갈 건데 밤이라 무서워") !is AssistantAction.Emergency)
+        assertTrue(rule("보도블록이 다 깨져서 넘어질 뻔했어") is AssistantAction.OpenReport)
+    }
+
+    @Test
+    fun showingOnTheMapIsNotAReport() {
+        assertTrue(rule("장애인 화장실이랑 보도턱 낮춘 횡단보도 보여 줘 이번 달까지") !is AssistantAction.OpenReport)
+        assertTrue(rule("가까운 버스 보여 줘") is AssistantAction.ShowBuses)
+        assertTrue(rule("여기 턱이 높아서 신고할래") is AssistantAction.OpenReport)
+    }
 }
