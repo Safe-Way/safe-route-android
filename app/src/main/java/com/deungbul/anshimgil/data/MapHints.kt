@@ -140,20 +140,30 @@ fun openMoment(history: List<String>, now: LocalDateTime): OpenMoment {
 /** "08:30" for any time from 8:30 to 8:59. */
 fun halfHour(t: LocalTime): String = "%02d:%02d".format(t.hour, if (t.minute < 30) 0 else 30)
 
-/** App opens kept on this phone only (never sent), to tell the first open of the day and usual times. */
-class AppOpenLog(private val context: android.content.Context) {
+/**
+ * App opens kept on this phone only (never sent), to tell the first open of the day and usual times.
+ * Kept only while [keep] says so: the walker said yes to keeping trips (팀 결정 11-09).
+ */
+class AppOpenLog(private val context: android.content.Context, private val keep: suspend () -> Boolean = { true }) {
     private val key = androidx.datastore.preferences.core.stringPreferencesKey("app_opens")
 
-    /** Notes this open and says which moment it is. */
+    /** Notes this open (when kept) and says which moment it is. */
     suspend fun record(now: LocalDateTime): OpenMoment {
         var moment = OpenMoment.OTHER
+        val keeping = runCatching { keep() }.getOrDefault(false)
         context.settingsDataStore.edit { prefs ->
             val history = prefs[key].orEmpty().lines().filter { it.isNotBlank() }
             moment = openMoment(history, now)
+            if (!keeping) return@edit
             val line = "${now.toLocalDate()}|${halfHour(now.toLocalTime())}"
             prefs[key] = (history.filter { it != line } + line).takeLast(200).joinToString("\n")
         }
         return moment
+    }
+
+    /** Forgets every open noted (on saying no to keeping trips). */
+    suspend fun clear() {
+        context.settingsDataStore.edit { it.remove(key) }
     }
 }
 

@@ -52,7 +52,8 @@ sealed interface AssistantAction {
      * Route to a place the server already found (its recommendation or a nearby place) or a saved place.
      * [transit] opens the 대중교통 tab, when the recommendation was the bus or subway.
      */
-    data class GoPlace(override val say: String, val place: Place, val transit: Boolean = false) : AssistantAction
+    /** [stops]: 들를 곳 on the way, in order, when AI 비서 planned them ("다이소 들르고 택배 찾고 집 갈래"). */
+    data class GoPlace(override val say: String, val place: Place, val transit: Boolean = false, val stops: List<StopPlace> = emptyList()) : AssistantAction
 
     data class ShowBuses(override val say: String) : AssistantAction
     /** Open 불편 신고 filled in from what was said: the kind of problem when it is clear, and the words as the memo. */
@@ -428,11 +429,30 @@ internal fun parseServerAssistantReply(json: JSONObject): ServerAssistantReply? 
     val action = when {
         // A question waits for the walker, even when a place came with it.
         ask != null || choices.isNotEmpty() -> AssistantAction.Ask(say, choices.map { it.second })
-        place != null -> AssistantAction.GoPlace(say, place, transit = json.optJSONObject("pick")?.optString("type") == "transit")
+        place != null -> AssistantAction.GoPlace(
+            say, place, transit = json.optJSONObject("pick")?.optString("type") == "transit",
+            stops = assistantStops(json),
+        )
         else -> AssistantAction.Answer(say)
     }
     val setup = "get_my_info" in tools && place == null && choices.any { it.first in SETUP_CHOICES }
     return ServerAssistantReply(action, json.text("conversationId"), choices, tools, setup)
+}
+
+/**
+ * 들를 곳 from the server assistant (#121·#123): `pick.request.stops` (`via` before #123) as [{name, lat, lon}],
+ * else the top `stops[]` ({label, name, lat, lon}); in the order to visit them.
+ */
+internal fun assistantStops(json: JSONObject): List<StopPlace> {
+    val request = json.optJSONObject("pick")?.optJSONObject("request")
+    val a = request?.optJSONArray("stops") ?: request?.optJSONArray("via") ?: json.optJSONArray("stops") ?: return emptyList()
+    return (0 until a.length()).mapNotNull { i ->
+        val s = a.optJSONObject(i) ?: return@mapNotNull null
+        if (!s.has("lat") || !s.has("lon")) return@mapNotNull null
+        val name = s.optString("name").takeIf { !s.isNull("name") && it.isNotBlank() }
+            ?: s.optString("label").takeIf { !s.isNull("label") && it.isNotBlank() } ?: "들를 곳 ${i + 1}"
+        StopPlace(name, LatLon(s.getDouble("lat"), s.getDouble("lon")))
+    }
 }
 
 /**

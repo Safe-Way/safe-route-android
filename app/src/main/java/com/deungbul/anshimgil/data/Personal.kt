@@ -409,6 +409,12 @@ class UsageRepository(private val context: Context) {
         m.remove(arrivalKey)
     }
 
+    /**
+     * Forgets the places learned on this phone: trips (이동 패턴), stays and the last arrival. On saying no to keeping
+     * trips: they are kept only with a yes (팀 결정 11-09).
+     */
+    suspend fun forgetPlaces() = change { _, m -> listOf(arrivalKey, staysKey, tripsKey).forEach { m.remove(it) } }
+
     suspend fun setAdapt(on: Boolean) = change { _, m -> m[adaptKey] = on }
 
     /** One step more of AI 비서's text enlargement ("글씨가 작아" when the setting is already 크게). */

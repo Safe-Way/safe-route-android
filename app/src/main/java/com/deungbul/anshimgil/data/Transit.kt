@@ -8,7 +8,8 @@ import org.json.JSONObject
  * swaps the walking parts for our own safer walking routes. At most 3 routes, best first.
  */
 
-enum class LegType { WALK, BUS, SUBWAY }
+/** [STOP] is a place to stop at on the way (들를 곳): [TransitLeg.to] is the place. */
+enum class LegType { WALK, BUS, SUBWAY, STOP }
 
 data class TransitStop(val name: String?, val point: LatLon)
 
@@ -41,13 +42,20 @@ data class TransitResult(val routes: List<TransitRoute>, val hiddenForWheelchair
 
 object TransitRepository {
     /** Throws [ApiException], e.g. TOO_CLOSE (walk instead), NO_ROUTE, DAILY_LIMIT, TRANSIT_UNAVAILABLE. */
-    suspend fun find(origin: LatLon, destination: LatLon, mode: UserMode, guestId: String? = null): TransitResult {
+    suspend fun find(
+        origin: LatLon,
+        destination: LatLon,
+        mode: UserMode,
+        stops: List<StopPlace> = emptyList(),
+        guestId: String? = null,
+    ): TransitResult {
         val body = JSONObject()
             .put("origin", JSONObject().put("lat", origin.lat).put("lon", origin.lon))
             .put("destination", JSONObject().put("lat", destination.lat).put("lon", destination.lon))
             .put("mode", mode.key)
             // The walking parts follow the walker's own choices (server #115).
             .apply { guestId?.let { put("guestId", it) } }
+            .apply { stopsJson(stops)?.let { put("stops", it) } }
         return parseTransit(ServerApi.post("/api/transit", body))
     }
 }
@@ -79,18 +87,21 @@ private fun parseLeg(l: JSONObject): TransitLeg {
     )
     fun strings(a: JSONArray?) = if (a == null) emptyList() else (0 until a.length()).map { a.optString(it) }
     val geometry = l.optJSONArray("geometry")
+    // A stop leg may give the place as `to`, `place`, or on the leg itself.
+    val place = l.optJSONObject("to") ?: l.optJSONObject("place") ?: l.takeIf { it.has("lat") && it.has("lon") }
     val buses = l.optJSONArray("buses")
     val trains = l.optJSONArray("trains")
     return TransitLeg(
         type = when (l.optString("type")) {
             "bus" -> LegType.BUS
             "subway" -> LegType.SUBWAY
+            "stop" -> LegType.STOP
             else -> LegType.WALK
         },
         distanceM = l.optInt("distanceM"),
         minutes = l.optInt("minutes"),
-        from = stop(l.optJSONObject("from")),
-        to = stop(l.optJSONObject("to")),
+        from = stop(l.optJSONObject("from") ?: place),
+        to = stop(place),
         lines = strings(l.optJSONArray("lines")),
         way = l.optString("way").takeUnless { l.isNull("way") || it.isBlank() },
         stationCount = if (l.isNull("stationCount")) null else l.optInt("stationCount"),
@@ -135,6 +146,7 @@ fun legTitle(leg: TransitLeg): String = when (leg.type) {
         (leg.stationCount?.let { " · ${it}정거장" } ?: "")
     LegType.SUBWAY -> "${leg.lines.firstOrNull() ?: "지하철"}${leg.way?.let { " $it 방면" } ?: ""} · ${leg.from.name ?: "역"} → ${leg.to.name ?: "역"}" +
         (leg.stationCount?.let { " · ${it}개 역" } ?: "")
+    LegType.STOP -> "들르기 · ${leg.to.name ?: "들를 곳"}"
 }
 
 /**
@@ -145,7 +157,9 @@ fun legTitle(leg: TransitLeg): String = when (leg.type) {
 data class FirstWait(val legIndex: Int, val waitMin: Int, val catches: String)
 
 fun firstWait(route: TransitRoute): FirstWait? {
-    val i = route.legs.indexOfFirst { it.type != LegType.WALK }.takeIf { it >= 0 } ?: return null
+    val i = route.legs.indexOfFirst { it.type == LegType.BUS || it.type == LegType.SUBWAY }.takeIf { it >= 0 } ?: return null
+    // After a stop (들를 곳) nobody knows when the walker gets to the bus.
+    if (route.legs.take(i).any { it.type == LegType.STOP }) return null
     val ride = route.legs[i]
     val reachMin = route.legs.take(i).sumOf { it.minutes }
     return when (ride.type) {
@@ -153,7 +167,7 @@ fun firstWait(route: TransitRoute): FirstWait? {
             ?.let { FirstWait(i, it.inMin!! - reachMin, "${it.line}번" + if (it.lowFloor) " 저상버스" else "") }
         LegType.SUBWAY -> ride.trains.filter { it.inMin >= reachMin }.minByOrNull { it.inMin }
             ?.let { FirstWait(i, it.inMin - reachMin, it.direction) }
-        LegType.WALK -> null
+        LegType.WALK, LegType.STOP -> null
     }
 }
 
