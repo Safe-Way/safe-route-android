@@ -10,22 +10,32 @@ interface RouteRepository {
     /** Throws [ApiException]. */
     suspend fun findRoutes(request: RouteRequest): RouteResult
 
+    /** This phone's guest number, sent with route and transit requests so the server uses the walker's own choices. */
+    suspend fun guestId(): String? = null
+
     companion object {
-        fun create(): RouteRepository = if (ServerApi.isConfigured) ServerRouteRepository() else FakeRouteRepository()
+        fun create(guestId: suspend () -> String? = { null }): RouteRepository =
+            if (ServerApi.isConfigured) ServerRouteRepository(guestId) else FakeRouteRepository()
     }
 }
 
-/** Talks to `POST /api/route` (requirements 8.3, server Safe-Way/safe-route#33). */
-class ServerRouteRepository : RouteRepository {
+/**
+ * Talks to `POST /api/route` (requirements 8.3, server Safe-Way/safe-route#33). With the guest number (진행표 10,
+ * server #111·#115) the route follows that walker's stairs, detour and rest choices kept in the server's user_profile.
+ */
+class ServerRouteRepository(private val guest: suspend () -> String? = { null }) : RouteRepository {
+    override suspend fun guestId(): String? = runCatching { guest() }.getOrNull()
+
     override suspend fun findRoutes(request: RouteRequest): RouteResult =
-        parseRouteResult(ServerApi.post("/api/route", request.toJson()), request.mode)
+        parseRouteResult(ServerApi.post("/api/route", request.toJson(guestId())), request.mode)
 }
 
-internal fun RouteRequest.toJson(): JSONObject = JSONObject()
+internal fun RouteRequest.toJson(guestId: String? = null): JSONObject = JSONObject()
     .put("origin", JSONObject().put("lat", origin.lat).put("lon", origin.lon))
     .put("destination", JSONObject().put("lat", destination.lat).put("lon", destination.lon))
     .put("mode", mode.key)
     .put("night", night)
+    .apply { guestId?.let { put("guestId", it) } }
 
 /** Comparison rows built from each route's `counts`, in the server's group order. */
 private val COUNT_GROUPS = listOf(

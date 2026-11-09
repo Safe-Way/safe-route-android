@@ -122,9 +122,9 @@ class MainActivity : ComponentActivity() {
         val savedPlaces = SavedPlacesRepository(applicationContext)
         val placeRepository = PlaceRepository.create()
         val facilityRepository = FacilityRepository.create()
-        val routeRepository = RouteRepository.create()
         val settingsRepository = SettingsRepository(applicationContext)
         val walkSpeedRepository = WalkSpeedRepository(applicationContext)
+        val routeRepository = RouteRepository.create(guestId = { walkSpeedRepository.guestId() })
         val tripLog = TripLogRepository(applicationContext, guestId = { walkSpeedRepository.guestId() })
         val myInfoRepository = com.deungbul.anshimgil.data.MyInfoRepository(guestId = { walkSpeedRepository.guestId() })
         val usageRepository = UsageRepository(applicationContext)
@@ -363,6 +363,11 @@ fun AppRoot(
         SavedMode.Loading -> Box(modifier.fillMaxSize())
         is SavedMode.Ready -> {
             val mode = state.mode
+            // The server keeps this phone's guest number and mode (진행표 10); quietly, and again next time if offline.
+            LaunchedEffect(mode) {
+                val m = mode ?: return@LaunchedEffect
+                if (com.deungbul.anshimgil.data.ServerApi.isConfigured) runCatching { myInfoRepository.syncMode(m) }
+            }
             // AI 비서, as its own screen from the map or laid over walking guidance (which keeps running underneath).
             val assistantPanel: @Composable (UserMode, () -> Unit) -> Unit = { mode, onClose ->
                     AssistantScreen(

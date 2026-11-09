@@ -1,13 +1,7 @@
 package com.deungbul.anshimgil.data
 
-import com.deungbul.anshimgil.BuildConfig
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
 /*
  * 말로 맞추기: the walker (or a family member) says in their own words who walks and how, e.g.
@@ -42,7 +36,7 @@ interface SetupAssistant {
 
     companion object {
         fun create(): SetupAssistant =
-            if (BuildConfig.GEMINI_API_KEY.isNotBlank()) GeminiSetupAssistant(RuleSetupAssistant) else RuleSetupAssistant
+            if (ServerApi.isConfigured) ServerSetupAssistant(RuleSetupAssistant) else RuleSetupAssistant
     }
 }
 
@@ -134,96 +128,36 @@ object RuleSetupAssistant : SetupAssistant {
 }
 
 /**
- * Gemini, asked for JSON in a fixed shape (structured output), so it can only answer with a question
- * or with the app's own setting values. Falls back to [fallback] on any failure.
+ * 말로 맞추기 through the server's window `POST /api/ai/setup-chat` (진행표 12, server #119): the server holds the
+ * Gemini key, the instruction and the answer's shape, so the app carries no key. Only the words and the settings go;
+ * no name, number, place or guest number. On 503 AI_UNAVAILABLE or any failure the app's own rules answer.
  */
-class GeminiSetupAssistant(private val fallback: SetupAssistant) : SetupAssistant {
+class ServerSetupAssistant(private val fallback: SetupAssistant) : SetupAssistant {
     override suspend fun reply(history: List<ChatLine>, current: SetupPick?): SetupReply =
-        runCatching { ask(history, current) }.getOrNull() ?: fallback.reply(history, current)
-
-    private suspend fun ask(history: List<ChatLine>, current: SetupPick?): SetupReply? = withContext(Dispatchers.IO) {
-        val url = URL("https://generativelanguage.googleapis.com/v1beta/models/${BuildConfig.GEMINI_MODEL}:generateContent")
-        val body = geminiRequest(history, current).toString().toByteArray()
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 8_000
-            readTimeout = 20_000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            setRequestProperty("x-goog-api-key", BuildConfig.GEMINI_API_KEY)
-            outputStream.use { it.write(body) }
-        }
-        try {
-            if (connection.responseCode !in 200..299) return@withContext null
-            val text = connection.inputStream.bufferedReader().use { it.readText() }
-            parseGeminiReply(JSONObject(text))
-        } catch (e: IOException) {
-            null
-        } finally {
-            connection.disconnect()
-        }
-    }
+        runCatching { parseSetupJson(ServerApi.post("/api/ai/setup-chat", appChatRequest(history, SETUP_CHAT_LINES, current?.let { settingsJson(it) }))) }
+            .getOrNull() ?: fallback.reply(history, current)
 }
 
-private val SETUP_INSTRUCTION = """
-너는 '세잎지도' 걷기 길안내 앱의 처음 설정 도우미야. 사용자가 누가 어떻게 걷는지 한국어로 말하면 앱 설정을 골라.
-모드: CHILD(어린이), SENIOR(어르신·다리가 불편하거나 천천히 걷는 사람), DISABLED(휠체어·보행기), GENERAL(그 밖의 사람).
-누가 걷는지 모르면 한 번만 짧게 되물어(type=ask, 고를 답 2~4개). 알면 바로 설정을 골라(type=pick).
-이미 고른 설정이 있고 사용자가 더 바꾸거나 더하고 싶다고 하면, 그 설정을 바탕으로 바꿔서 다시 pick 해.
-무엇을 더할지 말하지 않았으면 "무엇을 더 볼까요?"처럼 되묻고 고를 답에 지도 항목 이름을 줘.
-모든 칸을 채워. pick이면 reason에 왜 그렇게 골랐는지, question은 빈 글자, choices는 빈 목록. ask이면 question에 되물을 말, choices에 고를 답, 설정 칸은 지금 짐작한 값, reason은 빈 글자.
-question과 reason은 존댓말 한국어 한두 문장(80자 안쪽)으로만 써. 한자나 다른 언어는 쓰지 마. 이름·전화번호는 묻지 마.
-extraMapItems에는 모드에 더하면 좋은 것만: ${SETUP_MAP_ITEMS.entries.joinToString(", ") { "${it.key}(${it.value})" }}.
-""".trimIndent()
+/** The server takes this many lines of the talk at most, each up to [APP_CHAT_LINE_CHARS]. */
+private const val SETUP_CHAT_LINES = 12
+internal const val APP_CHAT_LINE_CHARS = 300
 
-internal fun geminiRequest(history: List<ChatLine>, current: SetupPick? = null): JSONObject {
-    val contents = JSONArray()
-    history.forEach { line ->
-        contents.put(
-            JSONObject()
-                .put("role", if (line.fromUser) "user" else "model")
-                .put("parts", JSONArray().put(JSONObject().put("text", line.text))),
-        )
-    }
-    fun str(vararg values: String) = JSONObject().put("type", "STRING").apply { if (values.isNotEmpty()) put("enum", JSONArray(values.toList())) }
-    val schema = JSONObject()
-        .put("type", "OBJECT")
-        .put(
-            "properties",
-            JSONObject()
-                .put("type", str("ask", "pick"))
-                .put("question", str())
-                .put("choices", JSONObject().put("type", "ARRAY").put("items", str()))
-                .put("mode", str(*UserMode.entries.map { it.name }.toTypedArray()))
-                .put("textSize", str(*TextSize.entries.map { it.name }.toTypedArray()))
-                .put("voiceGuide", JSONObject().put("type", "BOOLEAN"))
-                .put("sosButton", JSONObject().put("type", "BOOLEAN"))
-                .put("extraMapItems", JSONObject().put("type", "ARRAY").put("items", str(*SETUP_MAP_ITEMS.keys.toTypedArray())))
-                .put("reason", str()),
-        )
-        // Everything required: a small model otherwise leaves out the sentence (reason) quite often.
-        .put("required", JSONArray(listOf("type", "question", "choices", "mode", "textSize", "voiceGuide", "sosButton", "extraMapItems", "reason")))
-        .put("propertyOrdering", JSONArray(listOf("type", "mode", "textSize", "voiceGuide", "sosButton", "extraMapItems", "reason", "question", "choices")))
-    val instruction = SETUP_INSTRUCTION + (current?.let {
-        "\n지금까지 고른 설정: mode=${it.mode.name}, textSize=${it.textSize.name}, voiceGuide=${it.voiceGuide}, " +
-            "sosButton=${it.sosButton}, extraMapItems=${it.extraMapItems.joinToString(",").ifEmpty { "없음" }}"
-    } ?: "")
-    return JSONObject()
-        .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", instruction))))
-        .put("contents", contents)
-        .put(
-            "generationConfig",
-            JSONObject().put("responseMimeType", "application/json").put("responseSchema", schema)
-                .put("temperature", 0.2).put("maxOutputTokens", 400),
-        )
-}
+/** `{history: [{fromUser, text}], settings}` for the server's AI windows (/api/ai/setup-chat, /api/ai/map-chat). */
+internal fun appChatRequest(history: List<ChatLine>, lines: Int, settings: JSONObject?): JSONObject = JSONObject()
+    .put("history", JSONArray().apply {
+        history.takeLast(lines).forEach { put(JSONObject().put("fromUser", it.fromUser).put("text", it.text.take(APP_CHAT_LINE_CHARS))) }
+    })
+    .put("settings", settings ?: JSONObject.NULL)
 
-/** Gemini's answer as a reply, or null when it is not one the app can use. */
-internal fun parseGeminiReply(response: JSONObject): SetupReply? {
-    val text = response.optJSONArray("candidates")?.optJSONObject(0)
-        ?.optJSONObject("content")?.optJSONArray("parts")?.optJSONObject(0)?.optString("text")
-        ?.takeIf { it.isNotBlank() } ?: return null
-    val j = runCatching { JSONObject(text) }.getOrNull() ?: return null
+/** The app's settings in the app's own names, as the server's windows take them. */
+internal fun settingsJson(mode: UserMode, textSize: TextSize, voiceGuide: Boolean, sosButton: Boolean, extraMapItems: Set<String>): JSONObject =
+    JSONObject().put("mode", mode.name).put("textSize", textSize.name).put("voiceGuide", voiceGuide)
+        .put("sosButton", sosButton).put("extraMapItems", JSONArray(extraMapItems.toList()))
+
+private fun settingsJson(p: SetupPick) = settingsJson(p.mode, p.textSize, p.voiceGuide, p.sosButton, p.extraMapItems)
+
+/** The server's answer (the shape Gemini used to give the app) as a reply, or null when the app cannot use it. */
+internal fun parseSetupJson(j: JSONObject): SetupReply? {
     return when (j.optString("type")) {
         "ask" -> {
             val question = j.optString("question").takeIf { looksLikeKorean(it) } ?: return null
