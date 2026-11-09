@@ -63,14 +63,14 @@ sealed interface AssistantAction {
     /** Open 불편 신고 filled in from what was said: the kind of problem when it is clear, and the words as the memo. */
     data class OpenReport(override val say: String, val type: ReportType? = null, val memo: String = "") : AssistantAction
 
-    /** Ask back, with ready answers. */
-    data class Ask(override val say: String, val choices: List<String>) : AssistantAction
+    /** Ask back, with ready answers. [onPhone]: the phone's own question, whose answer it handles too. */
+    data class Ask(override val say: String, val choices: List<String>, val onPhone: Boolean = false) : AssistantAction
 
     /** Something urgent (a fall, pain, danger): ask first whether to call 112 or tell a guardian. */
     data class Emergency(override val say: String) : AssistantAction
 
-    /** Just an answer, nothing to do. */
-    data class Answer(override val say: String) : AssistantAction
+    /** Just an answer, nothing to do. [onPhone]: the phone's own, not to be asked of the server. */
+    data class Answer(override val say: String, val onPhone: Boolean = false) : AssistantAction
 }
 
 /** What the assistant knows about the app right now, so "글씨 더 크게" builds on the current setting. */
@@ -111,6 +111,9 @@ object RuleAppAssistant : AppAssistant {
         val said = history.lastOrNull { it.fromUser }?.text.orEmpty()
         val s = said.replace(" ", "")
         fun has(vararg w: String) = w.any { s.contains(it.replace(" ", "")) }
+        // Who walks and how ("다리를 다쳐서 휠체어 타", "오늘은 휠체어 안 타"): before the emergency words, which
+        // would take "다쳐서" for a fall; walkerChange leaves anything urgent to them.
+        walkerChange(said, history, context.mode)?.let { return it }
         if (has("넘어", "다쳤", "다쳐", "아파", "아퍼", "쓰러", "위험", "따라와", "따라오", "살려", "무서워", "도와주세요")) {
             return AssistantAction.Emergency("괜찮으세요? 112에 전화하거나 보호자에게 알릴까요?")
         }
@@ -118,7 +121,7 @@ object RuleAppAssistant : AppAssistant {
         iconAnswer(said)?.let { return AssistantAction.Answer(it) }
         val wantsGo = has("안내", "가고싶", "가자", "가줘", "어디", "가까운", "근처", "찾아", "길")
         NEARBY_KINDS.entries.firstOrNull { (_, name) -> s.contains(name) }?.let { (kind, name) ->
-            if (wantsGo || s.length <= name.length + 3) return AssistantAction.GoNearby("가까운 ${name}으로 길을 찾을게요.", kind)
+            if (wantsGo || s.length <= name.length + 3) return AssistantAction.GoNearby("가까운 ${withDirection(name)} 길을 찾을게요.", kind)
         }
         undoAdaptation(s, context.usage)?.let { return it }
         return when {
@@ -134,7 +137,6 @@ object RuleAppAssistant : AppAssistant {
             has("글씨", "글자") && has("작게", "커", "너무 커") -> AssistantAction.ChangeSettings("글씨를 작게 바꿀게요.", textSize = TextSize.SMALL)
             has("음성", "소리", "말소리") && has("꺼", "끄", "시끄") -> AssistantAction.ChangeSettings("음성 안내를 끌게요.", voiceGuide = false)
             has("음성", "소리", "읽어") && has("켜", "들려") -> AssistantAction.ChangeSettings("음성 안내를 켤게요.", voiceGuide = true)
-            has("휠체어") -> AssistantAction.ChangeSettings("장애인(휠체어) 모드로 바꿀게요.", mode = UserMode.DISABLED)
             has("버스") -> AssistantAction.ShowBuses("가까운 정류장에 곧 오는 버스를 보여 드릴게요.")
             reportTypeIn(said) != null || has("신고", "불편") -> reportAction(said)
             else -> AssistantAction.Ask(
@@ -309,7 +311,8 @@ class FavoriteAppAssistant(
 /** Actions the phone does itself; the server assistant is not asked about these. */
 private fun AssistantAction.staysOnPhone(): Boolean = this is AssistantAction.Emergency ||
     this is AssistantAction.ChangeSettings || this is AssistantAction.ShowBuses ||
-    this is AssistantAction.OpenReport || this is AssistantAction.GoNearby
+    this is AssistantAction.OpenReport || this is AssistantAction.GoNearby ||
+    (this is AssistantAction.Ask && onPhone) || (this is AssistantAction.Answer && onPhone)
 
 /** Server tools that save settings on the server, which the app does not read; the phone does these. */
 private val SERVER_SETTING_TOOLS = setOf("update_my_info", "set_map_layers")
@@ -446,6 +449,8 @@ internal fun parseServerAssistantReply(json: JSONObject): ServerAssistantReply? 
 /** Gemini picks the action in a fixed JSON shape; anything unusable falls back to the rules. */
 class GeminiAppAssistant(private val fallback: AppAssistant) : AppAssistant {
     override suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction {
+        // The phone's own: who walks and how (asked back first), and the app's pictures.
+        walkerChange(history.lastOrNull { it.fromUser }?.text.orEmpty(), history, context.mode)?.let { return it }
         // Gemini does not know the app's pictures.
         if (iconAnswer(history.lastOrNull { it.fromUser }?.text.orEmpty()) != null) return fallback.reply(history, context)
         val action = runCatching { ask(history, context) }.getOrNull() ?: return fallback.reply(history, context)

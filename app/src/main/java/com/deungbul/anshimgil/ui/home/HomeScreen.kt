@@ -172,6 +172,9 @@ fun HomeScreen(
     /** 처음 맞추기: AI 비서's question and its answers, answered with [onSetupAnswer] (the answer's index). */
     setupAsk: Pair<String, List<String>>? = null,
     onSetupAnswer: (Int) -> Unit = {},
+    /** A change just made from a bubble, told with 좋아요 / 되돌리기 ([onUndoAnswer] true to take it back). */
+    undoAsk: String? = null,
+    onUndoAnswer: (Boolean) -> Unit = {},
     /** AI 비서's live words here and the walker's answers, for the chat (fromUser, text). */
     onLive: (Boolean, String) -> Unit = { _, _ -> },
 ) {
@@ -182,6 +185,8 @@ fun HomeScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var finding by remember { mutableStateOf<String?>(null) }
     var nearbyMessage by remember { mutableStateOf<String?>(null) }
+    // When the internet was the trouble: the same search again, offered as [다시 하기] (사용성 점검표 19번).
+    var nearbyRetry by remember { mutableStateOf<(() -> Unit)?>(null) }
     var bbox by remember { mutableStateOf<Bbox?>(null) }
     var mapNote by remember { mutableStateOf<String?>(null) }
     // The tapped place whose details are shown, e.g. a station's elevator exits.
@@ -257,6 +262,7 @@ fun HomeScreen(
     LaunchedEffect(askTripConsent) { if (askTripConsent) onLive(false, TRIP_CONSENT_QUESTION) }
     LaunchedEffect(adaptation) { adaptation?.let { onLive(false, it.question) } }
     LaunchedEffect(setupAsk?.first) { setupAsk?.let { onLive(false, it.first) } }
+    LaunchedEffect(undoAsk) { undoAsk?.let { onLive(false, it) } }
     LaunchedEffect(hint) {
         val shown = hint ?: return@LaunchedEffect
         onLive(false, shown.text)
@@ -293,6 +299,7 @@ fun HomeScreen(
         if (finding != null) return
         finding = kind
         nearbyMessage = null
+        nearbyRetry = null
         scope.launch {
             // Outside Gwangju the server has no places, so the demo point is used as for routes.
             val from = here?.let { chooseOrigin(it).point } ?: phoneOrigin(context).point
@@ -303,6 +310,7 @@ fun HomeScreen(
                 else nearbyMessage = result.message ?: "가까운 ${label}을(를) 찾지 못했어요"
             } catch (e: ApiException) {
                 nearbyMessage = e.message
+                if (e.code == "NETWORK") nearbyRetry = { goToNearest(kind, label) }
             }
             finding = null
         }
@@ -352,7 +360,7 @@ fun HomeScreen(
             }
         } catch (e: ApiException) {
             // Kept short and distinct from the shortcut buttons' message, which may show at the same time.
-            if (e.code == "NETWORK") "지도 시설을 불러오지 못했어요 (인터넷 연결 확인)" else e.message
+            if (e.code == "NETWORK") "인터넷이 안 돼서 지도 시설을 못 불러왔어요" else e.message
         }
     }
 
@@ -456,7 +464,15 @@ fun HomeScreen(
             }
             nearbyMessage?.let {
                 Surface(shape = RoundedCornerShape(12.dp), color = Color.White, shadowElevation = 2.dp) {
-                    Text(it, fontSize = 14.sp, color = Color(0xFFB42318), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Text(it, fontSize = 16.sp, color = Color(0xFFB42318))
+                        nearbyRetry?.let { again ->
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { nearbyMessage = null; again() },
+                                modifier = Modifier.padding(top = 6.dp).heightIn(min = 48.dp),
+                            ) { Text("다시 하기", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                        }
+                    }
                 }
             }
         }
@@ -525,6 +541,16 @@ fun HomeScreen(
                 AiAskBubble(
                     setupAsk.first,
                     answers = setupAsk.second.mapIndexed { i, a -> a to { onLive(true, a); onSetupAnswer(i) } },
+                )
+            }
+        } else if (undoAsk != null && !showBuses && picked == null) {
+            Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
+                AiAskBubble(
+                    undoAsk,
+                    answers = listOf(
+                        "좋아요" to { onLive(true, "좋아요"); onUndoAnswer(false) },
+                        "되돌리기" to { onLive(true, "되돌리기"); onUndoAnswer(true) },
+                    ),
                 )
             }
         } else if (askTripConsent && !showBuses && picked == null) {

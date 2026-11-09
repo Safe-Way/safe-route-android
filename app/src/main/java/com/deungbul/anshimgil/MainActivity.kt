@@ -56,6 +56,7 @@ import com.deungbul.anshimgil.data.Adaptation
 import com.deungbul.anshimgil.data.adaptationToOffer
 import com.deungbul.anshimgil.data.preferredRoute
 import com.deungbul.anshimgil.data.ShownHints
+import com.deungbul.anshimgil.data.SETUP_UNDO_INDEX
 import com.deungbul.anshimgil.data.SetupStep
 import com.deungbul.anshimgil.data.SetupAnswers
 import com.deungbul.anshimgil.data.answerSetup
@@ -84,6 +85,9 @@ import com.deungbul.anshimgil.ui.assistant.AssistantScreen
 import com.deungbul.anshimgil.ui.theme.SeipjidoTheme
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+
+/** What was set before a change, to take it back ([mode] is null before one is picked). */
+data class SettingsSnapshot(val mode: UserMode?, val settings: AppSettings, val usage: Usage)
 
 class MainActivity : ComponentActivity() {
     /** A place to open from the 출발 시간 알림 (name, point, by transit), handled once by AppRoot. */
@@ -235,6 +239,10 @@ fun AppRoot(
     // 처음 맞추기: AI 비서's few questions on the map after the first mode pick ([SetupStep]).
     var setupStep by rememberSaveable { mutableStateOf<SetupStep?>(null) }
     var setupAnswers by remember { mutableStateOf(SetupAnswers()) }
+    // 사용성 점검표 21번: what was set before a change, so a mistaken tap or answer can be taken back at once.
+    var setupBefore by remember { mutableStateOf<SettingsSnapshot?>(null) }
+    var assistantUndo by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
+    var homeUndo by remember { mutableStateOf<Pair<String, suspend () -> Unit>?>(null) }
     val setupAssistant = remember { SetupAssistant.create() }
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     val appAssistant = remember {
@@ -349,6 +357,17 @@ fun AppRoot(
                         context = AssistantContext(mode, settings, usage = usage, where = { currentLocation(appContext, 4_000) }),
                         placeRepository = placeRepository,
                         onChangeSettings = { change ->
+                            val before = SettingsSnapshot(mode, settings, usage)
+                            assistantUndo = {
+                                if (change.mode != null) before.mode?.let { modeRepository.save(it) }
+                                change.textSize?.let { settingsRepository.setTextSize(before.settings.textSize) }
+                                change.voiceGuide?.let { settingsRepository.setVoiceGuide(before.settings.voiceGuide) }
+                                change.sosButton?.let { settingsRepository.setSosButton(before.settings.sosButton) }
+                                (change.addMapItems + change.removeMapItems).forEach { settingsRepository.setExtraMapItem(it, it in before.settings.extraMapItems) }
+                                if (change.undoTextBoost || change.textBoostStepBack || change.textBoostUp) usageRepository?.setTextBoost(before.usage.textBoost)
+                                change.adapt?.let { usageRepository?.setAdapt(before.usage.adapt) }
+                                change.calendar?.let { useCalendar(!it) }
+                            }
                             // On asks for the calendar permission first.
                             change.calendar?.let { useCalendar(it) }
                             scope.launch {
@@ -369,6 +388,12 @@ fun AppRoot(
                         onShowBuses = { busesOnHome = true; screen = Screen.Home },
                         onOpenReport = { r -> reportPrefill = r; screen = Screen.Report },
                         onAlertGuardian = { sosOnHome = true; screen = Screen.Home },
+                        onUndo = {
+                            val undo = assistantUndo
+                            assistantUndo = null
+                            if (undo != null) scope.launch { undo() }
+                            undo != null
+                        },
                         onBack = onClose,
                         modifier = modifier,
                     )
@@ -411,7 +436,11 @@ fun AppRoot(
                             if (mode == null) setupStep = SetupStep.START
                             else if (picked != mode) setupStep = SetupStep.CHANGED
                             setupAnswers = SetupAnswers()
+                            val firstPick = mode == null
                             scope.launch {
+                                // An older walker starts on the bigger text, body text 18sp and over (사용성 점검표 13번);
+                                // "잘 보여요" in 처음 맞추기 keeps it, and 설정 or AI 비서 can make it smaller.
+                                if (firstPick && picked == UserMode.SENIOR && settings.textSize == TextSize.NORMAL) settingsRepository.setTextSize(TextSize.LARGE)
                                 modeRepository.save(picked)
                                 changingMode = false
                                 // Straight to the map, also when the mode was changed from settings.
@@ -506,6 +535,7 @@ fun AppRoot(
                             startWithTransit = route.transit,
                             preferred = preferredRoute(usage),
                             autoStart = route.autoStart,
+                            voiceOn = settings.voiceGuide,
                             onChosen = { choice -> scope.launch { usageRepository?.chooseRoute(choice) } },
                             startPlace = route.start,
                             destination = route.destination,
@@ -611,10 +641,32 @@ fun AppRoot(
                     usage = usage,
                     adaptation = if (askTripConsent || setupStep != null) null else adaptationToOffer(usage),
                     setupAsk = setupStep?.let { setupQuestion(it, setupAnswers) to it.answers },
+                    undoAsk = homeUndo?.first,
+                    onUndoAnswer = { undo ->
+                        val u = homeUndo
+                        homeUndo = null
+                        if (undo && u != null) {
+                            scope.launch { u.second() }
+                            assistantChat.note(false, "되돌렸어요.")
+                        }
+                    },
                     onSetupAnswer = { i ->
                         val step = setupStep
-                        if (step != null) {
-                            val (next, answers) = answerSetup(step, i, setupAnswers)
+                        if (step == SetupStep.DONE && i == SETUP_UNDO_INDEX) {
+                            // "처음대로 되돌리기": everything as it was before the questions.
+                            setupStep = null
+                            setupBefore?.let { b ->
+                                scope.launch {
+                                    settingsRepository.setTextSize(b.settings.textSize)
+                                    usageRepository?.setTextBoost(b.usage.textBoost)
+                                    settingsRepository.setVoiceGuide(b.settings.voiceGuide)
+                                    settingsRepository.setSosButton(b.settings.sosButton)
+                                }
+                            }
+                            assistantChat.note(false, "처음대로 되돌렸어요. 필요하면 설정에서나 저에게 말해서 바꿀 수 있어요.")
+                        } else if (step != null) {
+                            if ((step == SetupStep.START || step == SetupStep.CHANGED) && i == 0) setupBefore = SettingsSnapshot(mode, settings, usage)
+                            val (next, answers) = answerSetup(step, i, setupAnswers, settings.textSize)
                             setupAnswers = answers
                             setupStep = next
                             if ((step == SetupStep.START || step == SetupStep.CHANGED) && next == null) {
@@ -630,9 +682,12 @@ fun AppRoot(
                         }
                     },
                     onAdaptation = { a, yes ->
+                        val boostBefore = usage.textBoost
                         scope.launch {
                             usageRepository?.answer(a, yes)
                         }
+                        // A yes shows at once what changed, with 되돌리기 next to it (사용성 점검표 21번).
+                        if (yes && a != Adaptation.CALENDAR) homeUndo = "글씨를 한 단계 크게 바꿨어요." to { usageRepository?.setTextBoost(boostBefore) }
                         if (a == Adaptation.CALENDAR && yes) useCalendar(true)
                     },
                     onNearbyTap = { k -> scope.launch { usageRepository?.tapNearby(k) } },

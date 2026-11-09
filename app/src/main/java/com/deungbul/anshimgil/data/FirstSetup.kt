@@ -18,8 +18,12 @@ enum class SetupStep(val question: String, val answers: List<String>) {
     TEXT("화면의 글씨가 잘 보이세요?", listOf("잘 보여요", "조금 작아요", "많이 작아요")),
     VOICE("걸을 때 소리로 길을 알려 드릴까요?", listOf("소리로 알려 줘", "화면만 볼게요")),
     SOS("위급할 때 바로 누를 SOS 버튼을 지도에 둘까요?", listOf("둘래요", "필요 없어요")),
-    DONE("", listOf("알겠어요")),
+    /** The summary; its second answer takes everything back (사용성 점검표 21번). */
+    DONE("", listOf("알겠어요", "처음대로 되돌리기")),
 }
+
+/** The index of "처음대로 되돌리기" among [SetupStep.DONE]'s answers. */
+const val SETUP_UNDO_INDEX = 1
 
 /** What the answers set; null is left as it is. */
 data class SetupAnswers(
@@ -30,14 +34,15 @@ data class SetupAnswers(
 )
 
 /** The next step after answer [index] to [step], with the settings so far; null step means finished or skipped. */
-fun answerSetup(step: SetupStep, index: Int, so: SetupAnswers): Pair<SetupStep?, SetupAnswers> = when (step) {
+fun answerSetup(step: SetupStep, index: Int, so: SetupAnswers, current: TextSize = TextSize.NORMAL): Pair<SetupStep?, SetupAnswers> = when (step) {
     SetupStep.START, SetupStep.CHANGED -> (if (index == 0) SetupStep.TEXT else null) to so
     SetupStep.TEXT -> SetupStep.VOICE to when (index) {
         // Readable as it is: left as it is (a walker on 크게 who changes the mode keeps it).
         0 -> so
-        1 -> so.copy(textSize = TextSize.LARGE)
-        // Still hard to read at the biggest size: AI 비서's own enlargement on top, one step.
-        else -> so.copy(textSize = TextSize.LARGE, textBoost = TEXT_BOOST_STEPS[1])
+        // Already on 크게 (어르신 starts there): AI 비서's own enlargement on top instead, one or two steps.
+        1 -> if (current == TextSize.LARGE) so.copy(textSize = TextSize.LARGE, textBoost = TEXT_BOOST_STEPS[1]) else so.copy(textSize = TextSize.LARGE)
+        // Still hard to read at the biggest size: AI 비서's own enlargement on top, one step (two from 크게).
+        else -> so.copy(textSize = TextSize.LARGE, textBoost = TEXT_BOOST_STEPS[if (current == TextSize.LARGE) 2 else 1])
     }
     SetupStep.VOICE -> SetupStep.SOS to so.copy(voiceGuide = index == 0)
     SetupStep.SOS -> SetupStep.DONE to so.copy(sosButton = index == 0)
@@ -47,7 +52,11 @@ fun answerSetup(step: SetupStep, index: Int, so: SetupAnswers): Pair<SetupStep?,
 /** The closing line: what was set, and where to change it. */
 fun setupSummary(a: SetupAnswers): String {
     val parts = listOfNotNull(
-        a.textSize?.let { size -> "글씨 ${size.label}" + if ((a.textBoost ?: 1f) > 1f) "(한 단계 더)" else "" } ?: "글씨 그대로",
+        a.textSize?.let { size -> "글씨 ${size.label}" + when {
+            (a.textBoost ?: 1f) >= TEXT_BOOST_STEPS[2] -> "(두 단계 더)"
+            (a.textBoost ?: 1f) > 1f -> "(한 단계 더)"
+            else -> ""
+        } } ?: "글씨 그대로",
         a.voiceGuide?.let { if (it) "음성 안내 켬" else "음성 안내 끔" },
         a.sosButton?.let { if (it) "SOS 버튼 켬" else "SOS 버튼 없음" },
     )

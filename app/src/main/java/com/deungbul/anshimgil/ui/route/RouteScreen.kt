@@ -94,6 +94,9 @@ import com.deungbul.anshimgil.data.RouteRequest
 import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.routeCriteria
 import com.deungbul.anshimgil.data.RouteType
+import com.deungbul.anshimgil.data.routeSpoken
+import com.deungbul.anshimgil.data.transitSpoken
+import kotlinx.coroutines.delay
 import com.deungbul.anshimgil.data.walkMinutes
 import com.deungbul.anshimgil.data.autoNightReason
 import com.deungbul.anshimgil.data.UserMode
@@ -158,6 +161,8 @@ fun RouteScreen(
     autoStart: Boolean = false,
     /** Which kind was started, to learn from. */
     onChosen: (RouteChoice) -> Unit = {},
+    /** 음성 안내: read out the recommendation when it is found (사용성 점검표 17번). */
+    voiceOn: Boolean = false,
 ) {
     val context = LocalContext.current
     var conditionsOff by rememberSaveable { mutableStateOf(if (autoConditions) emptySet() else ALL_CONDITION_KEYS) }
@@ -266,6 +271,8 @@ fun RouteScreen(
             conditionsOn = conditionsOn + "night"
         }
     }
+    // Read out what is recommended, once per result and tab, when 음성 안내 is on.
+    val tts = com.deungbul.anshimgil.ui.guide.rememberTts(context)
     // 걸어서 / 대중교통 tabs. Transit is asked for only when its tab is opened (the server's ODsay
     // lookups are limited per day) and kept while the screen is open.
     var transitTab by rememberSaveable { mutableStateOf(startWithTransit || preferred == RouteChoice.TRANSIT) }
@@ -291,6 +298,16 @@ fun RouteScreen(
                 autoStarted = true
                 onStart(s.result, type)
             }
+        }
+    }
+    LaunchedEffect(result, transit, transitTab, selected) {
+        if (!voiceOn) return@LaunchedEffect
+        val speaker = tts
+        val text = if (transitTab) (transit as? TransitState.Ready)?.result?.routes?.getOrNull(transitSelected)?.let(::transitSpoken)
+        else result?.let { routeSpoken(it, selected) }
+        if (text != null) {
+            delay(800) // let the screen and the speech engine settle first
+            speaker.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "route")
         }
     }
     LaunchedEffect(transitTab, origin) {

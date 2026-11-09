@@ -2,6 +2,7 @@ package com.deungbul.anshimgil.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FirstSetupTest {
@@ -37,6 +38,16 @@ class FirstSetupTest {
             setupSummary(a.copy(voiceGuide = false, sosButton = true)),
         )
         assertEquals(TextSize.LARGE, answerSetup(SetupStep.TEXT, 1, SetupAnswers()).second.textSize)
+    }
+
+    @Test
+    fun fromBigTextASmallAnswerGoesOneStepFurther() {
+        // 어르신 starts on 크게 (사용성 점검표 13번), so "조금 작아요" has to make it bigger still.
+        val (_, a) = answerSetup(SetupStep.TEXT, 1, SetupAnswers(), current = TextSize.LARGE)
+        assertEquals(1.15f, a.textBoost)
+        val (_, b) = answerSetup(SetupStep.TEXT, 2, SetupAnswers(), current = TextSize.LARGE)
+        assertEquals(1.3f, b.textBoost)
+        assertTrue(setupSummary(b).startsWith("이렇게 맞췄어요: 글씨 크게(두 단계 더)"))
     }
 
     @Test
