@@ -279,11 +279,12 @@ fun AssistantScreen(
             }
         }
         if (choices.isNotEmpty()) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 16.dp)) {
+            // Big enough for a thick finger: 48dp high, 8dp apart (사용성 점검표 14번).
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 16.dp)) {
                 choices.forEach { c -> SuggestionChip(
                         onClick = { send(c) }, label = { Text(c, fontSize = 16.sp, color = Ink) },
                         colors = androidx.compose.material3.SuggestionChipDefaults.suggestionChipColors(containerColor = Color.White),
-                        modifier = Modifier.heightIn(min = 44.dp),
+                        modifier = Modifier.heightIn(min = 48.dp),
                     ) }
             }
         }

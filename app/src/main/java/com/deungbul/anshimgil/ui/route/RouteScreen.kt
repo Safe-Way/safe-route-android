@@ -522,7 +522,7 @@ private fun LocationNotice(issue: OriginIssue, onFix: () -> Unit) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp).heightIn(min = 44.dp),
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp).heightIn(min = 48.dp),
         ) {
             Icon(Icons.Filled.WarningAmber, contentDescription = null, tint = Color(0xFFB45309))
             Text(issue.message, fontSize = 14.sp, color = Color(0xFF7A5310), lineHeight = 19.sp, modifier = Modifier.weight(1f))
