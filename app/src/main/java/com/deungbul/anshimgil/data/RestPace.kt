@@ -35,7 +35,7 @@ val REST_KINDS = listOf(
 fun asksToRest(mode: UserMode) = mode == UserMode.SENIOR || mode == UserMode.DISABLED
 
 /** Watches progress along the route over time; [slow] when the last [SLOW_WINDOW_MS] went much slower than usual. */
-class PaceWatch(private val usualMps: Double) {
+class PaceWatch(private val usualMps: Double, private val windowMs: Long = SLOW_WINDOW_MS) {
     private val times = ArrayDeque<Long>()
     private val progress = ArrayDeque<Double>()
 
@@ -43,7 +43,7 @@ class PaceWatch(private val usualMps: Double) {
         times.addLast(timeMs)
         progress.addLast(progressM)
         // Keep a little more than the window, so a full window is always there to measure.
-        while (times.size > 2 && timeMs - times[1] >= SLOW_WINDOW_MS) {
+        while (times.size > 2 && timeMs - times[1] >= windowMs) {
             times.removeFirst()
             progress.removeFirst()
         }
@@ -59,7 +59,7 @@ class PaceWatch(private val usualMps: Double) {
         get() {
             if (times.size < 2) return null
             val span = times.last() - times.first()
-            if (span < SLOW_WINDOW_MS) return null
+            if (span < windowMs) return null
             return (progress.last() - progress.first()).coerceAtLeast(0.0) / (span / 1000.0)
         }
 
@@ -85,3 +85,25 @@ fun restOfferText(p: RestPlace): String = "걸음이 조금 느려지셨어요. 
 
 /** Said on reaching it. */
 fun restArrivedText(p: RestPlace): String = "${restName(p)}에 왔어요. 충분히 쉬시고, 다 쉬셨으면 [다시 출발]을 눌러 주세요."
+
+/*
+ * The demo walk (가상 이동, when the phone is far from the route) slows down for a while in the senior and wheelchair
+ * modes, like a walker tiring, so the rest offer can be shown in a demonstration. Its own pace is the "usual" one and
+ * the window is shorter, so the offer comes after about twenty seconds of slowing rather than a minute and a half.
+ */
+
+/** The demo walk slows down from this second… */
+const val DEMO_SLOW_FROM_S = 20
+
+/** …for this long… */
+const val DEMO_SLOW_FOR_S = 45
+
+/** …to this share of its pace. */
+const val DEMO_SLOW_SHARE = 0.35
+
+/** The demo walk's window for slowing down. */
+const val DEMO_SLOW_WINDOW_MS = 20_000L
+
+/** Meters the demo walk goes in second [second] of the walk; [slows]: this walk slows down once (see above). */
+fun demoStepM(second: Int, normalM: Double, slows: Boolean): Double =
+    if (slows && second >= DEMO_SLOW_FROM_S && second < DEMO_SLOW_FROM_S + DEMO_SLOW_FOR_S) normalM * DEMO_SLOW_SHARE else normalM

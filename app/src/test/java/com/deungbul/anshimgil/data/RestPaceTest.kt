@@ -60,4 +60,22 @@ class RestPaceTest {
         assertFalse(asksToRest(UserMode.CHILD))
         assertFalse(asksToRest(UserMode.GENERAL))
     }
+
+    @Test
+    fun demoWalkSlowsDownOnceAndIsNoticed() {
+        assertEquals(8.0, demoStepM(5, 8.0, slows = true), 0.0)
+        assertEquals(8.0 * DEMO_SLOW_SHARE, demoStepM(DEMO_SLOW_FROM_S, 8.0, slows = true), 1e-9)
+        assertEquals(8.0, demoStepM(DEMO_SLOW_FROM_S + DEMO_SLOW_FOR_S, 8.0, slows = true), 0.0)
+        assertEquals(8.0, demoStepM(DEMO_SLOW_FROM_S, 8.0, slows = false), 0.0)
+        // The demo's own watch notices the slowing within its window.
+        val w = PaceWatch(8.0, DEMO_SLOW_WINDOW_MS)
+        var m = 0.0
+        var noticedAt: Int? = null
+        for (s in 0 until DEMO_SLOW_FROM_S + DEMO_SLOW_FOR_S) {
+            m += demoStepM(s, 8.0, slows = true)
+            w.add(m, s * 1000L)
+            if (noticedAt == null && w.slow) noticedAt = s
+        }
+        assertTrue(noticedAt != null && noticedAt in DEMO_SLOW_FROM_S..DEMO_SLOW_FROM_S + 25)
+    }
 }

@@ -1,5 +1,7 @@
 package com.deungbul.anshimgil.ui.guide
 
+import com.deungbul.anshimgil.data.DEMO_SLOW_WINDOW_MS
+import com.deungbul.anshimgil.data.demoStepM
 import com.deungbul.anshimgil.map.WALK_TILT_DEGREES
 import com.deungbul.anshimgil.data.MovingState
 import com.kakao.vectormap.camera.CameraPosition
@@ -301,11 +303,13 @@ fun GuideScreen(
     val demo = realState == null || realState.offRouteM > FAR_FROM_ROUTE_M
     val state: GuidanceState = if (demo) guidance.atProgress(demoProgress) else realState!!
 
-    // Demo walk: move along the route a few meters per second.
+    // Demo walk: move along the route a few meters per second; in the senior and wheelchair modes it slows down
+    // once for a while, like a walker tiring, so the rest offer shows in a demonstration.
     LaunchedEffect(demo) {
+        var second = 0
         while (demo && demoProgress < guidance.totalM) {
             delay(1000)
-            demoProgress += DEMO_STEP_M
+            demoProgress += demoStepM(second++, DEMO_STEP_M, slows = asksToRest(mode))
         }
     }
 
@@ -502,16 +506,19 @@ fun GuideScreen(
 
     // Walking much slower than usual for a while (seniors and wheelchair users): offer a place to rest.
     val paceWatch = remember(speed) { PaceWatch(speed / 60.0) }
+    val demoPaceWatch = remember { PaceWatch(DEMO_STEP_M, DEMO_SLOW_WINDOW_MS) }
     var restOffer by remember { mutableStateOf<RestPlace?>(null) }
     var lastRestAsk by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(realState?.progressM) {
+    LaunchedEffect(state.progressM) {
         val now = android.os.SystemClock.elapsedRealtime()
-        if (demo || inVehicle) { paceWatch.reset(); return@LaunchedEffect }
-        paceWatch.add(state.progressM, now)
+        if (inVehicle) { paceWatch.reset(); demoPaceWatch.reset(); return@LaunchedEffect }
+        val watch = if (demo) demoPaceWatch.also { paceWatch.reset() } else paceWatch.also { demoPaceWatch.reset() }
+        watch.add(state.progressM, now)
         val due = lastRestAsk?.let { now - it >= REST_ASK_AGAIN_MS } ?: true
         if (!asksToRest(mode) || resting != null || restOffer != null || !due || state.remainingM <= REST_NOT_NEAR_END_M) return@LaunchedEffect
-        if (!paceWatch.slow) return@LaunchedEffect
-        val place = restPlace(active.facilities, fix ?: state.snapped) ?: return@LaunchedEffect
+        if (!watch.slow) return@LaunchedEffect
+        // Where the walker is drawn: in the demo walk that is on the route, not the phone's far-away position.
+        val place = restPlace(active.facilities, if (demo) state.snapped else fix ?: state.snapped) ?: return@LaunchedEffect
         lastRestAsk = now
         restOffer = place
         val said = restOfferText(place)
@@ -524,7 +531,7 @@ fun GuideScreen(
             restOffer = null
             rerouting = true
             try {
-                active = routeRepository.findRoutes(RouteRequest(fix ?: state.snapped, LatLon(place.facility.lat, place.facility.lon), mode))
+                active = routeRepository.findRoutes(RouteRequest(if (demo) state.snapped else fix ?: state.snapped, LatLon(place.facility.lat, place.facility.lon), mode))
                 resting = place
                 restReached = false
                 demoProgress = 0.0
@@ -549,7 +556,7 @@ fun GuideScreen(
             resting = null
             restReached = false
             try {
-                active = routeRepository.findRoutes(RouteRequest(fix ?: state.snapped, destination, mode))
+                active = routeRepository.findRoutes(RouteRequest(if (demo) state.snapped else fix ?: state.snapped, destination, mode))
                 demoProgress = 0.0
                 paceWatch.reset()
                 aiNotice = "다시 출발할게요. ${destinationName}까지 안내해요."
