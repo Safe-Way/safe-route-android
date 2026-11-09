@@ -50,8 +50,25 @@ class MotionTest {
         assertEquals(0f, guideHeading(onRoute = true, moving = true, routeAhead = 0f, course = 5f, compass = 180f))
         // Off the route: the way they actually go.
         assertEquals(90f, guideHeading(onRoute = false, moving = true, routeAhead = 0f, course = 90f, compass = 180f))
-        // Standing still: where the phone points.
-        assertEquals(180f, guideHeading(onRoute = true, moving = false, routeAhead = 0f, course = null, compass = 180f))
-        assertEquals(0f, guideHeading(onRoute = true, moving = false, routeAhead = 0f, course = null, compass = null))
+        // On the route standing still too: the route ahead, not the compass (switching swung the map, 11/9).
+        assertEquals(0f, guideHeading(onRoute = true, moving = false, routeAhead = 0f, course = null, compass = 180f))
+        // Standing still off the route: where the phone points.
+        assertEquals(180f, guideHeading(onRoute = false, moving = false, routeAhead = 0f, course = 90f, compass = 180f))
+        assertEquals(0f, guideHeading(onRoute = false, moving = false, routeAhead = 0f, course = null, compass = null))
+    }
+
+    @Test
+    fun movingDoesNotFlickAtACorner() {
+        val m = MovingState()
+        assertEquals(true, m.update(1.0, 0))
+        // Slowing at a corner for a moment, or between the two speeds: still moving.
+        assertEquals(true, m.update(0.2, 1_000))
+        assertEquals(true, m.update(0.4, 2_000))
+        assertEquals(true, m.update(0.2, 3_000))
+        assertEquals(true, m.update(0.2, 5_500))
+        // Slow for 3 s: stopped.
+        assertEquals(false, m.update(0.1, 6_100))
+        assertEquals(false, m.update(0.5, 7_000))
+        assertEquals(true, m.update(0.7, 8_000))
     }
 }
