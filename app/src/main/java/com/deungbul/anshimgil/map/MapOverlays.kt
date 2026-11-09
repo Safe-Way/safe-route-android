@@ -122,7 +122,14 @@ fun LatLon.toLatLng(): LatLng = LatLng.from(lat, lon)
  * Draws both routes (the [selected] one on top and stronger), facility tags along them,
  * and start/end markers, then fits the camera to the routes.
  */
-fun KakaoMap.showRoutes(context: Context, result: RouteResult, selected: RouteType, destinationName: String) {
+fun KakaoMap.showRoutes(
+    context: Context,
+    result: RouteResult,
+    selected: RouteType,
+    destinationName: String,
+    /** Walking guidance: a darker, wider line with a wider white edge, still clear in sunlight (사용성 16번). */
+    walking: Boolean = false,
+) {
     val density = context.resources.displayMetrics.density
     val lineLayer = routeLineManager?.layer ?: return
     lineLayer.removeAll()
@@ -131,11 +138,11 @@ fun KakaoMap.showRoutes(context: Context, result: RouteResult, selected: RouteTy
     result.routes.sortedBy { it.type == selected }.forEach { route ->
         val isSelected = route.type == selected
         val color = when (route.type) {
-            RouteType.SAFE -> if (isSelected) 0xFF1F6B42 else 0xFF86A893
+            RouteType.SAFE -> if (walking) 0xFF0B3D23 else if (isSelected) 0xFF1F6B42 else 0xFF86A893
             RouteType.SHORTEST -> if (isSelected) 0xFF17211B else 0xFF8A968E
         }.toInt()
-        val width = (if (isSelected) 8f else 5f) * density
-        val style = RouteLineStyle.from(width, color, 1.5f * density, 0xFFFFFFFF.toInt())
+        val width = (if (walking) 11f else if (isSelected) 8f else 5f) * density
+        val style = RouteLineStyle.from(width, color, (if (walking) 2.5f else 1.5f) * density, 0xFFFFFFFF.toInt())
         lineLayer.addRouteLine(
             RouteLineOptions.from(RouteLineSegment.from(route.path.map { it.toLatLng() }, style)),
         )

@@ -364,7 +364,7 @@ fun GuideScreen(
             true
         }
         // Stop pins are drawn here with their first numbers, not the new route's.
-        m.showRoutes(context, active.copy(routes = listOf(route.copy(stops = emptyList()))), route.type, destinationName)
+        m.showRoutes(context, active.copy(routes = listOf(route.copy(stops = emptyList()))), route.type, destinationName, walking = true)
         m.addStopPins(context, plannedStops.withIndex().filter { it.index !in stopsDone }.map { it.index + 1 to it.value.point })
         if (showTurnSigns) m.addTurnArrows(context, guidance.turnMarks)
         me = m.addMyLocation(context, state.snapped, sizeDp = 24f)
@@ -851,7 +851,8 @@ private fun sideText(side: Turn) = when (side) {
 private fun InstructionCard(state: GuidanceState, instruction: Instruction) {
     // Slightly see-through so the map under it still shows.
     // Thin bar: distance and action side by side so the map keeps most of the screen.
-    Surface(shape = RoundedCornerShape(16.dp), color = Ink.copy(alpha = 0.82f), contentColor = Color.White) {
+    // Solid, not see-through: the map behind made it paler in sunlight (사용성 16번, 11/9).
+    Surface(shape = RoundedCornerShape(16.dp), color = Ink, contentColor = Color.White) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
