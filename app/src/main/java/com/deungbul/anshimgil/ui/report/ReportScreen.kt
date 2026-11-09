@@ -59,6 +59,8 @@ import com.deungbul.anshimgil.data.Origin
 import com.deungbul.anshimgil.data.REPORT_MAX_MEMO
 import com.deungbul.anshimgil.data.REPORT_MAX_PHOTOS
 import com.deungbul.anshimgil.data.ReportRepository
+import com.deungbul.anshimgil.data.MyReports
+import com.deungbul.anshimgil.data.WalkSpeedRepository
 import com.deungbul.anshimgil.data.ReportType
 import com.deungbul.anshimgil.data.UserMode
 import com.deungbul.anshimgil.data.photoForUpload
@@ -195,8 +197,11 @@ fun ReportScreen(
                 error = null
                 scope.launch {
                     try {
-                        ReportRepository.send(t, at, null, mode, memo, photos.toList())
-                        Toast.makeText(context, "신고를 보냈어요. 고마워요!", Toast.LENGTH_SHORT).show()
+                        val guest = runCatching { WalkSpeedRepository(context).guestId() }.getOrNull()
+                        val id = ReportRepository.send(t, at, null, mode, memo, photos.toList(), guest)
+                        MyReports.add(context, id)
+                        // Drawn on the map once reports pile up there (11/10), so say so.
+                        Toast.makeText(context, "신고를 보냈어요. 고마워요! 같은 곳에 신고가 쌓이면 지도에 표시돼요.", Toast.LENGTH_LONG).show()
                         File(context.cacheDir, "report_photos").deleteRecursively()
                         onBack()
                     } catch (e: ApiException) {

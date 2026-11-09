@@ -105,6 +105,11 @@ import com.deungbul.anshimgil.map.pointTo
 import com.deungbul.anshimgil.map.tiltForWalking
 import com.deungbul.anshimgil.location.rememberCompassHeading
 import com.deungbul.anshimgil.map.showLayers
+import com.deungbul.anshimgil.map.showReportSpots
+import com.deungbul.anshimgil.data.ReportSpot
+import com.deungbul.anshimgil.data.RoadReportRepository
+import com.deungbul.anshimgil.data.MyReports
+import com.deungbul.anshimgil.data.reportSpots
 import com.kakao.vectormap.label.Label
 import com.deungbul.anshimgil.ui.common.MapMessage
 import com.deungbul.anshimgil.ui.mode.style
@@ -202,6 +207,8 @@ fun HomeScreen(
     var mapNote by remember { mutableStateOf<String?>(null) }
     // The tapped place whose details are shown, e.g. a station's elevator exits.
     var picked by remember { mutableStateOf<Facility?>(null) }
+    // 신고 쌓인 곳 tapped on the map (11/10).
+    var pickedReport by remember { mutableStateOf<ReportSpot?>(null) }
     var showBuses by remember { mutableStateOf(startWithBuses) }
     LaunchedEffect(Unit) { if (startWithBuses) onBusesShown() }
     // What the map shows now, so a station's card can list its exits.
@@ -351,6 +358,7 @@ fun HomeScreen(
             // That tap opened something: not a miss even if it was beside a button.
             missDetector.forget()
             (label.tag as? Facility)?.let { picked = it; showBuses = false }
+            (label.tag as? ReportSpot)?.let { pickedReport = it; picked = null; showBuses = false }
             true
         }
     }
@@ -361,6 +369,7 @@ fun HomeScreen(
         // Zoomed far out the user is looking for a place, not at what is on each street: no tags then.
         if (zoom < MIN_TAG_ZOOM) {
             m.showLayers(context, MapLayers(emptyList(), emptyList()))
+            m.showReportSpots(context, emptyList())
             shownFacilities = emptyList()
             me = here?.let { m.addMyLocation(context, it) }
             mapNote = "확대하면 시설이 보여요"
@@ -370,6 +379,9 @@ fun HomeScreen(
             val page = facilityRepository.load(mode, extraMapItems, area)
             m.showLayers(context, page.layers)
             shownFacilities = page.layers.facilities
+            // 신고 쌓인 곳 on top; the map's facilities still show when the reports cannot be read.
+            runCatching { reportSpots(RoadReportRepository.within(area), mine = MyReports.ids(context)) }
+                .onSuccess { m.showReportSpots(context, it) }
             // showLayers clears every label, the position dot included.
             me = here?.let { m.addMyLocation(context, it) }
             when {
@@ -571,6 +583,13 @@ fun HomeScreen(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 112.dp).tracked("_buses"),
             )
         }
+        pickedReport?.takeIf { picked == null }?.let { spot ->
+            ReportSpotCard(
+                spot,
+                onClose = { pickedReport = null },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 112.dp).tracked("_report"),
+            )
+        }
         picked?.let { place ->
             PlaceDetailCard(
                 place,
@@ -584,7 +603,7 @@ fun HomeScreen(
 
         // AI 비서's one-line bubble sits just above its button, unless a card is open there.
         // "자주 가는 길을 기억해 둘까요?" comes first, in the same live bubble, with the two answers under it.
-        if (setupAsk != null && !showBuses && picked == null) {
+        if (setupAsk != null && !showBuses && picked == null && pickedReport == null) {
             // 처음 맞추기 comes before anything else.
             Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
                 AiAskBubble(
@@ -600,14 +619,14 @@ fun HomeScreen(
                         }),
                 )
             }
-        } else if (feedbackAsk != null && !showBuses && picked == null) {
+        } else if (feedbackAsk != null && !showBuses && picked == null && pickedReport == null) {
             Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
                 AiAskBubble(
                     feedbackAsk.first,
                     answers = feedbackAsk.second.mapIndexed { i, a -> a to { onLive(true, a); onFeedbackAnswer(i) } },
                 )
             }
-        } else if (undoAsk != null && !showBuses && picked == null) {
+        } else if (undoAsk != null && !showBuses && picked == null && pickedReport == null) {
             Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
                 AiAskBubble(
                     undoAsk,
@@ -617,7 +636,7 @@ fun HomeScreen(
                     ),
                 )
             }
-        } else if (askTripConsent && !showBuses && picked == null) {
+        } else if (askTripConsent && !showBuses && picked == null && pickedReport == null) {
             Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
                 AiAskBubble(
                     TRIP_CONSENT_QUESTION,
@@ -627,7 +646,7 @@ fun HomeScreen(
                     ),
                 )
             }
-        } else if (adaptation != null && !showBuses && picked == null) {
+        } else if (adaptation != null && !showBuses && picked == null && pickedReport == null) {
             // 쓰는 대로 맞추기: asked before anything changes.
             Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
                 AiAskBubble(
@@ -638,7 +657,7 @@ fun HomeScreen(
                     ),
                 )
             }
-        } else if (!showBuses && picked == null) hint?.let { h ->
+        } else if (!showBuses && picked == null && pickedReport == null) hint?.let { h ->
             Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 148.dp).tracked("_hint")) {
                 HintBubble(
                     h,

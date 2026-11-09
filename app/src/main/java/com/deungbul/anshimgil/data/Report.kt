@@ -33,10 +33,12 @@ object ReportRepository {
         mode: UserMode,
         memo: String,
         photos: List<ByteArray>,
+        /** This phone's id, so the server can tell one person reporting the same place again (not used by it yet). */
+        guestId: String? = null,
     ): Long {
         val json = ServerApi.postMultipart(
             "/api/reports",
-            reportFields(type, at, accuracyM, mode, memo),
+            reportFields(type, at, accuracyM, mode, memo) + ("guestId" to guestId),
             photos.take(REPORT_MAX_PHOTOS).mapIndexed { i, bytes -> ServerApi.Part("photos", "photo${i + 1}.jpg", "image/jpeg", bytes) },
         )
         return json.optLong("id")

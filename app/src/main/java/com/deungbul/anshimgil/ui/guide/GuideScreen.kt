@@ -68,6 +68,15 @@ import androidx.compose.runtime.mutableFloatStateOf
 import com.deungbul.anshimgil.data.FacilityRepository
 import com.deungbul.anshimgil.data.ApiException
 import com.deungbul.anshimgil.data.bboxAround
+import com.deungbul.anshimgil.data.MyReports
+import com.deungbul.anshimgil.data.REPORT_NEAR_ROUTE_M
+import com.deungbul.anshimgil.data.ReportSpot
+import com.deungbul.anshimgil.data.RoadReportRepository
+import com.deungbul.anshimgil.data.reportAheadText
+import com.deungbul.anshimgil.data.reportSpotTitle
+import com.deungbul.anshimgil.data.reportSpots
+import com.deungbul.anshimgil.data.reportSpotsAhead
+import com.deungbul.anshimgil.map.showReportSpots
 import com.deungbul.anshimgil.map.addTurnArrows
 import com.deungbul.anshimgil.map.addCrosswalks
 import com.deungbul.anshimgil.location.angleBetween
@@ -188,6 +197,9 @@ internal fun walkerTopPaddingPx(coveredPx: Int, mapHeightPx: Int): Int {
     val y = coveredPx + WALKER_DOWN * (mapHeightPx - coveredPx)
     return (2 * y - mapHeightPx).toInt().coerceIn(coveredPx, mapHeightPx - 1)
 }
+
+/** Reports along the route are read again this often. */
+private const val REPORTS_AGAIN_MS = 5 * 60_000L
 
 /** Close-up for walking: the next few buildings, with the map tilted so the street ahead shows. */
 private const val GUIDE_ZOOM = 19
@@ -381,12 +393,15 @@ fun GuideScreen(
         if (inVehicle && voiceOn) tts.speak("차로 이동하는 것 같아요. 내려서 걸으면 다시 안내할게요.", TextToSpeech.QUEUE_FLUSH, null, "vehicle")
     }
 
+    // A tapped 신고 쌓인 곳 says what it is in the notice line.
+    var tappedReport by remember { mutableStateOf<ReportSpot?>(null) }
     // Drawn again whenever the route changes (after finding a new one).
     LaunchedEffect(map, route) {
         val m = map ?: return@LaunchedEffect
         // A tapped picture on the way says what it is (11/9).
         m.setOnLabelClickListener { _, _, label ->
             (label.tag as? Facility)?.let { tapped = it }
+            (label.tag as? ReportSpot)?.let { tappedReport = it }
             true
         }
         // Stop pins are drawn here with their first numbers, not the new route's.
@@ -478,6 +493,28 @@ fun GuideScreen(
     }
     // AI 비서's short word about what just happened (a new route found), shown under the status line for a while.
     var aiNotice by remember { mutableStateOf<String?>(null) }
+
+    // 신고 쌓인 곳 along the route (11/10): drawn on the map, and told once each when coming up ahead.
+    var reportSpotsOnRoute by remember { mutableStateOf<List<ReportSpot>>(emptyList()) }
+    LaunchedEffect(route) {
+        while (true) {
+            runCatching { reportSpots(RoadReportRepository.within(bboxAround(route.path, marginDeg = 0.001)), mine = MyReports.ids(context)) }
+                .onSuccess { all -> reportSpotsOnRoute = all.filter { guidance.alongAndOff(it.point).second <= REPORT_NEAR_ROUTE_M } }
+            delay(REPORTS_AGAIN_MS)
+        }
+    }
+    LaunchedEffect(map, reportSpotsOnRoute) { map?.showReportSpots(context, reportSpotsOnRoute) }
+    LaunchedEffect(tappedReport) { tappedReport?.let { aiNotice = reportSpotTitle(it); tappedReport = null } }
+    val toldReports = remember { mutableSetOf<Long>() }
+    LaunchedEffect(state.progressM.toInt() / 10, reportSpotsOnRoute) {
+        val (spot, aheadM) = reportSpotsAhead(reportSpotsOnRoute, state.progressM) { guidance.alongAndOff(it) }
+            .firstOrNull { it.first.reports.minOf { r -> r.id } !in toldReports } ?: return@LaunchedEffect
+        toldReports += spot.reports.minOf { it.id }
+        val said = reportAheadText(spot, aheadM)
+        aiNotice = said
+        onLive(false, said)
+        if (voiceOn) tts.speak(said, TextToSpeech.QUEUE_FLUSH, null, "report")
+    }
     LaunchedEffect(aiNotice) { aiNotice?.let { onLive(false, it) } }
     LaunchedEffect(aiNotice) {
         if (aiNotice != null) {
