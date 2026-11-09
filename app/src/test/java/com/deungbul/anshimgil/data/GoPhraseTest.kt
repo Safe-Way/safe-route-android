@@ -51,4 +51,17 @@ class GoPhraseTest {
         assertEquals("다이소 들렀다 집에 갈래", withStopWordsFixed("다이소 드렸다 집에 갈래"))
         assertTrue(!mentionsStops("집에 갈래"))
     }
+
+    @Test
+    fun onlyShortPlaceNamesStayOnThePhone() {
+        // 11/9 test: these were searched as place names; the server assistant reads them now.
+        assertNull(placeToGo("비 안 맞고 문화전당 가고 싶어"))
+        assertNull(placeToGo("지하철 타고 시청 가고 싶어"))
+        assertNull(placeToGo("오늘은 그냥 빠른 길로 가자"))
+        assertNull(placeToGo("내일 아침 병원 예약 있는데 미리 길 알려 줘"))
+        assertNull(placeToGo("엘베 있는 데로 가자"))
+        assertEquals("문화전당", placeToGo("문화전당 가자"))
+        assertEquals("양림동 펭귄마을", placeToGo("양림동 펭귄마을 가고 싶어"))
+        assertEquals("충장로", placeToGo("충장로 쪽으로 가 줘"))
+    }
 }
