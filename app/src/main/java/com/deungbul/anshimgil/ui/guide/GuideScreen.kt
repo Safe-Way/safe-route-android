@@ -20,8 +20,8 @@ import android.os.VibratorManager
 import com.deungbul.anshimgil.data.restArrivedText
 import com.deungbul.anshimgil.data.restOfferText
 import com.deungbul.anshimgil.data.restName
-import com.deungbul.anshimgil.data.restPlace
 import com.deungbul.anshimgil.data.restPlaceOnTheWay
+import com.deungbul.anshimgil.data.restReachedAt
 import com.deungbul.anshimgil.data.asksToRest
 import com.deungbul.anshimgil.data.REST_NOT_NEAR_END_M
 import com.deungbul.anshimgil.data.REST_ASK_AGAIN_MS
@@ -75,6 +75,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.layout.PaddingValues
 import android.speech.tts.TextToSpeech
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -178,6 +179,16 @@ private const val AI_NOTICE_MS = 10_000L
 /** Off the route this long before offering to tell the guardians. */
 private const val OFF_ROUTE_ALERT_MS = 20_000L
 private const val DEMO_STEP_M = 8.0
+/** Where the walker sits in the map below the instruction card: this share of the way down. */
+private const val WALKER_DOWN = 0.7
+
+/** Top padding that puts the map's center [WALKER_DOWN] of the way down the part below [coveredPx]. */
+internal fun walkerTopPaddingPx(coveredPx: Int, mapHeightPx: Int): Int {
+    if (mapHeightPx <= coveredPx) return coveredPx
+    val y = coveredPx + WALKER_DOWN * (mapHeightPx - coveredPx)
+    return (2 * y - mapHeightPx).toInt().coerceIn(coveredPx, mapHeightPx - 1)
+}
+
 /** Close-up for walking: the next few buildings, with the map tilted so the street ahead shows. */
 private const val GUIDE_ZOOM = 19
 
@@ -313,20 +324,30 @@ fun GuideScreen(
     val demo = realState == null || realState.offRouteM > FAR_FROM_ROUTE_M
     val state: GuidanceState = if (demo) guidance.atProgress(demoProgress) else realState!!
 
+    // 지치면 쉬는 곳으로: [resting] is the place ahead on the route to rest at. The walker keeps to the same route
+    // (no new route, so no detour or turning back; 11/10) and rests on reaching its spot on the route.
+    var resting by remember { mutableStateOf<RestPlace?>(null) }
+    // Rested and set off again from there.
+    var restReached by remember { mutableStateOf(false) }
+    val restAlongM = remember(guidance, resting) { resting?.let { guidance.alongAndOff(LatLon(it.facility.lat, it.facility.lon)).first } }
+    val atRest = resting != null && (state.arrived || restAlongM?.let { restReachedAt(state.progressM, it) } == true)
+
     // Demo walk: move along the route a few meters per second; in the senior and wheelchair modes it slows down
     // once for a while, like a walker tiring, so the rest offer shows in a demonstration.
+    // The route changes on the way (a rest stop, setting off again, finding the way again), so the loop reads
+    // the current one: with the first route's length it stopped for good after a rest (영상 11/9, 925m에서 멈춤).
+    val currentGuidance by rememberUpdatedState(guidance)
+    // On the way to a rest the demo walker stops there until [다시 출발].
+    val currentRestStop by rememberUpdatedState(restAlongM?.takeIf { !restReached })
     LaunchedEffect(demo) {
         var second = 0
-        while (demo && demoProgress < guidance.totalM) {
+        while (demo) {
             delay(1000)
-            demoProgress += demoStepM(second++, DEMO_STEP_M, slows = asksToRest(mode))
+            val end = currentRestStop?.coerceAtMost(currentGuidance.totalM) ?: currentGuidance.totalM
+            if (demoProgress < end) demoProgress = (demoProgress + demoStepM(second++, DEMO_STEP_M, slows = asksToRest(mode))).coerceAtMost(end)
         }
     }
 
-    // 지치면 쉬는 곳으로: [resting] is the place being walked to for a rest; reaching it is not the end of the trip.
-    var resting by remember { mutableStateOf<RestPlace?>(null) }
-    // Right next to it (too close for a route): rest there at once.
-    var restReached by remember { mutableStateOf(false) }
     LaunchedEffect(state.arrived, resting) { onArrivedChange(state.arrived && resting == null) }
 
     val tts = rememberTts(context)
@@ -420,7 +441,8 @@ fun GuideScreen(
 
     // 귀가 지킴이: off the planned route for a while, offer to tell the guardians (once per stretch off route).
     // In a car or bus the route is left on purpose: no off-route warning, no new route.
-    val off = !demo && !inVehicle && state.offRouteM > OFF_ROUTE_WARN_M
+    // Stepping into the rest place (a little off the route) is not leaving the route.
+    val off = !demo && !inVehicle && !atRest && state.offRouteM > OFF_ROUTE_WARN_M
     var offRouteLong by remember { mutableStateOf(false) }
     var offRouteTold by remember { mutableStateOf(false) }
     LaunchedEffect(off) {
@@ -441,10 +463,9 @@ fun GuideScreen(
     suspend fun findNewRoute(from: LatLon, spoken: String): Boolean {
         rerouting = true
         val found = try {
-            val to = resting?.let { LatLon(it.facility.lat, it.facility.lon) } ?: destination
-            // On the way to a rest the stops wait; afterwards those not yet seen go with the route again.
-            val left = if (resting != null) emptyList() else plannedStops.filterIndexed { i, _ -> i !in stopsDone }.map { StopPlace(it.name, it.point) }
-            active = routeRepository.findRoutes(RouteRequest(from, to, mode, stops = left))
+            // A rest place on the way stays on the way: its spot is found again on the new route.
+            val left = plannedStops.filterIndexed { i, _ -> i !in stopsDone }.map { StopPlace(it.name, it.point) }
+            active = routeRepository.findRoutes(RouteRequest(from, destination, mode, stops = left))
             demoProgress = 0.0
             if (voiceOn) tts.speak(spoken, TextToSpeech.QUEUE_FLUSH, null, "reroute")
             true
@@ -506,12 +527,14 @@ fun GuideScreen(
         }
     }
 
-    // Keep the walker in the middle of the part of the map not covered by the instruction card:
-    // the map's top padding moves its center down by the card's height.
+    // Keep the walker low in the part of the map not covered by the instruction card, so more of the way
+    // ahead shows above it (11/10: 가운데는 너무 위쪽). The map's center sits halfway down what the top padding
+    // leaves, so this padding puts it [WALKER_DOWN] of the way down the free part.
     var overlayBottomPx by remember { mutableIntStateOf(0) }
-    LaunchedEffect(map, overlayBottomPx) {
+    var mapHeightPx by remember { mutableIntStateOf(0) }
+    LaunchedEffect(map, overlayBottomPx, mapHeightPx) {
         val m = map ?: return@LaunchedEffect
-        m.setPadding(0, overlayBottomPx, 0, 0)
+        m.setPadding(0, walkerTopPaddingPx(overlayBottomPx, mapHeightPx), 0, 0)
         m.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
     }
 
@@ -542,49 +565,20 @@ fun GuideScreen(
         if (voiceOn) tts.speak(said, TextToSpeech.QUEUE_FLUSH, null, "rest")
     }
     fun goRest(place: RestPlace) {
-        scope.launch {
-            onLive(true, "쉬었다 갈게요")
-            restOffer = null
-            rerouting = true
-            try {
-                active = routeRepository.findRoutes(RouteRequest(if (demo) state.snapped else fix ?: state.snapped, LatLon(place.facility.lat, place.facility.lon), mode))
-                resting = place
-                restReached = false
-                demoProgress = 0.0
-                aiNotice = "먼저 ${restName(place)}까지 안내할게요. 쉬고 나서 원래 가시던 곳으로 다시 안내해요."
-            } catch (e: ApiException) {
-                if (e.code == "SAME_POINT" || e.code == "TOO_CLOSE") {
-                    // A few steps away: no route needed.
-                    resting = place
-                    restReached = true
-                } else {
-                    aiNotice = "쉬는 곳 길을 찾지 못했어요. 가시던 길로 계속 안내할게요."
-                }
-            }
-            rerouting = false
-        }
+        onLive(true, "쉬었다 갈게요")
+        restOffer = null
+        resting = place
+        restReached = false
+        aiNotice = "가는 길 ${place.meters}m 앞 ${restName(place)}에서 쉬어 가요. 쉬고 나서 같은 길로 이어서 안내해요."
     }
     fun goOnAfterRest() {
-        scope.launch {
-            onLive(true, "다시 출발")
-            rerouting = true
-            val back = resting
-            resting = null
-            restReached = false
-            try {
-                val left = plannedStops.filterIndexed { i, _ -> i !in stopsDone }.map { StopPlace(it.name, it.point) }
-                active = routeRepository.findRoutes(RouteRequest(if (demo) state.snapped else fix ?: state.snapped, destination, mode, stops = left))
-                demoProgress = 0.0
-                paceWatch.reset()
-                aiNotice = "다시 출발할게요. ${destinationName}까지 안내해요."
-            } catch (e: ApiException) {
-                resting = back
-                aiNotice = "길을 다시 찾지 못했어요. 잠시 뒤 다시 눌러 주세요."
-            }
-            rerouting = false
-        }
+        onLive(true, "다시 출발")
+        restReached = true
+        resting = null
+        paceWatch.reset()
+        demoPaceWatch.reset()
+        aiNotice = "다시 출발할게요. ${destinationName}까지 같은 길로 안내해요."
     }
-    val atRest = resting != null && (state.arrived || restReached)
     LaunchedEffect(atRest) {
         val place = resting ?: return@LaunchedEffect
         if (!atRest) return@LaunchedEffect
@@ -617,7 +611,7 @@ fun GuideScreen(
     Box(modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            KakaoMapView(modifier = Modifier.fillMaxSize(), onMapReady = { map = it })
+            KakaoMapView(modifier = Modifier.fillMaxSize().onSizeChanged { mapHeightPx = it.height }, onMapReady = { map = it })
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
@@ -629,11 +623,11 @@ fun GuideScreen(
                     StatusPill(if (type == RouteType.SAFE) "안전한 길로 가는 중" else "빠른 길로 가는 중", Green)
                     if (demo) StatusPill("시연: 가상 이동", Color(0xFF6D28D9))
                 }
-                if (!demo && state.offRouteM > OFF_ROUTE_WARN_M) {
+                if (!demo && !atRest && state.offRouteM > OFF_ROUTE_WARN_M) {
                     StatusPill("경로에서 ${state.offRouteM}m 벗어났어요", Color(0xFFB42318))
                 }
                 if (rerouting) StatusPill("길을 다시 찾는 중…", Color(0xFF2F6FDB))
-                resting?.let { if (!atRest) StatusPill("${restName(it)}에서 쉬었다 가는 중", Color(0xFFB45309)) }
+                resting?.let { if (!atRest) StatusPill("${restName(it)}에서 쉬었다 가는 중" + (restAlongM?.let { a -> " · ${(a - state.progressM).coerceAtLeast(0.0).toInt()}m 앞" } ?: ""), Color(0xFFB45309)) }
                 restOffer?.let { offer ->
                     RestCard(restOfferText(offer), yes = "쉬었다 갈게요", no = "괜찮아요", onYes = { goRest(offer) },
                         onNo = { onLive(true, "괜찮아요"); restOffer = null })

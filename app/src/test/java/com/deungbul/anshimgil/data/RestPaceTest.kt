@@ -94,9 +94,10 @@ class RestPaceTest {
         assertEquals("앞 화장실", restName(p))
         assertTrue(p.ahead)
         assertEquals("걸음이 조금 느려지셨어요. 가는 길 ${p.meters}m 앞 앞 화장실에서 쉬었다 가실래요?", restOfferText(p))
-        // Nothing ahead: the one behind, turning back.
-        val back = restPlaceOnTheWay(listOf(behindShelter, farAhead), here, 200.0) { g.alongAndOff(LatLon(it.lat, it.lon)) }!!
-        assertEquals("지나온 쉼터", restName(back))
-        assertFalse(back.ahead)
+        // Nothing ahead: no offer. A tired walker is not sent back to the one behind (11/10).
+        assertNull(restPlaceOnTheWay(listOf(behindShelter, farAhead), here, 200.0) { g.alongAndOff(LatLon(it.lat, it.lon)) })
+        // Reached when walked up to its spot on the route.
+        assertFalse(restReachedAt(250.0, 280.0))
+        assertTrue(restReachedAt(270.0, 280.0))
     }
 }

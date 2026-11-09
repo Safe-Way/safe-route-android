@@ -81,9 +81,9 @@ const val REST_OFF_ROUTE_M = 50
 private const val REST_BEHIND_M = 10
 
 /**
- * The place to rest at (11/9: going back the way one came to rest makes little sense): the best kind lying ahead on
- * the way ([onRoute] gives a place's meters along the route and meters off it), nearest first; when there is none,
- * the best one nearby as before, which means turning back a little.
+ * The place to rest at: the best kind lying ahead on the way ([onRoute] gives a place's meters along the route and
+ * meters off it), nearest first. A tired walker is never sent back the way they came or round a detour (11/9, 11/10):
+ * with nothing ahead there is no offer.
  */
 fun restPlaceOnTheWay(
     facilities: List<Facility>,
@@ -97,8 +97,14 @@ fun restPlaceOnTheWay(
         if (toGo < -REST_BEHIND_M || toGo > REST_AHEAD_M || off > REST_OFF_ROUTE_M) null
         else RestPlace(f, (toGo.coerceAtLeast(0.0) + off).toInt(), ahead = true)
     }.minWithOrNull(compareBy<RestPlace> { REST_KINDS.indexOf(it.facility.kind) }.thenBy { it.meters })
-    return ahead ?: restPlace(facilities, here)
+    return ahead
 }
+
+/** Within this many meters before the rest place's spot on the route, the walker is there. */
+const val REST_REACHED_M = 15.0
+
+/** Reached the rest place: walked up to [restAlongM], its spot on the route. */
+fun restReachedAt(progressM: Double, restAlongM: Double): Boolean = progressM >= restAlongM - REST_REACHED_M
 
 /** The best place to rest near [here]: the best kind within [REST_NEAR_M], the nearer one among the same kind. */
 fun restPlace(facilities: List<Facility>, here: LatLon): RestPlace? =
