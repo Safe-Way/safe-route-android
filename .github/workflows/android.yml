@@ -44,6 +44,14 @@ jobs:
             echo "KAKAO_NATIVE_APP_KEY=$KAKAO_NATIVE_APP_KEY" >> local.properties
           fi
 
+      - name: Gradle 받기 (받는 곳이 잠깐 안 될 때를 대비해 3번까지)
+        run: |
+          for i in 1 2 3; do
+            ./gradlew --no-daemon --version && exit 0
+            echo "Gradle 받기 실패, 60초 뒤 다시 ($i/3)"; sleep 60
+          done
+          exit 1
+
       - name: 단위 시험
         run: ./gradlew --no-daemon testDebugUnitTest
 
