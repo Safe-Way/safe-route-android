@@ -353,6 +353,18 @@ class Guidance(
         }
     }
 
+    /** Where [point] lies against the route: meters along it to the nearest spot, and meters off it. */
+    fun alongAndOff(point: LatLon): Pair<Double, Double> {
+        val p = toXY(point)
+        var best = Double.MAX_VALUE
+        var along = 0.0
+        for (i in legLengths.indices) {
+            val (t, d) = projectOnLeg(p, i)
+            if (d < best) { best = d; along = cumulative[i] + legLengths[i] * t }
+        }
+        return along to best
+    }
+
     private fun projectOnLeg(p: Pair<Double, Double>, i: Int): Pair<Double, Double> {
         val (ax, ay) = points[i]
         val (bx, by) = points[i + 1]

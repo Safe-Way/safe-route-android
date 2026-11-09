@@ -49,7 +49,7 @@ class RestPaceTest {
         val p = restPlace(list, here)!!
         assertEquals(FacilityKind.HEAT_SHELTER, p.facility.kind)
         assertEquals("남구 경로당", restName(p))
-        assertEquals("걸음이 조금 느려지셨어요. ${p.meters}m 거리 남구 경로당에서 쉬었다 가실래요?", restOfferText(p))
+        assertEquals("걸음이 조금 느려지셨어요. ${p.meters}m 거리 남구 경로당에서 쉬었다 가실래요? 조금 돌아가야 해요.", restOfferText(p))
         assertNull(restPlace(listOf(at(FacilityKind.TOILET, 300.0)), here))
     }
 
@@ -77,5 +77,26 @@ class RestPaceTest {
             if (noticedAt == null && w.slow) noticedAt = s
         }
         assertTrue(noticedAt != null && noticedAt in DEMO_SLOW_FROM_S..DEMO_SLOW_FROM_S + 25)
+    }
+
+    @Test
+    fun restPlaceAheadOnTheWayComesFirst() {
+        // A route going east; the walker is 200 m along.
+        val path = listOf(LatLon(35.0, 126.0), LatLon(35.0, 126.0 + 600 / 91_290.0))
+        val g = Guidance(path, emptyList())
+        fun at(kind: FacilityKind, alongM: Double, offM: Double = 10.0, name: String? = null) =
+            Facility(kind, 35.0 + offM / 111_320.0, 126.0 + alongM / 91_290.0, name = name)
+        val here = LatLon(35.0, 126.0 + 200 / 91_290.0)
+        val behindShelter = at(FacilityKind.HEAT_SHELTER, 120.0, name = "지나온 쉼터")
+        val aheadToilet = at(FacilityKind.TOILET, 280.0, name = "앞 화장실")
+        val farAhead = at(FacilityKind.HEAT_SHELTER, 590.0)
+        val p = restPlaceOnTheWay(listOf(behindShelter, aheadToilet, farAhead), here, 200.0) { g.alongAndOff(LatLon(it.lat, it.lon)) }!!
+        assertEquals("앞 화장실", restName(p))
+        assertTrue(p.ahead)
+        assertEquals("걸음이 조금 느려지셨어요. 가는 길 ${p.meters}m 앞 앞 화장실에서 쉬었다 가실래요?", restOfferText(p))
+        // Nothing ahead: the one behind, turning back.
+        val back = restPlaceOnTheWay(listOf(behindShelter, farAhead), here, 200.0) { g.alongAndOff(LatLon(it.lat, it.lon)) }!!
+        assertEquals("지나온 쉼터", restName(back))
+        assertFalse(back.ahead)
     }
 }

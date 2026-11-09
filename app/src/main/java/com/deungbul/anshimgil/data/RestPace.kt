@@ -68,7 +68,37 @@ class PaceWatch(private val usualMps: Double, private val windowMs: Long = SLOW_
 }
 
 /** A place to rest and how far it is. */
-data class RestPlace(val facility: Facility, val meters: Int)
+/** A place to rest, how far it is, and whether it lies [ahead] on the way (not back the way the walker came). */
+data class RestPlace(val facility: Facility, val meters: Int, val ahead: Boolean = false)
+
+/** A rest place ahead counts when it is this far along the route at most… */
+const val REST_AHEAD_M = 300
+
+/** …and this close to the route. */
+const val REST_OFF_ROUTE_M = 50
+
+/** A place this far behind still counts as here (GPS wobble). */
+private const val REST_BEHIND_M = 10
+
+/**
+ * The place to rest at (11/9: going back the way one came to rest makes little sense): the best kind lying ahead on
+ * the way ([onRoute] gives a place's meters along the route and meters off it), nearest first; when there is none,
+ * the best one nearby as before, which means turning back a little.
+ */
+fun restPlaceOnTheWay(
+    facilities: List<Facility>,
+    here: LatLon,
+    progressM: Double,
+    onRoute: (Facility) -> Pair<Double, Double>,
+): RestPlace? {
+    val ahead = facilities.filter { it.kind in REST_KINDS }.mapNotNull { f ->
+        val (along, off) = onRoute(f)
+        val toGo = along - progressM
+        if (toGo < -REST_BEHIND_M || toGo > REST_AHEAD_M || off > REST_OFF_ROUTE_M) null
+        else RestPlace(f, (toGo.coerceAtLeast(0.0) + off).toInt(), ahead = true)
+    }.minWithOrNull(compareBy<RestPlace> { REST_KINDS.indexOf(it.facility.kind) }.thenBy { it.meters })
+    return ahead ?: restPlace(facilities, here)
+}
 
 /** The best place to rest near [here]: the best kind within [REST_NEAR_M], the nearer one among the same kind. */
 fun restPlace(facilities: List<Facility>, here: LatLon): RestPlace? =
@@ -80,8 +110,10 @@ fun restPlace(facilities: List<Facility>, here: LatLon): RestPlace? =
 /** The place's name for the walker: its own name, or the kind ("무더위쉼터"). */
 fun restName(p: RestPlace): String = p.facility.name?.takeIf { it.isNotBlank() } ?: p.facility.kind.label
 
-/** AI 비서's offer, e.g. "걸음이 조금 느려지셨어요. 120m 거리 무더위쉼터에서 쉬었다 가실래요?". */
-fun restOfferText(p: RestPlace): String = "걸음이 조금 느려지셨어요. ${p.meters}m 거리 ${restName(p)}에서 쉬었다 가실래요?"
+/** AI 비서's offer: "걸음이 조금 느려지셨어요. 가는 길 80m 앞 무더위쉼터에서 쉬었다 가실래요?" (or nearby, turning back). */
+fun restOfferText(p: RestPlace): String =
+    if (p.ahead) "걸음이 조금 느려지셨어요. 가는 길 ${p.meters}m 앞 ${restName(p)}에서 쉬었다 가실래요?"
+    else "걸음이 조금 느려지셨어요. ${p.meters}m 거리 ${restName(p)}에서 쉬었다 가실래요? 조금 돌아가야 해요."
 
 /** Said on reaching it. */
 fun restArrivedText(p: RestPlace): String = "${restName(p)}에 왔어요. 충분히 쉬시고, 다 쉬셨으면 [다시 출발]을 눌러 주세요."
