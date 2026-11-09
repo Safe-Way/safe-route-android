@@ -26,6 +26,7 @@ internal fun RouteRequest.toJson(): JSONObject = JSONObject()
     .put("destination", JSONObject().put("lat", destination.lat).put("lon", destination.lon))
     .put("mode", mode.key)
     .put("night", night)
+    .apply { stopsJson(stops.take(MAX_WALK_STOPS))?.let { put("stops", it) } }
 
 /** Comparison rows built from each route's `counts`, in the server's group order. */
 private val COUNT_GROUPS = listOf(
@@ -126,6 +127,7 @@ internal fun parseRouteResult(json: JSONObject, mode: UserMode? = null): RouteRe
                     near = text("near"),
                 )
             },
+            stops = parseRouteStops(route),
         ).withoutEndDetours()
     }
     val shortest = routes.firstOrNull { it.type == RouteType.SHORTEST }

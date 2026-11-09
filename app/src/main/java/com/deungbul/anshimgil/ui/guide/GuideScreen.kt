@@ -22,6 +22,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material3.AlertDialog
 import com.deungbul.anshimgil.data.HelpAhead
 import com.deungbul.anshimgil.data.RouteRequest
+import com.deungbul.anshimgil.data.StopPlace
+import com.deungbul.anshimgil.data.stopArrivedText
+import com.deungbul.anshimgil.data.stopReached
+import com.deungbul.anshimgil.data.stopsLeftText
+import com.deungbul.anshimgil.map.addStopPins
 import com.deungbul.anshimgil.data.RouteRepository
 import androidx.compose.material3.TextButton
 import com.deungbul.anshimgil.ui.safety.sendGuardianText
@@ -203,6 +208,10 @@ fun GuideScreen(
     val route = active.route(type) ?: active.routes.first()
     val guidance = remember(route) { Guidance(route.path, active.facilitiesOn(route.type), route.crossings) }
     val destination = remember { (result.route(type) ?: result.routes.first()).path.last() }
+    // 들를 곳 (11-09): the stops as first planned keep their numbers; [stopsDone] holds those seen or skipped.
+    val plannedStops = remember { (result.route(type) ?: result.routes.first()).stops }
+    var stopsDone by remember { mutableStateOf(setOf<Int>()) }
+    var atStop by remember { mutableStateOf<Int?>(null) }
     var fix by remember { mutableStateOf<LatLon?>(null) }
     var demoProgress by remember { mutableDoubleStateOf(0.0) }
     var voiceOn by rememberSaveable { mutableStateOf(voiceByDefault) }
@@ -292,7 +301,9 @@ fun GuideScreen(
             (label.tag as? Facility)?.let { tapped = it }
             true
         }
-        m.showRoutes(context, active.copy(routes = listOf(route)), route.type, destinationName)
+        // Stop pins are drawn here with their first numbers, not the new route's.
+        m.showRoutes(context, active.copy(routes = listOf(route.copy(stops = emptyList()))), route.type, destinationName)
+        m.addStopPins(context, plannedStops.withIndex().filter { it.index !in stopsDone }.map { it.index + 1 to it.value.point })
         if (showTurnSigns) m.addTurnArrows(context, guidance.turnMarks)
         me = m.addMyLocation(context, state.snapped, sizeDp = 24f)
         m.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
@@ -353,7 +364,8 @@ fun GuideScreen(
     suspend fun findNewRoute(from: LatLon, spoken: String): Boolean {
         rerouting = true
         val found = try {
-            active = routeRepository.findRoutes(RouteRequest(from, destination, mode))
+            val left = plannedStops.filterIndexed { i, _ -> i !in stopsDone }.map { StopPlace(it.name, it.point) }
+            active = routeRepository.findRoutes(RouteRequest(from, destination, mode, stops = left))
             demoProgress = 0.0
             if (voiceOn) tts.speak(spoken, TextToSpeech.QUEUE_FLUSH, null, "reroute")
             true
@@ -427,6 +439,19 @@ fun GuideScreen(
     // Closes by itself after a while, so it does not stay over the map while walking.
     LaunchedEffect(tapped) { if (tapped != null) { delay(TAPPED_CARD_MS); tapped = null } }
 
+    // Reaching the next stop: say where, and what comes next, until [다 봤어요].
+    val stopNames = plannedStops.map { it.name }
+    val leftStops = plannedStops.indices.filter { it !in stopsDone }
+    val leftAlong = remember(guidance, stopsDone) { guidance.alongInOrder(leftStops.map { plannedStops[it].point }) }
+    val reached = if (atStop == null) stopReached(leftAlong, state.progressM, emptySet())?.let { leftStops[it] } else null
+    LaunchedEffect(reached) {
+        val i = reached ?: return@LaunchedEffect
+        atStop = i
+        val text = stopArrivedText(stopNames, i, stopsDone, destinationName)
+        onLive(false, text)
+        if (voiceOn) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "stop")
+    }
+
     Box(modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -460,6 +485,31 @@ fun GuideScreen(
                             rerouted = false
                         },
                         onDismiss = { offRouteTold = true; rerouted = false },
+                    )
+                }
+                atStop?.let { i ->
+                    StopArrivedCard(
+                        stopArrivedText(stopNames, i, stopsDone, destinationName),
+                        onDone = {
+                            onLive(true, "다 봤어요")
+                            stopsDone = stopsDone + i
+                            atStop = null
+                        },
+                    )
+                } ?: stopsLeftText(stopNames, stopsDone)?.let { left ->
+                    StopsLeftRow(
+                        left,
+                        finding = rerouting,
+                        onSkip = {
+                            val i = leftStops.first()
+                            onLive(true, "이곳은 안 갈게요")
+                            stopsDone = stopsDone + i
+                            scope.launch {
+                                if (findNewRoute(fix ?: state.snapped, "${stopNames[i]}에는 안 들르는 길을 찾았어요")) {
+                                    aiNotice = "${stopNames[i]}에는 안 들르고 지금 자리에서 새 길을 찾았어요."
+                                }
+                            }
+                        },
                     )
                 }
                 // Something new on the way, in AI 비서's words, here under the status line (team, 11/6).
@@ -717,6 +767,44 @@ private fun AiNotice(text: String, onDismiss: () -> Unit) {
             Icon(Icons.Filled.AutoAwesome, contentDescription = "AI 비서", tint = Green, modifier = Modifier.size(18.dp))
             Text(text, fontSize = 16.sp, color = Color(0xFF17211B), lineHeight = 22.sp, modifier = Modifier.weight(1f).padding(start = 8.dp))
             IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Color(0xFF5E6A62)) }
+        }
+    }
+}
+
+/** 들를 곳 left: "들를 곳 2/3 다이소" with [이곳은 안 갈게요] to skip it. */
+@Composable
+private fun StopsLeftRow(left: String, finding: Boolean, onSkip: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White.copy(alpha = AI_BUBBLE_ALPHA),
+        border = BorderStroke(1.5.dp, Color(0xFFB45309)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)) {
+            Text("들를 곳 $left", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7A3E06), modifier = Modifier.weight(1f))
+            TextButton(onClick = onSkip, enabled = !finding, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text("이곳은 안 갈게요", fontSize = 15.sp, color = Color(0xFFB45309))
+            }
+        }
+    }
+}
+
+/** At a stop: "다이소에 도착했어요. 다음은 CU예요" and [다 봤어요]. */
+@Composable
+private fun StopArrivedCard(text: String, onDone: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFFFF4E5).copy(alpha = AI_BUBBLE_ALPHA),
+        border = BorderStroke(1.5.dp, Color(0xFFB45309)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(14.dp)) {
+            Text(text, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF17211B), lineHeight = 25.sp)
+            Button(
+                onClick = onDone,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB45309)),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            ) { Text("다 봤어요", fontSize = 17.sp, fontWeight = FontWeight.Bold) }
         }
     }
 }

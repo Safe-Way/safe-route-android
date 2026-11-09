@@ -815,6 +815,7 @@ private fun LegRow(leg: TransitLeg, wait: FirstWait?) {
         LegType.WALK -> "걷기" to Green
         LegType.BUS -> "버스" to Transit
         LegType.SUBWAY -> "지하철" to Color(0xFF6D28D9)
+        LegType.STOP -> "들르기" to Color(0xFFB45309)
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
         Text(
@@ -826,7 +827,7 @@ private fun LegRow(leg: TransitLeg, wait: FirstWait?) {
             val live = when (leg.type) {
                 LegType.BUS -> nextBusText(leg.buses)
                 LegType.SUBWAY -> nextTrainLines(leg.trains).firstOrNull()
-                LegType.WALK -> null
+                LegType.WALK, LegType.STOP -> null
             }
             live?.let { Text(it, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color) }
             wait?.let {

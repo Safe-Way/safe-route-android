@@ -1,5 +1,16 @@
 package com.deungbul.anshimgil.ui.guide
 
+import com.deungbul.anshimgil.data.TransitRepository
+import com.deungbul.anshimgil.data.TransitRoute
+import com.deungbul.anshimgil.data.TransitStop
+import com.deungbul.anshimgil.data.LatLon
+import com.deungbul.anshimgil.data.STOP_REFOUND_TEXT
+import com.deungbul.anshimgil.data.STOP_REFIND_FAILED_TEXT
+import com.deungbul.anshimgil.data.stopsAfter
+import com.deungbul.anshimgil.data.stopTitle
+import com.deungbul.anshimgil.data.withRestFoundAgain
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -45,14 +56,12 @@ import com.deungbul.anshimgil.data.ALIGHT_NEAR_M
 import com.deungbul.anshimgil.data.ApiException
 import com.deungbul.anshimgil.data.FacilityRepository
 import com.deungbul.anshimgil.data.Guardian
-import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.LegType
 import com.deungbul.anshimgil.data.RouteRepository
 import com.deungbul.anshimgil.data.RouteRequest
 import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.RouteType
 import com.deungbul.anshimgil.data.TransitLeg
-import com.deungbul.anshimgil.data.TransitRoute
 import com.deungbul.anshimgil.data.UserMode
 import com.deungbul.anshimgil.data.WalkSpeedRepository
 import com.deungbul.anshimgil.data.distanceMeters
@@ -97,15 +106,55 @@ fun TransitGuideScreen(
     /** AI 비서's live words and the walker's answers, for the chat. */
     onLive: (Boolean, String) -> Unit = { _, _ -> },
 ) {
-    val legs = remember(route) { guideLegs(route) }
+    // The parts; after a stop (들를 곳) the rest is found again from there and replaces what was after it.
+    var legs by remember(route) { mutableStateOf(guideLegs(route)) }
+    val destination = remember(route) { route.legs.last().to.point }
     var step by rememberSaveable { mutableIntStateOf(0) }
+    var finding by remember { mutableStateOf(false) }
+    var notice by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(notice) { if (notice != null) { kotlinx.coroutines.delay(12_000); notice = null } }
+    val scope = rememberCoroutineScope()
     val leg = legs.getOrNull(step) ?: run { LaunchedEffect(Unit) { onFinish() }; return }
     val last = step == legs.lastIndex
     fun next() = if (last) { onArrived(); onFinish() } else step++
-    val nextLabel = legs.getOrNull(step + 1)?.let { n -> if (n.type == LegType.WALK) "다음: 걷기" else "다음: ${legLabel(n)} 타기" }
+    val nextLabel = legs.getOrNull(step + 1)?.let { n ->
+        when (n.type) {
+            LegType.WALK -> "다음: 걷기"
+            LegType.STOP -> "다음: ${n.to.name ?: "들를 곳"} 들르기"
+            else -> "다음: ${legLabel(n)} 타기"
+        }
+    }
+    // [다 봤어요] at a stop: find the rest from here (new bus times too), then go on.
+    fun refindAfterStop() {
+        scope.launch {
+            finding = true
+            val here = leg.to.point
+            val rest = try {
+                TransitRepository.find(here, destination, mode, stopsAfter(legs, step)).routes.firstOrNull()
+            } catch (e: ApiException) {
+                // Too close for a bus: walk the rest.
+                if (e.code == "TOO_CLOSE") TransitRoute(0, null, 0, 0, listOf(restWalk(leg, destination, destinationName))) else null
+            }
+            if (rest != null) {
+                legs = withRestFoundAgain(legs, step, rest)
+                notice = STOP_REFOUND_TEXT
+            } else {
+                notice = STOP_REFIND_FAILED_TEXT
+            }
+            onLive(false, notice!!)
+            finding = false
+            next()
+        }
+    }
 
     Column(modifier.fillMaxSize().background(Color.White)) {
         StepStrip(legs, step)
+        notice?.let {
+            Text(
+                it, fontSize = 15.sp, color = Ink, lineHeight = 21.sp,
+                modifier = Modifier.fillMaxWidth().background(Color(0xFFFFF4E5)).padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+        }
         Box(Modifier.weight(1f)) {
             key(step) {
                 if (leg.type == LegType.WALK) {
@@ -116,6 +165,12 @@ fun TransitGuideScreen(
                         onDone = ::next,
                         onOpenAssistant = onOpenAssistant,
                         onLive = onLive,
+                    )
+                } else if (leg.type == LegType.STOP) {
+                    StopPart(
+                        leg, voiceByDefault, finding,
+                        onDone = { onLive(true, "다 봤어요"); if (last) next() else refindAfterStop() },
+                        onStop = onFinish, onOpenAssistant = onOpenAssistant,
                     )
                 } else {
                     RidePart(leg, voiceByDefault, nextLabel = nextLabel, onDone = ::next, onStop = onFinish, onOpenAssistant = onOpenAssistant)
@@ -213,6 +268,63 @@ private fun WalkPart(
                     colors = ButtonDefaults.buttonColors(containerColor = Green),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 ) { Text(finishLabel, fontSize = 17.sp, fontWeight = FontWeight.Bold) }
+            }
+        }
+    }
+}
+
+/** The rest of the way on foot from a stop, when it is too close for a bus (the walk part finds the line). */
+private fun restWalk(stop: TransitLeg, destination: LatLon, destinationName: String): TransitLeg {
+    val m = distanceMeters(stop.to.point.lat, stop.to.point.lon, destination.lat, destination.lon)
+    return TransitLeg(
+        LegType.WALK, m, maxOf(1, m / 60), stop.to, TransitStop(destinationName, destination),
+        emptyList(), null, null, emptyList(), emptyList(), emptyList(),
+    )
+}
+
+/** 들를 곳: "다이소에 들러요" and [다 봤어요], which finds the rest of the way from here. */
+@Composable
+private fun StopPart(
+    leg: TransitLeg,
+    voiceByDefault: Boolean,
+    finding: Boolean,
+    onDone: () -> Unit,
+    onStop: () -> Unit,
+    onOpenAssistant: (() -> Unit)?,
+) {
+    val context = LocalContext.current
+    val tts = rememberTts(context)
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(600)
+        if (voiceByDefault) tts.speak("${leg.to.name ?: "들를 곳"}에 도착했어요. 다 보시면 다 봤어요를 눌러 주세요.", TextToSpeech.QUEUE_FLUSH, null, "stop")
+    }
+    val color = Color(0xFFB45309)
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxSize().padding(20.dp)) {
+        Text(stopTitle(leg), fontSize = 24.sp, fontWeight = FontWeight.Black, color = Ink, lineHeight = 31.sp)
+        Text(
+            "다 보시면 [다 봤어요]를 눌러 주세요. 그때 있는 곳에서 남은 길과 버스를 다시 찾아요. 처음 보여 드린 길과 달라질 수 있어요.",
+            fontSize = 17.sp, color = Muted, lineHeight = 24.sp,
+        )
+        Spacer(Modifier.weight(1f))
+        Button(
+            onClick = onDone,
+            enabled = !finding,
+            colors = ButtonDefaults.buttonColors(containerColor = color),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
+        ) { Text(if (finding) "남은 길 찾는 중…" else "다 봤어요", fontSize = 18.sp, fontWeight = FontWeight.Black) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            onOpenAssistant?.let { open ->
+                Button(
+                    onClick = open,
+                    colors = ButtonDefaults.buttonColors(containerColor = Green),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) {
+                    Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Text(" AI 비서", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            OutlinedButton(onClick = onStop, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                Text("안내 끝내기", fontSize = 16.sp)
             }
         }
     }
