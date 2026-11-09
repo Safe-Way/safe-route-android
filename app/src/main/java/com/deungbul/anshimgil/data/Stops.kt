@@ -16,6 +16,9 @@ import org.json.JSONObject
 /** At most this many stops on a walk (팀 결정). */
 const val MAX_WALK_STOPS = 3
 
+/** At most this many on a transit trip: each costs the server one more ODsay call, 30 a day (채림, #121). */
+const val MAX_TRANSIT_STOPS = 1
+
 /** Within this many meters along the route of a stop counts as being there. */
 const val STOP_ARRIVE_M = 20.0
 

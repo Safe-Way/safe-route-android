@@ -1,5 +1,7 @@
 package com.deungbul.anshimgil.ui.route
 
+import com.deungbul.anshimgil.data.MAX_TRANSIT_STOPS
+import com.deungbul.anshimgil.data.StopPlace
 import com.deungbul.anshimgil.data.firstWait
 import com.deungbul.anshimgil.data.FirstWait
 import androidx.compose.ui.text.style.TextAlign
@@ -141,6 +143,8 @@ fun RouteScreen(
     mode: UserMode,
     startPlace: Place?,
     destination: Place,
+    /** 들를 곳 on the way, in order (walking up to 3, transit 1). */
+    stops: List<StopPlace> = emptyList(),
     routeRepository: RouteRepository,
     placeRepository: PlaceRepository,
     autoConditions: Boolean,
@@ -187,7 +191,7 @@ fun RouteScreen(
         state = try {
             RouteState.Ready(
                 routeRepository.findRoutes(
-                    RouteRequest(from.point, LatLon(destination.lat, destination.lon), mode, conditionsOff, conditionsOn),
+                    RouteRequest(from.point, LatLon(destination.lat, destination.lon), mode, conditionsOff, conditionsOn, stops = stops),
                 ),
             )
         } catch (e: ApiException) {
@@ -316,7 +320,7 @@ fun RouteScreen(
         if (!transitTab || transit is TransitState.Ready) return@LaunchedEffect
         transit = TransitState.Loading
         transit = try {
-            val r = TransitRepository.find(from.point, LatLon(destination.lat, destination.lon), mode)
+            val r = TransitRepository.find(from.point, LatLon(destination.lat, destination.lon), mode, stops.take(MAX_TRANSIT_STOPS))
             if (r.routes.isEmpty()) TransitState.Failed(r.note ?: "대중교통 경로가 없어요", null) else TransitState.Ready(r)
         } catch (e: ApiException) {
             TransitState.Failed(e.message, e.code)

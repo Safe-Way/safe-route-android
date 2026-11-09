@@ -104,4 +104,50 @@ class StopsTest {
         val joined = withRestFoundAgain(legs, 1, rest)
         assertEquals(listOf(LegType.WALK, LegType.STOP, LegType.BUS), joined.map { it.type })
     }
+
+    @Test
+    fun assistantStopsFromPickRequestOrTop() {
+        val req = JSONObject(
+            """{"say":"GS25 충장점(택배), 다이소 충장로점 들렀다 집까지 25분 걸려요.",
+                "pick":{"type":"walk","request":{"destination":{"name":"집","lat":35.15,"lon":126.92},
+                  "stops":[{"name":"GS25 충장점","lat":35.147,"lon":126.918},{"name":"다이소 충장로점","lat":35.148,"lon":126.919}]}},
+                "stops":[{"label":"택배","name":"GS25 충장점","lat":35.147,"lon":126.918}]}""",
+        )
+        assertEquals(listOf("GS25 충장점", "다이소 충장로점"), assistantStops(req).map { it.name })
+        val reply = parseServerAssistantReply(req)!!.action as AssistantAction.GoPlace
+        assertEquals("집", reply.place.name)
+        assertEquals(2, reply.stops.size)
+        // Before #123 the field was via; only the top list: its labels when there is no name.
+        val via = JSONObject("""{"pick":{"request":{"via":[{"name":"다이소","lat":35.1,"lon":126.9}]}}}""")
+        assertEquals(listOf("다이소"), assistantStops(via).map { it.name })
+        val top = JSONObject("""{"stops":[{"label":"택배","lat":35.1,"lon":126.9}]}""")
+        assertEquals(listOf("택배"), assistantStops(top).map { it.name })
+        assertTrue(assistantStops(JSONObject("{}")).isEmpty())
+    }
+
+    @Test
+    fun stretchesJoinIntoOneRouteWithStops() {
+        fun part(from: Double, to: Double, d: Int) = RouteResult(
+            conditions = emptyList(),
+            routes = listOf(
+                RouteOption(
+                    RouteType.SAFE, d, d / 60, listOf(LatLon(35.0, from), LatLon(35.0, (from + to) / 2), LatLon(35.0, to)),
+                    counts = mapOf("cctv" to 2), sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.LEFT)),
+                ),
+            ),
+            explanation = Explanation("", emptyList()),
+            facilities = emptyList(),
+            dataQuality = DataQuality(true, null),
+        )
+        val joined = joinStretches(
+            listOf(part(126.0, 126.001, 90), part(126.001, 126.003, 180)),
+            listOf(StopPlace("다이소", LatLon(35.0, 126.001))),
+        ).routes.single()
+        assertEquals(270, joined.distanceM)
+        assertEquals(5, joined.path.size) // the shared point is not repeated
+        assertEquals(4, joined.counts["cctv"])
+        assertEquals(Sidewalk(2, 4, SidewalkSide.LEFT), joined.sidewalks[1])
+        assertEquals(listOf("다이소"), joined.stops.map { it.name })
+        assertEquals(90.0, joined.stops[0].atM, 0.1)
+    }
 }
