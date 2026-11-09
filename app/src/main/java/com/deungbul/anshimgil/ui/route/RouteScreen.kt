@@ -11,6 +11,7 @@ import com.deungbul.anshimgil.data.legTitle
 import com.deungbul.anshimgil.data.LegType
 import com.deungbul.anshimgil.data.CompareItem
 import com.deungbul.anshimgil.data.RouteChoice
+import com.deungbul.anshimgil.data.choiceCounts
 import com.deungbul.anshimgil.data.TransitLeg
 import com.deungbul.anshimgil.data.TransitRoute
 import com.deungbul.anshimgil.data.TransitResult
@@ -93,6 +94,10 @@ import com.deungbul.anshimgil.data.RouteRequest
 import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.routeCriteria
 import com.deungbul.anshimgil.data.RouteType
+import com.deungbul.anshimgil.data.eventLine
+import com.deungbul.anshimgil.data.routeSpoken
+import com.deungbul.anshimgil.data.transitSpoken
+import kotlinx.coroutines.delay
 import com.deungbul.anshimgil.data.walkMinutes
 import com.deungbul.anshimgil.data.autoNightReason
 import com.deungbul.anshimgil.data.UserMode
@@ -157,6 +162,8 @@ fun RouteScreen(
     autoStart: Boolean = false,
     /** Which kind was started, to learn from. */
     onChosen: (RouteChoice) -> Unit = {},
+    /** 음성 안내: read out the recommendation when it is found (사용성 점검표 17번). */
+    voiceOn: Boolean = false,
 ) {
     val context = LocalContext.current
     var conditionsOff by rememberSaveable { mutableStateOf(if (autoConditions) emptySet() else ALL_CONDITION_KEYS) }
@@ -265,9 +272,19 @@ fun RouteScreen(
             conditionsOn = conditionsOn + "night"
         }
     }
+    // Read out what is recommended, once per result and tab, when 음성 안내 is on.
+    val tts = com.deungbul.anshimgil.ui.guide.rememberTts(context)
     // 걸어서 / 대중교통 tabs. Transit is asked for only when its tab is opened (the server's ODsay
     // lookups are limited per day) and kept while the screen is open.
     var transitTab by rememberSaveable { mutableStateOf(startWithTransit || preferred == RouteChoice.TRANSIT) }
+    // What this screen picked before the walker did: going along with it says nothing ([choiceCounts]).
+    val preselected = remember {
+        when {
+            startWithTransit || preferred == RouteChoice.TRANSIT -> RouteChoice.TRANSIT
+            else -> preferred
+        }
+    }
+    fun chosen(choice: RouteChoice) { if (choiceCounts(preselected, choice)) onChosen(choice) }
     var transit by remember { mutableStateOf<TransitState?>(null) }
     var transitSelected by rememberSaveable { mutableIntStateOf(0) }
     // [바로 출발]: start as soon as the route (of the usual kind) is there; the walker can still go back.
@@ -282,6 +299,16 @@ fun RouteScreen(
                 autoStarted = true
                 onStart(s.result, type)
             }
+        }
+    }
+    LaunchedEffect(result, transit, transitTab, selected) {
+        if (!voiceOn) return@LaunchedEffect
+        val speaker = tts
+        val text = if (transitTab) (transit as? TransitState.Ready)?.result?.routes?.getOrNull(transitSelected)?.let(::transitSpoken)
+        else result?.let { routeSpoken(it, selected) }
+        if (text != null) {
+            delay(800) // let the screen and the speech engine settle first
+            speaker.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "route")
         }
     }
     LaunchedEffect(transitTab, origin) {
@@ -438,13 +465,13 @@ fun RouteScreen(
                 }
                 if (!transitTab) (state as? RouteState.Ready)?.let { s ->
                     StartButton(s.result.atPace(walkSpeedMPerMin), selected, onStart = {
-                        if (s.result.routes.size > 1) onChosen(if (selected == RouteType.SHORTEST) RouteChoice.SHORTEST else RouteChoice.SAFE)
+                        if (s.result.routes.size > 1) chosen(if (selected == RouteType.SHORTEST) RouteChoice.SHORTEST else RouteChoice.SAFE)
                         onStart(s.result, selected)
                     })
                 }
                 if (transitTab) (transit as? TransitState.Ready)?.result?.routes?.getOrNull(transitSelected)?.let { t ->
                     Button(
-                        onClick = { onChosen(RouteChoice.TRANSIT); onStartTransit(t) },
+                        onClick = { chosen(RouteChoice.TRANSIT); onStartTransit(t) },
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2F5BB7), contentColor = Color.White),
                         modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
@@ -496,7 +523,7 @@ private fun LocationNotice(issue: OriginIssue, onFix: () -> Unit) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp).heightIn(min = 44.dp),
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp).heightIn(min = 48.dp),
         ) {
             Icon(Icons.Filled.WarningAmber, contentDescription = null, tint = Color(0xFFB45309))
             Text(issue.message, fontSize = 14.sp, color = Color(0xFF7A5310), lineHeight = 19.sp, modifier = Modifier.weight(1f))
@@ -571,6 +598,18 @@ private fun RouteDetails(
                     modifier = Modifier.size(20.dp),
                 )
                 Text(note.text, fontSize = 15.sp, color = if (note.warn) Color(0xFF7A5310) else Ink, lineHeight = 21.sp)
+            }
+        }
+        // Events and incidents on this route (팀 할 일 m08): a caution when this mode keeps away from them.
+        result.route(if (fast) RouteType.SHORTEST else RouteType.SAFE)?.events.orEmpty().forEach { e ->
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(end = 8.dp)) {
+                Icon(
+                    if (e.avoid) Icons.Filled.WarningAmber else Icons.Filled.Info,
+                    contentDescription = if (e.avoid) "주의" else "알림",
+                    tint = if (e.avoid) Color(0xFFB45309) else Color(0xFF2F5BB7),
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(eventLine(e), fontSize = 15.sp, color = if (e.avoid) Color(0xFF7A5310) else Ink, lineHeight = 21.sp)
             }
         }
         if (items.isNotEmpty()) {

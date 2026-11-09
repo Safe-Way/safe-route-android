@@ -280,4 +280,58 @@ class AssistantTest {
         assertNull(placeDetailAnswer("가까운 화장실", store))
         assertNull(placeDetailAnswer("글씨 크게 해 줘", store))
     }
+
+    private fun undo(said: String, usage: Usage, at: java.time.LocalDateTime = java.time.LocalDateTime.of(2026, 11, 8, 17, 10)) =
+        undoAdaptation(said.replace(" ", ""), usage, at)
+
+    @Test
+    fun aMistakenAnswerCanBeTakenBackByAsking() {
+        val boosted = Usage(textBoost = 1.15f)
+        // There are no big buttons any more: nothing to take back about buttons.
+        assertNull(undo("버튼 원래대로 해 줘", boosted))
+        assertTrue(undo("글씨 원래대로", boosted)!!.undoTextBoost)
+        assertEquals(false, undo("캘린더 알림 꺼 줘", Usage(calendarOn = true))!!.calendar)
+        assertEquals(false, undo("알아서 바꾸지 마", Usage())!!.adapt)
+        // Through the whole assistant too.
+        val ctx = AssistantContext(UserMode.SENIOR, AppSettings(), usage = boosted)
+        val a = runBlocking { RuleAppAssistant.reply(listOf(ChatLine(true, "글씨 원래대로 돌려줘")), ctx) }
+        assertTrue((a as AssistantAction.ChangeSettings).undoTextBoost)
+    }
+
+    @Test
+    fun justNowMeansTheLastChange() {
+        val at = java.time.LocalDateTime.of(2026, 11, 8, 17, 0)
+        val u = Usage(textBoost = 1.3f, lastChange = Adaptation.MISSED_TAPS to at)
+        assertTrue(undo("방금 거 잘못 눌렀어 원래대로 해줘", u)!!.textBoostStepBack)
+        assertTrue(undo("방금 거 잘못 눌렀어 원래대로 해줘", u.copy(lastChange = Adaptation.BIG_TEXT to at))!!.textBoostStepBack)
+        assertEquals(false, undo("실수로 눌렀어", Usage(calendarOn = true, lastChange = Adaptation.CALENDAR to at))!!.calendar)
+        // Long ago, or nothing changed: not guessed.
+        assertNull(undo("원래대로 해줘", u, at.plusHours(2)))
+        assertNull(undo("원래대로 해줘", Usage()))
+    }
+
+    @Test
+    fun otherWordsAreNotTakenForAnUndo() {
+        val u = Usage(textBoost = 1.3f, lastChange = Adaptation.MISSED_TAPS to java.time.LocalDateTime.of(2026, 11, 8, 17, 0))
+        assertNull(undo("길 안내 취소해줘", u))
+        assertNull(undo("지도 원래대로", u))
+        assertNull(undo("가까운 편의점", u))
+        // Without the AI's enlargement, "글씨 작게" is the text size setting as before.
+        val small = runBlocking { RuleAppAssistant.reply(listOf(ChatLine(true, "글씨 작게 해줘")), now) }
+        assertEquals(TextSize.SMALL, (small as AssistantAction.ChangeSettings).textSize)
+    }
+
+    @Test
+    fun textTooSmallGrowsStepByStep() {
+        fun said(settings: AppSettings, usage: Usage = Usage()) =
+            runBlocking { RuleAppAssistant.reply(listOf(ChatLine(true, "글씨가 너무 작아 안 보여")), AssistantContext(UserMode.SENIOR, settings, usage = usage)) }
+        assertEquals(TextSize.LARGE, (said(AppSettings()) as AssistantAction.ChangeSettings).textSize)
+        // Already 크게: AI 비서's own enlargement, the setting stays.
+        val up = said(AppSettings(textSize = TextSize.LARGE)) as AssistantAction.ChangeSettings
+        assertTrue(up.textBoostUp)
+        assertNull(up.textSize)
+        assertTrue((said(AppSettings(textSize = TextSize.LARGE), Usage(textBoost = 1.15f)) as AssistantAction.ChangeSettings).textBoostUp)
+        // The biggest: said so, nothing pretends to change.
+        assertTrue(said(AppSettings(textSize = TextSize.LARGE), Usage(textBoost = 1.3f)) is AssistantAction.Answer)
+    }
 }

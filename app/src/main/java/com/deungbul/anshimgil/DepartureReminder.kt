@@ -20,6 +20,11 @@ import com.deungbul.anshimgil.data.TripConsent
 import com.deungbul.anshimgil.data.TripLogRepository
 import com.deungbul.anshimgil.data.UsageRepository
 import com.deungbul.anshimgil.data.WalkSpeedRepository
+import com.deungbul.anshimgil.data.STILL_THERE_M
+import com.deungbul.anshimgil.data.distanceMeters
+import com.deungbul.anshimgil.data.habitNow
+import com.deungbul.anshimgil.data.sayTime
+import com.deungbul.anshimgil.location.lastKnownLocation
 import com.deungbul.anshimgil.data.settingsDataStore
 import kotlinx.coroutines.flow.first
 import org.json.JSONObject
@@ -32,6 +37,8 @@ import java.util.concurrent.TimeUnit
  * walker usually leaves for somewhere within the next 20 minutes (the same weekday and half hour, 3 times or
  * more), send one notification: "8시 30분에 국립아시아문화전당 가시죠? 눌러서 길 보기". Only with the trip-record
  * yes and 쓰는 대로 맞추기 on; the position is not sent (the server suggests from the habit alone).
+ * Before that, the habit learned on this phone ([habitNow], from the first week, weekdays together). Not sent
+ * while the walker is already there.
  */
 
 /** How long before the usual time the reminder comes. */
@@ -74,19 +81,43 @@ class DepartureWorker(context: Context, params: WorkerParameters) : CoroutineWor
 
     override suspend fun doWork(): Result {
         val ctx = applicationContext
-        if (!ServerApi.isConfigured || !ModeStatus.canShow(ctx)) return Result.success()
+        if (!ModeStatus.canShow(ctx)) return Result.success()
+        val usage = UsageRepository(ctx).current()
+        if (!usage.adapt) return Result.success()
+        val now = java.time.LocalDateTime.now(ZoneId.of("Asia/Seoul"))
+        val here = runCatching { lastKnownLocation(ctx, maxAgeMs = 30 * 60_000L) }.getOrNull()
+        // First the habit learned on this phone (이동 패턴): from the first week, nothing sent. With a recent position
+        // it is not sent while already there; without one (the phone keeps no fresh fix while the app is closed, so
+        // waiting for one meant the reminder never came, 11/9 on the phone) it is still sent, once a day, unless
+        // that trip was already started today.
+        habitNow(usage.trips, now, here, before = REMIND_BEFORE_MIN.toInt() + 5, after = 5)?.let { h ->
+            val reminder = Reminder(
+                key = "${now.toLocalDate()}-habit-${h.place.name}",
+                text = "보통 ${sayTime(h.time)}쯤 ${h.place.name}에 가셨어요. 길 안내할까요?",
+                name = h.place.name, lat = h.place.lat, lon = h.place.lon, transit = h.transit,
+            )
+            return send(ctx, reminder)
+        }
+        if (!ServerApi.isConfigured) return Result.success()
         val walk = WalkSpeedRepository(ctx)
         if (TripLogRepository(ctx) { walk.guestId() }.consent.first() != TripConsent.YES) return Result.success()
-        if (!UsageRepository(ctx).current().adapt) return Result.success()
         val mode = ModeRepository(ctx).mode.first() ?: return Result.success()
         val json = runCatching {
             ServerApi.get("/api/suggestions/today", mapOf("guestId" to walk.guestId(), "mode" to mode.key))
         }.getOrNull() ?: return Result.success()
-        val reminder = reminderFor(json, LocalTime.now(ZoneId.of("Asia/Seoul"))) ?: return Result.success()
-        // Once per habit a day.
-        if (ctx.settingsDataStore.data.first()[sentKey] == reminder.key) return Result.success()
+        val reminder = reminderFor(json, now.toLocalTime()) ?: return Result.success()
+        // Not while already there.
+        if (here != null && distanceMeters(here.lat, here.lon, reminder.lat, reminder.lon) <= STILL_THERE_M) return Result.success()
+        return send(ctx, reminder)
+    }
+
+    /** Sends [reminder] unless the same place was already reminded today (by the habit here or the server). */
+    private suspend fun send(ctx: Context, reminder: Reminder): Result {
+        val today = reminder.key.take(10)
+        val sent = ctx.settingsDataStore.data.first()[sentKey].orEmpty().split('\n')
+        if ("$today|${reminder.name}" in sent) return Result.success()
         notify(ctx, reminder)
-        ctx.settingsDataStore.edit { it[sentKey] = reminder.key }
+        ctx.settingsDataStore.edit { p -> p[sentKey] = (sent.filter { it.startsWith(today) } + "$today|${reminder.name}").joinToString("\n") }
         return Result.success()
     }
 

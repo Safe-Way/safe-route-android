@@ -149,7 +149,7 @@ fun SetupChatScreen(
 
         if (choices.isNotEmpty()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 16.dp)) {
-                choices.forEach { c -> SuggestionChip(onClick = { send(c) }, label = { Text(c, fontSize = 16.sp) }, modifier = Modifier.heightIn(min = 44.dp)) }
+                choices.forEach { c -> SuggestionChip(onClick = { send(c) }, label = { Text(c, fontSize = 16.sp) }, modifier = Modifier.heightIn(min = 48.dp)) }
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(12.dp)) {

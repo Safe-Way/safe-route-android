@@ -71,4 +71,79 @@ class GuidanceTest {
         assertEquals(listOf(FacilityKind.CONVENIENCE_STORE), later.map { it.kind })
         assertTrue(later[0].aheadM in 45..65)
     }
+
+    // Points given as meters east/north of a corner near 조선대.
+    private fun m(east: Double, north: Double) = LatLon(35.14 + north / 111_320.0, 126.93 + east / (111_320.0 * kotlin.math.cos(Math.toRadians(35.14))))
+
+    private fun turnsOf(g: Guidance): List<Pair<Int, Turn>> {
+        val out = mutableListOf<Pair<Int, Turn>>()
+        var p = 0.0
+        while (p < g.totalM) {
+            val s = g.atProgress(p)
+            if (s.nextTurn == Turn.LEFT || s.nextTurn == Turn.RIGHT) {
+                val at = (p + s.metersToNextTurn).toInt()
+                if (out.none { kotlin.math.abs(it.first - at) <= 1 }) out += at to s.nextTurn
+            }
+            p += 1.0
+        }
+        return out
+    }
+
+    @Test
+    fun aRoundedCornerIsOneTurn() {
+        // North 100 m, then a right-angle corner drawn as four 22.5° bends, then east 100 m.
+        val path = listOf(m(0.0, 0.0), m(0.0, 100.0), m(1.5, 103.5), m(4.0, 106.0), m(7.5, 108.5), m(11.0, 110.0), m(111.0, 110.0))
+        assertEquals(listOf(Turn.RIGHT), turnsOf(Guidance(path, emptyList())).map { it.second })
+    }
+
+    @Test
+    fun aStepAsideIsNoTurnButCrossingIsTwo() {
+        // A 3 m step to the side on the pavement: walk on, nothing to say.
+        val step = listOf(m(0.0, 0.0), m(0.0, 100.0), m(3.0, 103.0), m(3.0, 200.0))
+        assertTrue(turnsOf(Guidance(step, emptyList())).isEmpty())
+        // Crossing a road to the other side (10 m over), then on: right, then left.
+        val cross = listOf(m(0.0, 0.0), m(0.0, 100.0), m(10.0, 100.0), m(10.0, 200.0))
+        assertEquals(listOf(Turn.RIGHT, Turn.LEFT), turnsOf(Guidance(cross, emptyList())).map { it.second })
+    }
+
+    @Test
+    fun aJogWithoutACrossingIsNoTurnWhenTheServerListsCrossings() {
+        // The pavement shifts 7 m over (90° right, 7 m, 90° left), as on our server's routes near 조선대.
+        val jog = listOf(m(0.0, 0.0), m(0.0, 100.0), m(7.0, 100.0), m(7.0, 200.0))
+        // Crossings not known (an older server): told as before.
+        assertEquals(listOf(Turn.RIGHT, Turn.LEFT), turnsOf(Guidance(jog, emptyList())).map { it.second })
+        // The server lists crossings, none here: walk on.
+        assertTrue(turnsOf(Guidance(jog, emptyList(), crossings = listOf(m(0.0, 50.0)))).isEmpty())
+        // The server lists a crossing right here: crossing over, two turns.
+        assertEquals(
+            listOf(Turn.RIGHT, Turn.LEFT),
+            turnsOf(Guidance(jog, emptyList(), crossings = listOf(m(3.5, 100.0)))).map { it.second },
+        )
+    }
+
+    @Test
+    fun aZigzagKeepsItsRealTurn() {
+        // Left 78°, right 81° 5 m on, left 88° 4 m on (back_hospital near 1117 m): the line ends up turned left.
+        val path = listOf(m(0.0, 0.0), m(0.0, 100.0), m(-5.0, 101.0), m(-5.5, 105.0), m(-9.5, 105.3), m(-60.0, 106.0))
+        assertEquals(listOf(Turn.LEFT), turnsOf(Guidance(path, emptyList())).map { it.second })
+    }
+
+    @Test
+    fun aGentleBendIsNoTurn() {
+        // A road curving 40° over 30 m (OSM's walking steps do not call it a turn either).
+        val path = listOf(m(0.0, 0.0), m(0.0, 100.0), m(3.0, 110.0), m(8.0, 120.0), m(12.0, 128.0), m(70.0, 200.0))
+        assertTrue(turnsOf(Guidance(path, emptyList())).isEmpty())
+    }
+
+    @Test
+    fun aHairpinKeepsTheSideBeingWalked() {
+        // Up 100 m, a hairpin, and back down 12 m to the east.
+        val path = listOf(m(0.0, 0.0), m(0.0, 100.0), m(12.0, 100.0), m(12.0, 0.0))
+        val g = Guidance(path, emptyList())
+        // 40 m up, GPS 5 m off towards the other side: still 40 m along, not 170 m.
+        val s = g.update(m(5.0, 40.0), nearM = 35.0)
+        assertTrue("progress ${s.progressM}", s.progressM in 30.0..50.0)
+        // Without knowing where the walker was, the nearest side wins as before.
+        assertTrue(g.update(m(7.0, 40.0)).progressM > 150)
+    }
 }

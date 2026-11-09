@@ -77,6 +77,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onChangeMode: () -> Unit,
     onManagePlaces: () -> Unit,
+    /** 내 정보 (m06). */
+    onOpenMyInfo: () -> Unit = {},
     onVoiceChange: (Boolean) -> Unit,
     onAutoConditionsChange: (Boolean) -> Unit,
     onTextSizeChange: (TextSize) -> Unit,
@@ -96,9 +98,10 @@ fun SettingsScreen(
     onClearTrips: suspend () -> Boolean = { true },
     /** 쓰는 대로 맞추기 (Personal.kt). */
     adapt: Boolean = true,
-    bigButtons: Boolean = false,
     onAdaptChange: (Boolean) -> Unit = {},
-    onBigButtonsChange: (Boolean) -> Unit = {},
+    /** 캘린더 일정으로 길 알려 주기 (turning it on asks for the calendar permission). */
+    calendarOn: Boolean = false,
+    onCalendarChange: (Boolean) -> Unit = {},
     onResetAdapt: () -> Unit = {},
     /** How much AI 비서 has made the text bigger on top of the 글자 크기 below (1 = none). */
     textBoost: Float = 1f,
@@ -134,6 +137,7 @@ fun SettingsScreen(
         SectionTitle("내 설정")
         LinkRow("모드 바꾸기", "지금: ${mode.style().label}", onClick = onChangeMode)
         LinkRow("자주 가는 곳 관리", "집, 학교, 직장 등록과 변경", onClick = onManagePlaces)
+        LinkRow("내 정보", "계단, 돌아가는 정도, 쉬는 간격, 기록 남기기", onClick = onOpenMyInfo)
 
         SectionTitle("귀가 지킴이")
         Text(
@@ -177,11 +181,11 @@ fun SettingsScreen(
         SectionTitle("쓰는 대로 맞추기")
         SwitchRow(
             "쓰는 대로 맞추기",
-            "자주 쓰는 버튼을 앞에, 자주 고르는 길을 먼저 보여 주고, 필요해 보이면 버튼·글씨를 크게 할지 물어봐요. 폰 안에서만 세요",
+            "자주 쓰는 버튼을 앞에, 자주 고르는 길을 먼저 보여 주고, 필요해 보이면 글씨를 크게 할지 물어봐요. 폰 안에서만 세요",
             adapt,
             onAdaptChange,
         )
-        SwitchRow("큰 버튼", "지도 화면의 버튼을 더 크게 보여 줘요", bigButtons, onBigButtonsChange)
+        SwitchRow("캘린더 일정으로 길 알려 주기", "장소가 적힌 일정 전에 길을 먼저 알려 줘요. 일정은 폰 안에서만 봐요", calendarOn, onCalendarChange)
         if (textBoost > 1.001f) {
             // The AI part is separate from 글자 크기 (작게·보통·크게), which stays as chosen.
             LinkRow(
@@ -191,12 +195,12 @@ fun SettingsScreen(
             )
         }
         var confirmResetAdapt by remember { mutableStateOf(false) }
-        LinkRow("맞춘 것 처음대로", "버튼 순서·고르는 길·큰 버튼을 처음 상태로 돌려요") { confirmResetAdapt = true }
+        LinkRow("맞춘 것 처음대로", "버튼 순서·고르는 길·AI 글씨·이동 패턴을 처음 상태로 돌려요") { confirmResetAdapt = true }
         if (confirmResetAdapt) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { confirmResetAdapt = false },
                 title = { Text("맞춘 것을 처음대로 돌릴까요?") },
-                text = { Text("쓰면서 배운 버튼 순서, 자주 고르는 길, 큰 버튼, 머무는 시간을 지워요.") },
+                text = { Text("쓰면서 배운 버튼 순서, 자주 고르는 길, 머무는 시간, 이동 패턴을 지우고, AI가 키운 글씨와 캘린더 알림도 처음대로 돌려요.") },
                 confirmButton = {
                     androidx.compose.material3.TextButton(onClick = { confirmResetAdapt = false; onResetAdapt() }) { Text("처음대로") }
                 },
@@ -206,8 +210,8 @@ fun SettingsScreen(
 
         SectionTitle("이동 기록")
         SwitchRow(
-            "자주 가는 길 기억하기",
-            "도착한 곳(약 100m 범위)과 시간을 저장해서 AI 비서가 먼저 길을 알려 줘요" +
+            "다닌 기록 남기기",
+            "간 곳 이름, 요일·시간대(30분 단위), 걸었는지 버스였는지, 날씨, 한마디를 남겨요. 지나온 길·집 주소·정확한 시각은 남기지 않아요" +
                 if (tripConsent && tripCount != null) " · 지금 ${tripCount}번 기억함" else "",
             tripConsent,
             onTripConsentChange,

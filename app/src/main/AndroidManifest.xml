@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.SEND_SMS" />
     <!-- The mode icon next to the clock while the app is open (Android 13+ asks once). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 캘린더 일정으로 길 알려 주기: read on the phone, asked only after the walker says yes. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application

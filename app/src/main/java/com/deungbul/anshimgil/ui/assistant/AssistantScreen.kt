@@ -3,6 +3,8 @@ package com.deungbul.anshimgil.ui.assistant
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -57,7 +59,9 @@ import com.deungbul.anshimgil.data.ApiException
 import com.deungbul.anshimgil.data.AppAssistant
 import com.deungbul.anshimgil.data.AssistantAction
 import com.deungbul.anshimgil.data.AssistantContext
+import com.deungbul.anshimgil.data.pickLandmark
 import com.deungbul.anshimgil.data.placeDetailAnswer
+import com.deungbul.anshimgil.data.withDirection
 import com.deungbul.anshimgil.data.ChatLine
 import com.deungbul.anshimgil.data.NEARBY_KINDS
 import com.deungbul.anshimgil.data.Place
@@ -106,13 +110,16 @@ fun AssistantScreen(
     listenAtStart: Boolean = false,
     /** The conversation, kept by the caller while the app runs so it is still there on coming back. */
     chat: AssistantChat = remember { AssistantChat() },
+    /** Takes back the last change AI 비서 made; false when there is none (사용성 점검표 21번). */
+    onUndo: () -> Boolean = { false },
 ) {
     val android = LocalContext.current
     val scope = rememberCoroutineScope()
     val lines = chat.lines
     // A new chat starts with the greeting (or the bubble's line); coming back, a bubble's line is added on.
     remember {
-        if (lines.isEmpty()) {
+        if (!chat.greeted) {
+            chat.greeted = true
             lines += ChatLine(fromUser = false, text = opening ?: HELLO)
             chat.choices = STARTERS
         } else if (opening != null) {
@@ -125,6 +132,8 @@ fun AssistantScreen(
     var thinking by remember { mutableStateOf<String?>(null) }
     var urgent by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
+    // What the microphone heard last, shown with 다시 말하기 / 글자 고치기 (사용성 점검표 6번).
+    var heard by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
 
     // Replies are read aloud when 음성 안내 is on.
@@ -148,14 +157,21 @@ fun AssistantScreen(
             return
         }
         chat.lastPlace = place
-        say("${place.name}(으)로 길을 찾았어요.")
+        say("${withDirection(place.name)} 길을 찾았어요.")
         delay(600)
         onRoute(place)
     }
 
-    fun send(text: String) {
+    fun send(text: String, byVoice: Boolean = false) {
         val said = text.trim()
         if (said.isEmpty() || thinking != null) return
+        heard = if (byVoice) said else null
+        if (said == UNDO_CHOICE) {
+            lines += ChatLine(fromUser = true, text = said)
+            choices = emptyList()
+            say(if (onUndo()) "되돌렸어요." else "되돌릴 게 없어요.")
+            return
+        }
         lines += ChatLine(fromUser = true, text = said)
         input = ""
         choices = emptyList()
@@ -169,19 +185,31 @@ fun AssistantScreen(
             }
         }
         thinking = "생각하는 중…"
+        // Taking long (the server, say): after 3 s it says so, aloud or with a tone (사용성 점검표 20번).
+        val slow = scope.launch {
+            delay(SLOW_MS)
+            thinking = "잠시만요, 찾고 있어요…"
+            if (context.settings.voiceGuide) tts.speak("잠시만요, 찾고 있어요.", TextToSpeech.QUEUE_ADD, null, "wait")
+            else runCatching { ToneGenerator(AudioManager.STREAM_NOTIFICATION, 60).startTone(ToneGenerator.TONE_PROP_BEEP, 150) }
+        }
         scope.launch {
             // The greeting is the app's own, so only what the user said and the replies go out.
             val action = assistant.reply(lines.drop(1), context)
+            slow.cancel()
             say(action.say)
             when (action) {
-                is AssistantAction.ChangeSettings -> { onChangeSettings(action); say("바꿨어요. 더 바꿀 게 있으면 말해 주세요.") }
+                is AssistantAction.ChangeSettings -> {
+                    onChangeSettings(action)
+                    say("바꿨어요. 잘못 바뀌었으면 [되돌리기]를 눌러 주세요.")
+                    choices = listOf(UNDO_CHOICE)
+                }
                 is AssistantAction.Emergency -> urgent = true
                 is AssistantAction.GoNearby -> findAndGo(
                     { lat, lon -> placeRepository.nearby(action.kind, context.mode, lat, lon).places.firstOrNull() },
                     "1km 안에서 ${NEARBY_KINDS[action.kind]}을(를) 찾지 못했어요.",
                 )
                 is AssistantAction.GoTo -> findAndGo(
-                    { lat, lon -> placeRepository.search(action.query, lat, lon).firstOrNull() },
+                    { lat, lon -> pickLandmark(placeRepository.search(action.query, lat, lon)) },
                     "'${action.query}'을(를) 찾지 못했어요. 이름을 조금 다르게 말해 주세요.",
                 )
                 is AssistantAction.GoPlace -> { chat.lastPlace = action.place; delay(1200); if (action.transit) onRouteByTransit(action.place) else onRoute(action.place) }
@@ -195,7 +223,7 @@ fun AssistantScreen(
     }
 
     val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let(::send)
+        result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { send(it, byVoice = true) }
     }
     fun listen() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -251,12 +279,25 @@ fun AssistantScreen(
             }
         }
         if (choices.isNotEmpty()) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 16.dp)) {
+            // Big enough for a thick finger: 48dp high, 8dp apart (사용성 점검표 14번).
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 16.dp)) {
                 choices.forEach { c -> SuggestionChip(
                         onClick = { send(c) }, label = { Text(c, fontSize = 16.sp, color = Ink) },
                         colors = androidx.compose.material3.SuggestionChipDefaults.suggestionChipColors(containerColor = Color.White),
-                        modifier = Modifier.heightIn(min = 44.dp),
+                        modifier = Modifier.heightIn(min = 48.dp),
                     ) }
+            }
+        }
+        heard?.let { h ->
+            // Heard wrong? Say it again, or fix the words and send them.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp),
+            ) {
+                Text("잘못 들었나요?", fontSize = 16.sp, color = Muted, modifier = Modifier.align(Alignment.CenterVertically))
+                OutlinedButton(onClick = { heard = null; listen() }, modifier = Modifier.heightIn(min = 48.dp)) { Text("다시 말하기", fontSize = 16.sp) }
+                OutlinedButton(onClick = { input = h; heard = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("글자 고치기", fontSize = 16.sp) }
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(12.dp)) {
@@ -289,6 +330,15 @@ fun AssistantScreen(
     }
 }
 
+/** The chip that takes back AI 비서's last change. */
+const val UNDO_CHOICE = "되돌리기"
+
+/** How long AI 비서 may think before it says it is still looking. */
+private const val SLOW_MS = 3_000L
+
+/** How far back a live bubble's line counts as already said. */
+private const val RECENT_LINES = 8
+
 /** 급한 말에: 112 / 보호자 / 파출소 / 괜찮아요, big enough to hit in a hurry. */
 @Composable
 private fun EmergencyCard(onCall: () -> Unit, onGuardian: () -> Unit, onPolice: () -> Unit, onFine: () -> Unit) {
@@ -317,4 +367,19 @@ class AssistantChat {
     var choices by mutableStateOf<List<String>>(emptyList())
     /** The place found last, so "그곳 몇 층이야" is about it. */
     var lastPlace by mutableStateOf<Place?>(null)
+    /** The greeting has been said (live lines may come in before AI 비서 is first opened). */
+    var greeted by mutableStateOf(false)
+
+    /**
+     * A line from AI 비서's live bubbles (map, guidance) or the walker's tap on one, kept here so the chat shows
+     * the whole conversation (11/8). The same words twice in a row are kept once.
+     */
+    fun note(fromUser: Boolean, text: String) {
+        if (text.isBlank()) return
+        val last = lines.lastOrNull()
+        if (last != null && last.fromUser == fromUser && last.text == text) return
+        // A bubble's question shown again on coming back to the map is not added again (e.g. the calendar offer).
+        if (!fromUser && lines.takeLast(RECENT_LINES).any { !it.fromUser && it.text == text }) return
+        lines += ChatLine(fromUser = fromUser, text = text)
+    }
 }

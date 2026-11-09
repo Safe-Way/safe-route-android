@@ -100,6 +100,7 @@ import com.deungbul.anshimgil.location.LOCATION_PERMISSIONS
 import com.deungbul.anshimgil.location.LocationUpdates
 import com.deungbul.anshimgil.ui.route.arrivalTime
 import com.deungbul.anshimgil.location.hasLocationPermission
+import com.deungbul.anshimgil.data.Facility
 import com.deungbul.anshimgil.data.Guidance
 import com.deungbul.anshimgil.data.GuidanceState
 import com.deungbul.anshimgil.data.LatLon
@@ -111,6 +112,7 @@ import com.deungbul.anshimgil.data.RouteType
 import com.deungbul.anshimgil.data.Turn
 import com.deungbul.anshimgil.data.UserMode
 import com.deungbul.anshimgil.map.KakaoMapView
+import com.deungbul.anshimgil.ui.home.PlaceDetailCard
 import com.deungbul.anshimgil.map.addMyLocation
 import com.deungbul.anshimgil.map.pointTo
 import com.deungbul.anshimgil.map.tiltForWalking
@@ -130,7 +132,9 @@ private val Green = Color(0xFF1F6B42)
 
 /** A real fix farther than this from the route switches to the demo walk (e.g. testing away from the route). */
 private const val FAR_FROM_ROUTE_M = 300
-private const val OFF_ROUTE_WARN_M = 40
+// 11/8: 40 → 25. Replaying real routes with a made-up GPS, a wrong turn took 40–60 s to notice; at 25 m it takes
+// about 30 s, and a normal walk (6 m noise, jumps) was never taken for leaving the route.
+private const val OFF_ROUTE_WARN_M = 25
 /** Going back along the route less than this is treated as GPS noise. */
 private const val BACKTRACK_M = 25.0
 /** Off the route this long before finding a new route from where the walker is. */
@@ -143,6 +147,9 @@ private const val OFF_ROUTE_ALERT_MS = 20_000L
 private const val DEMO_STEP_M = 8.0
 /** Close-up for walking: the next few buildings, with the map tilted so the street ahead shows. */
 private const val GUIDE_ZOOM = 19
+
+/** How long a tapped picture's card stays before closing by itself. */
+private const val TAPPED_CARD_MS = 15_000L
 /** A crosswalk this close to the route line is one the route crosses. */
 private const val CROSSWALK_ON_ROUTE_M = 8.0
 /** Position updates come about once a second; moving over slightly less keeps the marker gliding. */
@@ -185,6 +192,8 @@ fun GuideScreen(
     onOpenAssistant: (() -> Unit)? = null,
     /** Whether the walker has reached the destination (for the trip record). */
     onArrivedChange: (Boolean) -> Unit = {},
+    /** AI 비서's live words here and the walker's answers, for the chat (fromUser, text). */
+    onLive: (Boolean, String) -> Unit = { _, _ -> },
 ) {
     var sos by remember { mutableStateOf(false) }
     var showHelpList by remember { mutableStateOf(false) }
@@ -192,12 +201,14 @@ fun GuideScreen(
     // The route being followed; replaced by a new one from where the walker is when they leave it.
     var active by remember { mutableStateOf(result) }
     val route = active.route(type) ?: active.routes.first()
-    val guidance = remember(route) { Guidance(route.path, active.facilitiesOn(route.type)) }
+    val guidance = remember(route) { Guidance(route.path, active.facilitiesOn(route.type), route.crossings) }
     val destination = remember { (result.route(type) ?: result.routes.first()).path.last() }
     var fix by remember { mutableStateOf<LatLon?>(null) }
     var demoProgress by remember { mutableDoubleStateOf(0.0) }
     var voiceOn by rememberSaveable { mutableStateOf(voiceByDefault) }
     var map by remember { mutableStateOf<KakaoMap?>(null) }
+    // A picture on the map the walker tapped, told in a card.
+    var tapped by remember { mutableStateOf<Facility?>(null) }
     var me by remember { mutableStateOf<Label?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -241,7 +252,7 @@ fun GuideScreen(
     // Along the route the walker only goes forward: a fix a few meters behind the last one is GPS noise,
     // so the marker stays put instead of sliding back and forth. A real step back (U-turn) still shows.
     var furthest by remember(guidance) { mutableDoubleStateOf(0.0) }
-    val realState = fix?.let { guidance.update(it) }?.let { raw ->
+    val realState = fix?.let { guidance.update(it, nearM = furthest) }?.let { raw ->
         if (raw.progressM < furthest && furthest - raw.progressM < BACKTRACK_M && raw.offRouteM <= OFF_ROUTE_WARN_M) {
             guidance.atProgress(furthest).copy(offRouteM = raw.offRouteM)
         } else {
@@ -269,12 +280,18 @@ fun GuideScreen(
         if (voiceOn && !inVehicle) tts.speak(instruction.spoken, TextToSpeech.QUEUE_FLUSH, null, "guide")
     }
     LaunchedEffect(inVehicle) {
+        if (inVehicle) onLive(false, "차로 이동하는 것 같아요. 내려서 걸으면 다시 안내할게요.")
         if (inVehicle && voiceOn) tts.speak("차로 이동하는 것 같아요. 내려서 걸으면 다시 안내할게요.", TextToSpeech.QUEUE_FLUSH, null, "vehicle")
     }
 
     // Drawn again whenever the route changes (after finding a new one).
     LaunchedEffect(map, route) {
         val m = map ?: return@LaunchedEffect
+        // A tapped picture on the way says what it is (11/9).
+        m.setOnLabelClickListener { _, _, label ->
+            (label.tag as? Facility)?.let { tapped = it }
+            true
+        }
         m.showRoutes(context, active.copy(routes = listOf(route)), route.type, destinationName)
         if (showTurnSigns) m.addTurnArrows(context, guidance.turnMarks)
         me = m.addMyLocation(context, state.snapped, sizeDp = 24f)
@@ -349,6 +366,7 @@ fun GuideScreen(
     }
     // AI 비서's short word about what just happened (a new route found), shown under the status line for a while.
     var aiNotice by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(aiNotice) { aiNotice?.let { onLive(false, it) } }
     LaunchedEffect(aiNotice) {
         if (aiNotice != null) {
             delay(AI_NOTICE_MS)
@@ -371,6 +389,7 @@ fun GuideScreen(
     val eventRepository = remember { EventRepository.create() }
     val knownEvents = remember { mutableSetOf<Long>() }
     var eventAhead by remember { mutableStateOf<EventAhead?>(null) }
+    LaunchedEffect(eventAhead) { eventAhead?.let { onLive(false, eventAheadText(it)) } }
     var firstEventCheck by remember { mutableStateOf(true) }
     val progressNow by rememberUpdatedState(state.progressM)
     LaunchedEffect(guidance) {
@@ -404,6 +423,9 @@ fun GuideScreen(
         m.setPadding(0, overlayBottomPx, 0, 0)
         m.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
     }
+
+    // Closes by itself after a while, so it does not stay over the map while walking.
+    LaunchedEffect(tapped) { if (tapped != null) { delay(TAPPED_CARD_MS); tapped = null } }
 
     Box(modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
@@ -447,17 +469,24 @@ fun GuideScreen(
                         finding = rerouting,
                         onReroute = {
                             scope.launch {
+                                onLive(true, "다른 길 찾기")
                                 if (findNewRoute(fix ?: state.snapped, "${ahead.event.kind} 구간을 피해 새 길을 찾았어요")) {
                                     eventAhead = null
                                     aiNotice = "${ahead.event.kind} 구간을 피해 지금 자리에서 새 길을 찾았어요."
                                 }
                             }
                         },
-                        onDismiss = { eventAhead = null },
+                        onDismiss = { onLive(true, "그냥 갈게요"); eventAhead = null },
                     )
                 } ?: aiNotice?.let { AiNotice(it, onDismiss = { aiNotice = null }) }
             }
             if (showSos) SosButton(onClick = { sos = true }, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp))
+            tapped?.let { place ->
+                PlaceDetailCard(
+                    place, exits = emptyList(), onClose = { tapped = null },
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                )
+            }
             // The mode on the instruction card's top left corner.
             ModeBadge(mode, Modifier.align(Alignment.TopStart).padding(start = 4.dp, top = 4.dp))
             onOpenAssistant?.let { open ->

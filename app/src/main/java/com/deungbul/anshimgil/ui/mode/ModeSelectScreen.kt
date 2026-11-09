@@ -94,12 +94,20 @@ fun ModeSelectScreen(
     onTalk: (() -> Unit)? = null,
 ) {
     var selected by rememberSaveable { mutableStateOf(initial) }
+    // A tap on a mode scrolls down to its "○○ 길 보기" button (11/8), once the card under the tiles is laid out.
+    val scroll = rememberScrollState()
+    var picks by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    androidx.compose.runtime.LaunchedEffect(picks) {
+        if (picks == 0) return@LaunchedEffect
+        androidx.compose.runtime.withFrameNanos { }
+        scroll.animateScrollTo(scroll.maxValue)
+    }
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(Ground)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scroll)
             .padding(horizontal = 18.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
@@ -138,7 +146,7 @@ fun ModeSelectScreen(
                         ModeTile(
                             mode = mode,
                             selected = mode == selected,
-                            onClick = { selected = mode },
+                            onClick = { selected = mode; picks++ },
                             modifier = Modifier.weight(1f),
                         )
                     }

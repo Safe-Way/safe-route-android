@@ -55,6 +55,18 @@ import com.deungbul.anshimgil.location.lastKnownLocation
 import com.deungbul.anshimgil.data.Adaptation
 import com.deungbul.anshimgil.data.adaptationToOffer
 import com.deungbul.anshimgil.data.preferredRoute
+import com.deungbul.anshimgil.data.ShownHints
+import com.deungbul.anshimgil.data.SETUP_UNDO_INDEX
+import com.deungbul.anshimgil.data.nextFeedbackStep
+import com.deungbul.anshimgil.data.feedbackFor
+import com.deungbul.anshimgil.data.FeedbackStep
+import com.deungbul.anshimgil.data.setupAnswerFromSpeech
+import com.deungbul.anshimgil.data.SetupStep
+import com.deungbul.anshimgil.data.SetupAnswers
+import com.deungbul.anshimgil.data.answerSetup
+import com.deungbul.anshimgil.data.setupQuestion
+import com.deungbul.anshimgil.data.calendarHint
+import com.deungbul.anshimgil.data.hasCalendarPermission
 import com.deungbul.anshimgil.data.Usage
 import com.deungbul.anshimgil.data.UsageRepository
 import com.deungbul.anshimgil.data.tripWeather
@@ -77,6 +89,9 @@ import com.deungbul.anshimgil.ui.assistant.AssistantScreen
 import com.deungbul.anshimgil.ui.theme.SeipjidoTheme
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+
+/** What was set before a change, to take it back ([mode] is null before one is picked). */
+data class SettingsSnapshot(val mode: UserMode?, val settings: AppSettings, val usage: Usage)
 
 class MainActivity : ComponentActivity() {
     /** A place to open from the 출발 시간 알림 (name, point, by transit), handled once by AppRoot. */
@@ -101,6 +116,7 @@ class MainActivity : ComponentActivity() {
         readReminder(intent)
         // 출발 시간 알림: a check every 15 minutes (it does nothing without the trip-record yes).
         runCatching { DepartureWorker.schedule(applicationContext) }
+        ShownHints.init(applicationContext)
         enableEdgeToEdge()
         val modeRepository = ModeRepository(applicationContext)
         val savedPlaces = SavedPlacesRepository(applicationContext)
@@ -110,6 +126,7 @@ class MainActivity : ComponentActivity() {
         val settingsRepository = SettingsRepository(applicationContext)
         val walkSpeedRepository = WalkSpeedRepository(applicationContext)
         val tripLog = TripLogRepository(applicationContext, guestId = { walkSpeedRepository.guestId() })
+        val myInfoRepository = com.deungbul.anshimgil.data.MyInfoRepository(guestId = { walkSpeedRepository.guestId() })
         val usageRepository = UsageRepository(applicationContext)
         // Walks that could not be sent last time (offline, server not ready) go now.
         lifecycleScope.launch { runCatching { walkSpeedRepository.uploadPending() } }
@@ -144,6 +161,7 @@ class MainActivity : ComponentActivity() {
                             modeRepository, savedPlaces, placeRepository, facilityRepository, routeRepository,
                             settingsRepository, settings, walkSpeedRepository, Modifier.padding(innerPadding),
                             tripLog = tripLog,
+                            myInfoRepository = myInfoRepository,
                             usageRepository = usageRepository,
                             reminded = reminded.value,
                             onRemindedHandled = { reminded.value = null },
@@ -182,6 +200,8 @@ private sealed interface Screen {
     /** [startFor] is set while choosing a new start for that route. */
     data class Search(val startFor: Route? = null) : Screen
     data object Settings : Screen
+    /** 내 정보 (m06): stairs, going round, resting, transit, keeping trips. */
+    data object MyInfo : Screen
     /** 불편 신고 (FR-49). */
     data object Report : Screen
 
@@ -214,6 +234,7 @@ fun AppRoot(
     walkSpeedRepository: WalkSpeedRepository,
     modifier: Modifier = Modifier,
     tripLog: TripLogRepository? = null,
+    myInfoRepository: com.deungbul.anshimgil.data.MyInfoRepository = com.deungbul.anshimgil.data.MyInfoRepository(guestId = { walkSpeedRepository.guestId() }),
     usageRepository: UsageRepository? = null,
     /** From the 출발 시간 알림: open the route there. */
     reminded: Pair<Place, Boolean>? = null,
@@ -224,6 +245,14 @@ fun AppRoot(
     var changingMode by rememberSaveable { mutableStateOf(false) }
     // 말로 맞추기 open on top of the mode picker.
     var talking by rememberSaveable { mutableStateOf(false) }
+    // 처음 맞추기: AI 비서's few questions on the map after the first mode pick ([SetupStep]).
+    var setupStep by rememberSaveable { mutableStateOf<SetupStep?>(null) }
+    var setupAnswers by remember { mutableStateOf(SetupAnswers()) }
+    // 사용성 점검표 21번: what was set before a change, so a mistaken tap or answer can be taken back at once.
+    var setupBefore by remember { mutableStateOf<SettingsSnapshot?>(null) }
+    var assistantUndo by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
+    val savedFavorites by savedPlaces.favorites.collectAsStateWithLifecycle(initialValue = emptyList())
+    var homeUndo by remember { mutableStateOf<Pair<String, suspend () -> Unit>?>(null) }
     val setupAssistant = remember { SetupAssistant.create() }
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     val appAssistant = remember {
@@ -249,12 +278,21 @@ fun AppRoot(
             openLog = AppOpenLog(appContext),
             usage = { usageRepository?.current() },
             home = { savedPlaces.favorites.first().firstOrNull { it.name == "집" }?.place },
+            calendar = { here, now -> calendarHint(appContext, placeRepository, here, now) },
         )
     }
     // The assistant's 보호자에게 알리기: open SOS on the map.
     var sosOnHome by remember { mutableStateOf(false) }
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
     val scope = rememberCoroutineScope()
+    // 캘린더 일정으로 길 알려 주기: on only with the permission; off at once.
+    val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        scope.launch { usageRepository?.setCalendar(granted) }
+    }
+    fun useCalendar(on: Boolean) {
+        if (on && !hasCalendarPermission(appContext)) calendarPermission.launch(android.Manifest.permission.READ_CALENDAR)
+        else scope.launch { usageRepository?.setCalendar(on) }
+    }
     // 이동 기록: asked once, after the first finished guidance.
     val tripConsent by (tripLog?.consent ?: kotlinx.coroutines.flow.flowOf(TripConsent.NO)).collectAsStateWithLifecycle(initialValue = TripConsent.NO)
     var askTripConsent by remember { mutableStateOf(false) }
@@ -276,7 +314,8 @@ fun AppRoot(
         tripId = null
         tripDestination = destination
         // Leaving the place last arrived at: how long the walker stays there is learned (for "집으로 갈까요?").
-        scope.launch { runCatching { usageRepository?.leaving(lastKnownLocation(appContext), guideStartedAt) } }
+        // Also kept for the habits (이동 패턴): where to and when.
+        scope.launch { runCatching { usageRepository?.leaving(lastKnownLocation(appContext), destination, transit, guideStartedAt) } }
         val log = tripLog ?: return
         if (tripConsent != TripConsent.YES) return
         val route = result?.let { r -> type?.let { r.route(it) } ?: r.routes.firstOrNull() }
@@ -292,6 +331,10 @@ fun AppRoot(
             }.getOrNull()
         }
     }
+    // 도착 뒤 한마디 (m07): the trip to send it with, the question now, and what the server learned from it.
+    var feedbackTrip by remember { mutableStateOf<Pair<Long, Int>?>(null) }
+    var feedbackStep by remember { mutableStateOf<FeedbackStep?>(null) }
+    var learnedSay by remember { mutableStateOf<String?>(null) }
     /** At the end: close the record (arrived or stopped), or ask the first time. */
     fun finishTrip(arrived: Boolean) {
         if (arrived) tripDestination?.let { place ->
@@ -303,6 +346,8 @@ fun AppRoot(
             TripConsent.YES -> tripId?.let { id ->
                 val minutes = java.time.Duration.between(guideStartedAt, java.time.LocalDateTime.now()).toMinutes().toInt()
                 scope.launch { runCatching { log.end(id, arrived, minutes) } }
+                // Arrived: ask how the way was, to send with the trip.
+                if (arrived) { feedbackTrip = id to minutes; feedbackStep = FeedbackStep.HOW }
             }
             TripConsent.NO -> Unit
         }
@@ -325,9 +370,22 @@ fun AppRoot(
                         listenAtStart = assistantListen,
                         chat = assistantChat,
                         assistant = appAssistant,
-                        context = AssistantContext(mode, settings, where = { currentLocation(appContext, 4_000) }),
+                        context = AssistantContext(mode, settings, usage = usage, where = { currentLocation(appContext, 4_000) }),
                         placeRepository = placeRepository,
                         onChangeSettings = { change ->
+                            val before = SettingsSnapshot(mode, settings, usage)
+                            assistantUndo = {
+                                if (change.mode != null) before.mode?.let { modeRepository.save(it) }
+                                change.textSize?.let { settingsRepository.setTextSize(before.settings.textSize) }
+                                change.voiceGuide?.let { settingsRepository.setVoiceGuide(before.settings.voiceGuide) }
+                                change.sosButton?.let { settingsRepository.setSosButton(before.settings.sosButton) }
+                                (change.addMapItems + change.removeMapItems).forEach { settingsRepository.setExtraMapItem(it, it in before.settings.extraMapItems) }
+                                if (change.undoTextBoost || change.textBoostStepBack || change.textBoostUp) usageRepository?.setTextBoost(before.usage.textBoost)
+                                change.adapt?.let { usageRepository?.setAdapt(before.usage.adapt) }
+                                change.calendar?.let { useCalendar(!it) }
+                            }
+                            // On asks for the calendar permission first.
+                            change.calendar?.let { useCalendar(it) }
                             scope.launch {
                                 change.mode?.let { modeRepository.save(it) }
                                 change.textSize?.let { settingsRepository.setTextSize(it) }
@@ -335,6 +393,10 @@ fun AppRoot(
                                 change.sosButton?.let { settingsRepository.setSosButton(it) }
                                 change.addMapItems.forEach { settingsRepository.setExtraMapItem(it, true) }
                                 change.removeMapItems.forEach { settingsRepository.setExtraMapItem(it, false) }
+                                if (change.undoTextBoost) usageRepository?.resetTextBoost()
+                                if (change.textBoostStepBack) usageRepository?.stepBackTextBoost()
+                                if (change.textBoostUp) usageRepository?.stepUpTextBoost()
+                                change.adapt?.let { usageRepository?.setAdapt(it) }
                             }
                         },
                         onRoute = { place -> screen = Screen.Route(place, fromHome = true) },
@@ -342,6 +404,12 @@ fun AppRoot(
                         onShowBuses = { busesOnHome = true; screen = Screen.Home },
                         onOpenReport = { r -> reportPrefill = r; screen = Screen.Report },
                         onAlertGuardian = { sosOnHome = true; screen = Screen.Home },
+                        onUndo = {
+                            val undo = assistantUndo
+                            assistantUndo = null
+                            if (undo != null) scope.launch { undo() }
+                            undo != null
+                        },
                         onBack = onClose,
                         modifier = modifier,
                     )
@@ -380,7 +448,15 @@ fun AppRoot(
                     ModeSelectScreen(
                         initial = mode,
                         onStart = { picked ->
+                            // The first pick on a new install, or another mode later: AI 비서 offers to set up the rest.
+                            if (mode == null) setupStep = SetupStep.START
+                            else if (picked != mode) setupStep = SetupStep.CHANGED
+                            setupAnswers = SetupAnswers()
+                            val firstPick = mode == null
                             scope.launch {
+                                // An older walker starts on the bigger text, body text 18sp and over (사용성 점검표 13번);
+                                // "잘 보여요" in 처음 맞추기 keeps it, and 설정 or AI 비서 can make it smaller.
+                                if (firstPick && picked == UserMode.SENIOR && settings.textSize == TextSize.NORMAL) settingsRepository.setTextSize(TextSize.LARGE)
                                 modeRepository.save(picked)
                                 changingMode = false
                                 // Straight to the map, also when the mode was changed from settings.
@@ -408,6 +484,18 @@ fun AppRoot(
                         initialMemo = prefill?.memo.orEmpty(),
                     )
                 }
+                screen == Screen.MyInfo -> {
+                    BackHandler { screen = Screen.Settings }
+                    com.deungbul.anshimgil.ui.settings.MyInfoScreen(
+                        mode = mode,
+                        repository = myInfoRepository,
+                        onBack = { screen = Screen.Settings },
+                        onChangeMode = { changingMode = true },
+                        onConsent = { yes -> tripLog?.setConsent(if (yes) TripConsent.YES else TripConsent.NO, mode) },
+                        onDeletedAll = { tripLog?.setConsent(TripConsent.UNASKED, mode) },
+                        modifier = modifier,
+                    )
+                }
                 screen == Screen.Settings -> {
                     BackHandler { screen = Screen.Home }
                     SettingsScreen(
@@ -416,6 +504,7 @@ fun AppRoot(
                         onBack = { screen = Screen.Home },
                         onChangeMode = { changingMode = true },
                         onManagePlaces = { screen = Screen.Search() },
+                        onOpenMyInfo = { screen = Screen.MyInfo },
                         onVoiceChange = { scope.launch { settingsRepository.setVoiceGuide(it) } },
                         onAutoConditionsChange = { scope.launch { settingsRepository.setAutoConditions(it) } },
                         onTextSizeChange = { scope.launch { settingsRepository.setTextSize(it) } },
@@ -436,11 +525,11 @@ fun AppRoot(
                         },
                         onClearTrips = { (tripLog?.clearAll(mode) ?: true).also { if (it) tripCount = 0 } },
                         adapt = usage.adapt,
-                        bigButtons = usage.bigButtons,
                         textBoost = usage.textBoost,
                         onResetTextBoost = { scope.launch { usageRepository?.resetTextBoost() } },
                         onAdaptChange = { on -> scope.launch { usageRepository?.setAdapt(on) } },
-                        onBigButtonsChange = { on -> scope.launch { usageRepository?.setBigButtons(on) } },
+                        calendarOn = usage.calendarOn,
+                        onCalendarChange = { on -> useCalendar(on) },
                         onResetAdapt = { scope.launch { usageRepository?.reset() } },
                     )
                 }
@@ -475,6 +564,7 @@ fun AppRoot(
                             startWithTransit = route.transit,
                             preferred = preferredRoute(usage),
                             autoStart = route.autoStart,
+                            voiceOn = settings.voiceGuide,
                             onChosen = { choice -> scope.launch { usageRepository?.chooseRoute(choice) } },
                             startPlace = route.start,
                             destination = route.destination,
@@ -503,6 +593,7 @@ fun AppRoot(
                     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                     TransitGuideScreen(
                         onArrived = { guideArrived = true },
+                        onLive = { fromUser, text -> assistantChat.note(fromUser, text) },
                         onOpenAssistant = openAssistantOverGuide,
                         mode = mode,
                         route = guide.transit,
@@ -530,6 +621,7 @@ fun AppRoot(
                     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                     GuideScreen(
                         onArrivedChange = { guideArrived = it },
+                        onLive = { fromUser, text -> assistantChat.note(fromUser, text) },
                         onOpenAssistant = openAssistantOverGuide,
                         mode = mode,
                         result = guide.result,
@@ -553,6 +645,7 @@ fun AppRoot(
                 }
                 else -> HomeScreen(
                     mode = mode,
+                    saved = savedFavorites,
                     extraMapItems = settings.extraMapItems,
                     facilityRepository = facilityRepository,
                     placeRepository = placeRepository,
@@ -573,19 +666,84 @@ fun AppRoot(
                     askTripConsent = askTripConsent,
                     onTripConsent = { yes ->
                         askTripConsent = false
+                        if (!yes) assistantChat.note(false, com.deungbul.anshimgil.data.CONSENT_NO_REPLY)
                         scope.launch { tripLog?.setConsent(if (yes) TripConsent.YES else TripConsent.NO, mode) }
                     },
                     usage = usage,
-                    adaptation = if (askTripConsent) null else adaptationToOffer(usage, settings.textSize),
+                    adaptation = if (askTripConsent || setupStep != null) null else adaptationToOffer(usage),
+                    setupAsk = setupStep?.let { setupQuestion(it, setupAnswers) to it.answers },
+                    setupFromSpeech = { said -> setupStep?.let { setupAnswerFromSpeech(it, said) } },
+                    undoAsk = homeUndo?.first,
+                    feedbackAsk = feedbackStep?.let { it.question to it.answers } ?: learnedSay?.let { it to listOf("알겠어요") },
+                    onFeedbackAnswer = { i ->
+                        val step = feedbackStep
+                        if (step == null) {
+                            learnedSay = null
+                        } else {
+                            val trip = feedbackTrip
+                            feedbackStep = nextFeedbackStep(step, i)
+                            val send = feedbackFor(step, i)
+                            if (feedbackStep == null) feedbackTrip = null
+                            if (send != null && trip != null) scope.launch {
+                                val says = tripLog?.feedback(trip.first, true, trip.second, send.first, send.second).orEmpty()
+                                learnedSay = says.firstOrNull()
+                                if (says.isEmpty()) assistantChat.note(false, if (send.first == "good") "다행이에요. 다음에도 편한 길로 안내할게요." else "알려 주셔서 고마워요. 다음 길을 고를 때 참고할게요.")
+                            }
+                        }
+                    },
+                    onUndoAnswer = { undo ->
+                        val u = homeUndo
+                        homeUndo = null
+                        if (undo && u != null) {
+                            scope.launch { u.second() }
+                            assistantChat.note(false, "되돌렸어요.")
+                        }
+                    },
+                    onSetupAnswer = { i ->
+                        val step = setupStep
+                        if (step == SetupStep.DONE && i == SETUP_UNDO_INDEX) {
+                            // "처음대로 되돌리기": everything as it was before the questions.
+                            setupStep = null
+                            setupBefore?.let { b ->
+                                scope.launch {
+                                    settingsRepository.setTextSize(b.settings.textSize)
+                                    usageRepository?.setTextBoost(b.usage.textBoost)
+                                    settingsRepository.setVoiceGuide(b.settings.voiceGuide)
+                                    settingsRepository.setSosButton(b.settings.sosButton)
+                                }
+                            }
+                            assistantChat.note(false, "처음대로 되돌렸어요. 필요하면 설정에서나 저에게 말해서 바꿀 수 있어요.")
+                        } else if (step != null) {
+                            if ((step == SetupStep.START || step == SetupStep.CHANGED) && i == 0) setupBefore = SettingsSnapshot(mode, settings, usage)
+                            val (next, answers) = answerSetup(step, i, setupAnswers, settings.textSize)
+                            setupAnswers = answers
+                            setupStep = next
+                            if ((step == SetupStep.START || step == SetupStep.CHANGED) && next == null) {
+                                assistantChat.note(false, "알겠어요. 필요하면 설정에서나 저에게 말해서 언제든 바꿀 수 있어요.")
+                            }
+                            // Applied at once, so the walker sees the text change.
+                            scope.launch {
+                                answers.textSize?.let { settingsRepository.setTextSize(it) }
+                                answers.textBoost?.let { usageRepository?.setTextBoost(it) }
+                                answers.voiceGuide?.let { settingsRepository.setVoiceGuide(it) }
+                                answers.sosButton?.let { settingsRepository.setSosButton(it) }
+                            }
+                        }
+                    },
                     onAdaptation = { a, yes ->
+                        val boostBefore = usage.textBoost
                         scope.launch {
                             usageRepository?.answer(a, yes)
                         }
+                        // A yes shows at once what changed, with 되돌리기 next to it (사용성 점검표 21번).
+                        if (yes && a != Adaptation.CALENDAR) homeUndo = "글씨를 한 단계 크게 바꿨어요." to { usageRepository?.setTextBoost(boostBefore) }
+                        if (a == Adaptation.CALENDAR && yes) useCalendar(true)
                     },
                     onNearbyTap = { k -> scope.launch { usageRepository?.tapNearby(k) } },
-                    onRetap = { scope.launch { usageRepository?.retap() } },
+                    onPress = { missed -> scope.launch { usageRepository?.press(missed) } },
                     onZoomIn = { scope.launch { usageRepository?.zoomIn() } },
                     onStartNow = { place, transit -> screen = Screen.Route(place, fromHome = true, transit = transit, autoStart = true) },
+                    onLive = { fromUser, text -> assistantChat.note(fromUser, text) },
                 )
             }
         }
