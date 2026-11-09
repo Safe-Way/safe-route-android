@@ -21,6 +21,7 @@ fun legLabel(leg: TransitLeg): String = when (leg.type) {
     LegType.WALK -> "걷기"
     LegType.BUS -> leg.lines.firstOrNull()?.let { "${it}번" } ?: "버스"
     LegType.SUBWAY -> leg.lines.firstOrNull() ?: "지하철"
+    LegType.STOP -> "들르기"
 }
 
 /** Where a walk goes, e.g. "남광주역 정류장까지 걸어요"; the last walk goes to the destination. */
@@ -31,7 +32,7 @@ fun walkTitle(leg: TransitLeg, last: Boolean, destinationName: String): String =
 fun rideTitle(leg: TransitLeg): String = when (leg.type) {
     LegType.BUS -> "${leg.lines.joinToString(", ") { "${it}번" }.ifBlank { "버스" }} 버스를 타요"
     LegType.SUBWAY -> "${leg.lines.firstOrNull() ?: "지하철"}${leg.way?.let { " $it 방면" } ?: ""}을 타요"
-    LegType.WALK -> ""
+    LegType.WALK, LegType.STOP -> ""
 }
 
 /** Where to get on and off, e.g. "문화전당역에서 타서 3정거장 뒤 남광주역에서 내려요". */
@@ -49,7 +50,7 @@ fun nextRideText(leg: TransitLeg): String? = when (leg.type) {
     LegType.SUBWAY -> leg.trains.minByOrNull { it.inMin }?.let {
         "${it.direction} ${if (it.inMin == 0) "곧" else "${it.inMin}분 뒤"} 도착 (찾을 때 기준)"
     }
-    LegType.WALK -> null
+    LegType.WALK, LegType.STOP -> null
 }
 
 /** What to say on reaching a ride: what to take and where to get off. */
@@ -66,6 +67,17 @@ fun walkResult(leg: TransitLeg): RouteResult? {
         dataQuality = DataQuality(ok = true, message = null),
     )
 }
+
+/** 들를 곳 not reached yet: the stop legs after [step], as places to ask for again. */
+fun stopsAfter(legs: List<TransitLeg>, step: Int): List<StopPlace> =
+    legs.drop(step + 1).filter { it.type == LegType.STOP }.map { StopPlace(it.to.name ?: "들를 곳", it.to.point) }
+
+/** What a stop part says, e.g. "다이소에 들러요". */
+fun stopTitle(leg: TransitLeg): String = "${leg.to.name ?: "들를 곳"}에 들러요"
+
+/** The parts after a stop, found again from there: those done so far, then the new route's parts. */
+fun withRestFoundAgain(legs: List<TransitLeg>, step: Int, rest: TransitRoute): List<TransitLeg> =
+    legs.take(step + 1) + guideLegs(rest)
 
 /** At a stop when this close (m): the bus is there, so the next one is the one after. */
 const val AT_STOP_M = 30

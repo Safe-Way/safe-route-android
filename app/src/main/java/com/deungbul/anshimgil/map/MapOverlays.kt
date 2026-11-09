@@ -149,6 +149,7 @@ fun KakaoMap.showRoutes(context: Context, result: RouteResult, selected: RouteTy
     showLayers(context, MapLayers(shown, zones = zones))
 
     val path = result.route(selected)?.path ?: result.routes.firstOrNull()?.path ?: return
+    addStopPins(context, (result.route(selected) ?: result.routes.first()).stops.map { it.point })
     labelManager?.layer?.let { labels ->
         labels.addLabel(
             LabelOptions.from(path.first().toLatLng())
@@ -288,6 +289,46 @@ private fun turnSignBitmap(density: Float, left: Boolean): Bitmap {
 }
 
 private val TURN_INK = 0xFF1F6B42.toInt()
+
+/** 들를 곳: a numbered orange pin (1, 2, 3) at each place to stop at, in order. */
+fun KakaoMap.addStopPins(context: Context, points: List<LatLon>) =
+    addStopPins(context, points.mapIndexed { i, p -> i + 1 to p })
+
+/** Numbered pins with the given numbers (stops already done or skipped are left out but keep their numbers). */
+@JvmName("addNumberedStopPins")
+fun KakaoMap.addStopPins(context: Context, pins: List<Pair<Int, LatLon>>) {
+    val density = context.resources.displayMetrics.density
+    pins.forEach { (n, p) ->
+        labelManager?.layer?.addLabel(
+            LabelOptions.from(p.toLatLng())
+                .setStyles(LabelStyles.from(LabelStyle.from(stopPinBitmap(n, density)).setAnchorPoint(0.5f, 1f).setApplyDpScale(false)))
+                .setRank(30),
+        )
+    }
+}
+
+/** A round orange pin with a white number and a point at the bottom. */
+internal fun stopPinBitmap(number: Int, density: Float): Bitmap {
+    val w = (30 * density).toInt()
+    val h = (38 * density).toInt()
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val r = w / 2f
+    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFB45309.toInt() }
+    val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() }
+    val tip = android.graphics.Path().apply {
+        moveTo(r - 7 * density, r * 1.5f); lineTo(r, h.toFloat()); lineTo(r + 7 * density, r * 1.5f); close()
+    }
+    canvas.drawPath(tip, fill)
+    canvas.drawCircle(r, r, r, ring)
+    canvas.drawCircle(r, r, r - 2.5f * density, fill)
+    val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt(); textSize = 17 * density; textAlign = Paint.Align.CENTER
+        typeface = android.graphics.Typeface.DEFAULT_BOLD
+    }
+    canvas.drawText(number.toString(), r, r - (text.descent() + text.ascent()) / 2, text)
+    return bitmap
+}
 
 /** A ride's line: its stops in order, or just where to get on and off. */
 internal fun ridePoints(leg: TransitLeg): List<LatLon> =
@@ -649,8 +690,11 @@ fun KakaoMap.showTransit(context: Context, route: TransitRoute, destinationName:
     val lineLayer = routeLineManager?.layer ?: return
     lineLayer.removeAll()
     val all = mutableListOf<LatLon>()
-    route.legs.forEach { leg ->
+    // 들를 곳: a numbered pin each, no line.
+    addStopPins(context, route.legs.filter { it.type == LegType.STOP }.map { it.to.point }.also { all += it })
+    route.legs.filter { it.type != LegType.STOP }.forEach { leg ->
         val (points, color) = when (leg.type) {
+            LegType.STOP -> return@forEach
             LegType.WALK -> (leg.path.ifEmpty { listOf(leg.from.point, leg.to.point) }) to 0xFF1F6B42.toInt()
             // Through every stop on the way (#110) when known, so the line follows the bus, not a straight cut.
             LegType.BUS -> ridePoints(leg) to 0xFF2F5BB7.toInt()

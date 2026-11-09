@@ -1,6 +1,8 @@
 package com.deungbul.anshimgil.ui.route
 
 import com.deungbul.anshimgil.data.withEulReul
+import com.deungbul.anshimgil.data.MAX_TRANSIT_STOPS
+import com.deungbul.anshimgil.data.StopPlace
 import com.deungbul.anshimgil.data.firstWait
 import com.deungbul.anshimgil.data.FirstWait
 import androidx.compose.ui.text.style.TextAlign
@@ -142,6 +144,8 @@ fun RouteScreen(
     mode: UserMode,
     startPlace: Place?,
     destination: Place,
+    /** 들를 곳 on the way, in order (walking up to 3, transit 1). */
+    stops: List<StopPlace> = emptyList(),
     routeRepository: RouteRepository,
     placeRepository: PlaceRepository,
     autoConditions: Boolean,
@@ -188,7 +192,7 @@ fun RouteScreen(
         state = try {
             RouteState.Ready(
                 routeRepository.findRoutes(
-                    RouteRequest(from.point, LatLon(destination.lat, destination.lon), mode, conditionsOff, conditionsOn),
+                    RouteRequest(from.point, LatLon(destination.lat, destination.lon), mode, conditionsOff, conditionsOn, stops = stops),
                 ),
             )
         } catch (e: ApiException) {
@@ -317,7 +321,7 @@ fun RouteScreen(
         if (!transitTab || transit is TransitState.Ready) return@LaunchedEffect
         transit = TransitState.Loading
         transit = try {
-            val r = TransitRepository.find(from.point, LatLon(destination.lat, destination.lon), mode, routeRepository.guestId())
+            val r = TransitRepository.find(from.point, LatLon(destination.lat, destination.lon), mode, stops.take(MAX_TRANSIT_STOPS), routeRepository.guestId())
             if (r.routes.isEmpty()) TransitState.Failed(r.note ?: "대중교통 경로가 없어요", null) else TransitState.Ready(r)
         } catch (e: ApiException) {
             TransitState.Failed(e.message, e.code)
@@ -816,6 +820,7 @@ private fun LegRow(leg: TransitLeg, wait: FirstWait?) {
         LegType.WALK -> "걷기" to Green
         LegType.BUS -> "버스" to Transit
         LegType.SUBWAY -> "지하철" to Color(0xFF6D28D9)
+        LegType.STOP -> "들르기" to Color(0xFFB45309)
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
         Text(
@@ -827,7 +832,7 @@ private fun LegRow(leg: TransitLeg, wait: FirstWait?) {
             val live = when (leg.type) {
                 LegType.BUS -> nextBusText(leg.buses)
                 LegType.SUBWAY -> nextTrainLines(leg.trains).firstOrNull()
-                LegType.WALK -> null
+                LegType.WALK, LegType.STOP -> null
             }
             live?.let { Text(it, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color) }
             wait?.let {
