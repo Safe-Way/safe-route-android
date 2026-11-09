@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.assistant
 
+import com.deungbul.anshimgil.data.StopPlace
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
@@ -98,6 +99,8 @@ fun AssistantScreen(
     onRoute: (Place) -> Unit,
     /** Like [onRoute], opening on the 대중교통 tab. */
     onRouteByTransit: (Place) -> Unit = onRoute,
+    /** A trip with 들를 곳 on the way (AI 비서 planned them): the place, the stops in order, and whether by transit. */
+    onRouteWithStops: (Place, List<StopPlace>, Boolean) -> Unit = { p, _, t -> if (t) onRouteByTransit(p) else onRoute(p) },
     onShowBuses: () -> Unit,
     onOpenReport: (AssistantAction.OpenReport) -> Unit,
     /** Go to the map and open SOS (it counts down before texting, so it can still be cancelled). */
@@ -212,7 +215,11 @@ fun AssistantScreen(
                     { lat, lon -> pickLandmark(placeRepository.search(action.query, lat, lon)) },
                     "'${action.query}'을(를) 찾지 못했어요. 이름을 조금 다르게 말해 주세요.",
                 )
-                is AssistantAction.GoPlace -> { chat.lastPlace = action.place; delay(1200); if (action.transit) onRouteByTransit(action.place) else onRoute(action.place) }
+                is AssistantAction.GoPlace -> { chat.lastPlace = action.place; delay(1200); when {
+                    action.stops.isNotEmpty() -> onRouteWithStops(action.place, action.stops, action.transit)
+                    action.transit -> onRouteByTransit(action.place)
+                    else -> onRoute(action.place)
+                } }
                 is AssistantAction.ShowBuses -> { delay(500); onShowBuses() }
                 is AssistantAction.OpenReport -> { delay(1200); onOpenReport(action) }
                 is AssistantAction.Ask -> choices = action.choices

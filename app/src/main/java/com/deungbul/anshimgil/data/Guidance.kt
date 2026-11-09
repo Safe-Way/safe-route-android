@@ -332,6 +332,27 @@ class Guidance(
         }.sorted()
     }
 
+    /**
+     * How far along the route each of [places] is, taken in order: each is looked for only after the one before,
+     * so a route that passes a later stop early (or comes back past an earlier one) keeps them in order.
+     */
+    fun alongInOrder(places: List<LatLon>): List<Double> {
+        var from = 0.0
+        return places.map { place ->
+            val p = toXY(place)
+            var best = Double.MAX_VALUE
+            var along = from
+            for (i in legLengths.indices) {
+                if (cumulative[i + 1] < from) continue
+                val (t, d) = projectOnLeg(p, i)
+                val a = cumulative[i] + legLengths[i] * t
+                if (a >= from && d < best) { best = d; along = a }
+            }
+            from = along
+            along
+        }
+    }
+
     private fun projectOnLeg(p: Pair<Double, Double>, i: Int): Pair<Double, Double> {
         val (ax, ay) = points[i]
         val (bx, by) = points[i + 1]

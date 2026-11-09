@@ -29,6 +29,8 @@ data class RouteOption(
     val crossings: List<LatLon>? = null,
     /** Events and incidents the route passes (routes[].events, 팀 할 일 m08). */
     val events: List<RouteEvent> = emptyList(),
+    /** Places to stop at on the way, in order (routes[].stops, 들를 곳). */
+    val stops: List<RouteStop> = emptyList(),
 )
 
 enum class SidewalkSide { LEFT, RIGHT, BOTH, NONE, UNKNOWN }
@@ -97,6 +99,8 @@ data class RouteRequest(
     val conditionsOff: Set<String> = emptySet(),
     /** Condition keys the user switched on even though they were not detected, e.g. night in daytime. */
     val conditionsOn: Set<String> = emptySet(),
+    /** Places to stop at on the way (들를 곳), at most [MAX_WALK_STOPS] on a walk. */
+    val stops: List<StopPlace> = emptyList(),
 )
 
 /** The server's `night` value: what the user chose, otherwise judged from sunset. */

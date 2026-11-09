@@ -26,8 +26,68 @@ interface RouteRepository {
 class ServerRouteRepository(private val guest: suspend () -> String? = { null }) : RouteRepository {
     override suspend fun guestId(): String? = runCatching { guest() }.getOrNull()
 
-    override suspend fun findRoutes(request: RouteRequest): RouteResult =
-        parseRouteResult(ServerApi.post("/api/route", request.toJson(guestId())), request.mode)
+    override suspend fun findRoutes(request: RouteRequest): RouteResult {
+        val stops = request.stops.take(MAX_WALK_STOPS)
+        val guestId = guestId()
+        val whole = parseRouteResult(ServerApi.post("/api/route", request.toJson(guestId)), request.mode)
+        // The engine takes stops itself once w10 is in; until then each stretch is found and joined here
+        // (as 채림 advised, #121).
+        if (stops.isEmpty() || whole.routes.any { it.stops.isNotEmpty() }) return whole
+        val points = listOf(request.origin) + stops.map { it.point } + request.destination
+        val parts = points.zipWithNext().map { (a, b) ->
+            parseRouteResult(ServerApi.post("/api/route", request.copy(origin = a, destination = b, stops = emptyList()).toJson(guestId)), request.mode)
+        }
+        return joinStretches(parts, stops)
+    }
+}
+
+/**
+ * One walking route through [stops] from the stretches between them ([parts]: start → stop 1 → … → destination),
+ * each stretch's safe route (or its only one) put end to end; the stops sit where each stretch ends.
+ */
+internal fun joinStretches(parts: List<RouteResult>, stops: List<StopPlace>): RouteResult {
+    val legs = parts.map { r -> r.route(RouteType.SAFE) ?: r.routes.first() }
+    val path = mutableListOf<LatLon>()
+    val sidewalks = mutableListOf<Sidewalk>()
+    val events = mutableListOf<RouteEvent>()
+    val routeStops = mutableListOf<RouteStop>()
+    var meters = 0
+    legs.forEachIndexed { i, leg ->
+        // The next stretch starts where this one ended: its first point is not repeated.
+        val skip = if (path.isEmpty()) 0 else 1
+        val offset = path.size - skip
+        path += leg.path.drop(skip)
+        sidewalks += leg.sidewalks.map { it.copy(from = it.from + offset, to = it.to + offset) }
+        events += leg.events.map { it.copy(fromM = it.fromM + meters, toM = it.toM + meters) }
+        meters += leg.distanceM
+        stops.getOrNull(i)?.let { routeStops += RouteStop(it.name, leg.path.lastOrNull() ?: it.point, meters.toDouble()) }
+    }
+    fun sum(maps: List<Map<String, Int>>) = maps.flatMap { it.entries }.groupBy({ it.key }, { it.value }).mapValues { it.value.sum() }
+    val first = parts.first()
+    return first.copy(
+        routes = listOf(
+            RouteOption(
+                type = RouteType.SAFE,
+                distanceM = meters,
+                durationMin = legs.sumOf { it.durationMin },
+                path = path,
+                counts = sum(legs.map { it.counts }),
+                covered = sum(legs.map { it.covered }),
+                sidewalks = sidewalks,
+                crossings = if (legs.all { it.crossings != null }) legs.flatMap { it.crossings!! } else null,
+                events = events,
+                stops = routeStops,
+            ),
+        ),
+        explanation = Explanation(
+            "${stops.joinToString(", ") { it.name }}에 들렀다 가는 길이에요.",
+            emptyList(),
+            parts.flatMap { it.explanation.notes }.distinct(),
+        ),
+        facilities = parts.flatMap { r -> r.facilitiesOn(r.route(RouteType.SAFE)?.type ?: r.routes.first().type) }
+            .map { it.copy(route = null) }.distinct(),
+        raining = parts.any { it.raining },
+    )
 }
 
 internal fun RouteRequest.toJson(guestId: String? = null): JSONObject = JSONObject()
@@ -36,6 +96,7 @@ internal fun RouteRequest.toJson(guestId: String? = null): JSONObject = JSONObje
     .put("mode", mode.key)
     .put("night", night)
     .apply { guestId?.let { put("guestId", it) } }
+    .apply { stopsJson(stops.take(MAX_WALK_STOPS))?.let { put("stops", it) } }
 
 /** Comparison rows built from each route's `counts`, in the server's group order. */
 private val COUNT_GROUPS = listOf(
@@ -136,6 +197,7 @@ internal fun parseRouteResult(json: JSONObject, mode: UserMode? = null): RouteRe
                     near = text("near"),
                 )
             },
+            stops = parseRouteStops(route),
         ).withoutEndDetours()
     }
     val shortest = routes.firstOrNull { it.type == RouteType.SHORTEST }

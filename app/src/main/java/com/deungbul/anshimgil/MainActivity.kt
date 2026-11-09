@@ -216,6 +216,8 @@ private sealed interface Screen {
         val fromHome: Boolean = false,
         val transit: Boolean = false,
         val autoStart: Boolean = false,
+        /** 들를 곳 on the way, in order (AI 비서 planned them). */
+        val stops: List<com.deungbul.anshimgil.data.StopPlace> = emptyList(),
     ) : Screen
     data class Guide(val route: Route, val result: RouteResult, val type: RouteType) : Screen
     data class TransitGuide(val route: Route, val transit: TransitRoute) : Screen
@@ -417,6 +419,7 @@ fun AppRoot(
                         },
                         onRoute = { place -> screen = Screen.Route(place, fromHome = true) },
                         onRouteByTransit = { place -> screen = Screen.Route(place, fromHome = true, transit = true) },
+                        onRouteWithStops = { place, stops, transit -> screen = Screen.Route(place, fromHome = true, transit = transit, stops = stops) },
                         onShowBuses = { busesOnHome = true; screen = Screen.Home },
                         onOpenReport = { r -> reportPrefill = r; screen = Screen.Report },
                         onAlertGuardian = { sosOnHome = true; screen = Screen.Home },
@@ -584,6 +587,7 @@ fun AppRoot(
                             onChosen = { choice -> scope.launch { usageRepository?.chooseRoute(choice) } },
                             startPlace = route.start,
                             destination = route.destination,
+                            stops = route.stops,
                             routeRepository = routeRepository,
                             placeRepository = placeRepository,
                             autoConditions = settings.autoConditions,
