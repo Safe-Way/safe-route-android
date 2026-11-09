@@ -730,3 +730,29 @@ fun KakaoMap.showTransit(context: Context, route: TransitRoute, destinationName:
     )
     if (all.isNotEmpty()) moveCamera(CameraUpdateFactory.fitMapPoints(all.map { it.toLatLng() }.toTypedArray(), (48 * density).toInt()))
 }
+
+private const val REPORT_LAYER = "reportSpots"
+
+/**
+ * 신고 쌓인 곳 (11/10): each spot as an orange tag ("공사 3") on a layer of its own above the facility tags, so it
+ * is never hidden by them; tapping it gives the spot ([Label.getTag]). Replaces the spots drawn before.
+ */
+fun KakaoMap.showReportSpots(context: Context, spots: List<com.deungbul.anshimgil.data.ReportSpot>) {
+    val density = context.resources.displayMetrics.density
+    val layer = labelManager?.let {
+        it.getLayer(REPORT_LAYER) ?: it.addLayer(LabelLayerOptions.from(REPORT_LAYER).setCompetitionType(CompetitionType.None).setZOrder(5_000))
+    } ?: return
+    layer.removeAll()
+    spots.forEach { spot ->
+        val confirmed = spot.reports.any { it.confirmed }
+        // Darker when confirmed or when many have reported it.
+        val color = if (confirmed || spot.count >= 5) 0xFF9A3412.toInt() else 0xFFC2410C.toInt()
+        val bitmap = pillBitmap("⚠ " + com.deungbul.anshimgil.data.reportSpotTag(spot), color, density)
+        layer.addLabel(
+            LabelOptions.from(LatLng.from(spot.point.lat, spot.point.lon))
+                .setStyles(LabelStyles.from(LabelStyle.from(bitmap).setAnchorPoint(0.5f, 1f).setApplyDpScale(false)))
+                .setClickable(true)
+                .setTag(spot),
+        )
+    }
+}
