@@ -59,7 +59,9 @@ import com.deungbul.anshimgil.data.ApiException
 import com.deungbul.anshimgil.data.AppAssistant
 import com.deungbul.anshimgil.data.AssistantAction
 import com.deungbul.anshimgil.data.AssistantContext
+import com.deungbul.anshimgil.data.pickLandmark
 import com.deungbul.anshimgil.data.placeDetailAnswer
+import com.deungbul.anshimgil.data.withDirection
 import com.deungbul.anshimgil.data.ChatLine
 import com.deungbul.anshimgil.data.NEARBY_KINDS
 import com.deungbul.anshimgil.data.Place
@@ -155,7 +157,7 @@ fun AssistantScreen(
             return
         }
         chat.lastPlace = place
-        say("${place.name}(으)로 길을 찾았어요.")
+        say("${withDirection(place.name)} 길을 찾았어요.")
         delay(600)
         onRoute(place)
     }
@@ -207,7 +209,7 @@ fun AssistantScreen(
                     "1km 안에서 ${NEARBY_KINDS[action.kind]}을(를) 찾지 못했어요.",
                 )
                 is AssistantAction.GoTo -> findAndGo(
-                    { lat, lon -> placeRepository.search(action.query, lat, lon).firstOrNull() },
+                    { lat, lon -> pickLandmark(placeRepository.search(action.query, lat, lon)) },
                     "'${action.query}'을(를) 찾지 못했어요. 이름을 조금 다르게 말해 주세요.",
                 )
                 is AssistantAction.GoPlace -> { chat.lastPlace = action.place; delay(1200); if (action.transit) onRouteByTransit(action.place) else onRoute(action.place) }

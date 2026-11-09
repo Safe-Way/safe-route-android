@@ -65,3 +65,26 @@ fun setupSummary(a: SetupAnswers): String {
 
 /** What AI 비서 says for [step] ([SetupStep.DONE] says what was set). */
 fun setupQuestion(step: SetupStep, so: SetupAnswers): String = if (step == SetupStep.DONE) setupSummary(so) else step.question
+
+/**
+ * The answer meant by words said to a 처음 맞추기 question (사용성 점검표 2번: answered by voice alone), as the
+ * index into [SetupStep.answers]; null when it is not clear, and the question is asked again.
+ */
+fun setupAnswerFromSpeech(step: SetupStep, said: String): Int? {
+    val s = said.replace(" ", "")
+    fun has(vararg w: String) = w.any { s.contains(it.replace(" ", "")) }
+    val no = has("아니", "싫어", "괜찮아", "필요없", "필요 없", "안 해", "안해", "다음에", "나중에", "그대로", "됐어")
+    val yes = has("좋아", "응", "네", "예", "그래", "해 줘", "해줘", "해주세요", "부탁", "맞춰")
+    return when (step) {
+        SetupStep.START, SetupStep.CHANGED -> when { no -> 1; yes -> 0; else -> null }
+        SetupStep.TEXT -> when {
+            has("많이", "너무", "안 보여", "안보여", "하나도") -> 2
+            has("조금", "좀", "약간", "작아", "작은") -> 1
+            has("잘 보여", "잘보여", "보여", "괜찮", "충분") -> 0
+            else -> null
+        }
+        SetupStep.VOICE -> when { has("화면", "소리 없이", "조용", "끄") || no -> 1; has("소리", "말로", "들려") || yes -> 0; else -> null }
+        SetupStep.SOS -> when { no -> 1; has("둘래", "둬", "놔", "있으면") || yes -> 0; else -> null }
+        SetupStep.DONE -> when { has("되돌", "처음대로", "취소") -> SETUP_UNDO_INDEX; has("알겠", "좋아", "응", "네", "고마") -> 0; else -> null }
+    }
+}

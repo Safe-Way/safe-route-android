@@ -38,6 +38,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalPolice
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Work
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.Tune
@@ -171,7 +175,11 @@ fun HomeScreen(
     onStartNow: (Place, Boolean) -> Unit = { _, _ -> },
     /** 처음 맞추기: AI 비서's question and its answers, answered with [onSetupAnswer] (the answer's index). */
     setupAsk: Pair<String, List<String>>? = null,
+    /** The index meant by words said to the current 처음 맞추기 question; null when unclear. */
+    setupFromSpeech: (String) -> Int? = { null },
     onSetupAnswer: (Int) -> Unit = {},
+    /** Saved places with a place set (집, 학교, …): one tap each finds the way there (사용성 점검표 7번). */
+    saved: List<com.deungbul.anshimgil.data.Favorite> = emptyList(),
     /** A change just made from a bubble, told with 좋아요 / 되돌리기 ([onUndoAnswer] true to take it back). */
     undoAsk: String? = null,
     onUndoAnswer: (Boolean) -> Unit = {},
@@ -262,6 +270,13 @@ fun HomeScreen(
     LaunchedEffect(askTripConsent) { if (askTripConsent) onLive(false, TRIP_CONSENT_QUESTION) }
     LaunchedEffect(adaptation) { adaptation?.let { onLive(false, it.question) } }
     LaunchedEffect(setupAsk?.first) { setupAsk?.let { onLive(false, it.first) } }
+    // 처음 맞추기 by voice (사용성 점검표 2번): the words go to the answer they mean.
+    val setupSpeech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val said = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: return@rememberLauncherForActivityResult
+        onLive(true, said)
+        val index = setupFromSpeech(said)
+        if (index != null) onSetupAnswer(index) else onLive(false, "잘 못 알아들었어요. 버튼을 누르거나 다시 말해 주세요.")
+    }
     LaunchedEffect(undoAsk) { undoAsk?.let { onLive(false, it) } }
     LaunchedEffect(hint) {
         val shown = hint ?: return@LaunchedEffect
@@ -449,6 +464,36 @@ fun HomeScreen(
                     )
                 }
             }
+            // 집·학교… saved places, one tap to the route, under the nearby buttons (사용성 점검표 7번).
+            val savedWithPlace = saved.filter { it.place != null }.take(3)
+            if (savedWithPlace.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                savedWithPlace.forEach { fav ->
+                    Surface(
+                        onClick = { onLive(true, "${com.deungbul.anshimgil.data.withDirection(fav.name)} 가기"); onPlaceSelected(fav.place!!.copy(name = fav.name)) },
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.White,
+                        shadowElevation = 4.dp,
+                        modifier = Modifier.heightIn(min = 48.dp).tracked("_saved"),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                            Icon(
+                                when (fav.name) {
+                                    "집" -> Icons.Filled.Home
+                                    "학교" -> Icons.Filled.School
+                                    "직장" -> Icons.Filled.Work
+                                    else -> Icons.Filled.Place
+                                },
+                                contentDescription = null, tint = Color(0xFF1F6B42), modifier = Modifier.size(22.dp),
+                            )
+                            Text(
+                                "${com.deungbul.anshimgil.data.withDirection(fav.name)} 가기",
+                                fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink, maxLines = 1,
+                                modifier = Modifier.padding(start = 6.dp),
+                            )
+                        }
+                    }
+                }
+            }
             // 불편 신고: a small icon on the right, under the nearby buttons (team, 11/6).
             Surface(
                 onClick = onOpenReport,
@@ -540,7 +585,15 @@ fun HomeScreen(
             Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
                 AiAskBubble(
                     setupAsk.first,
-                    answers = setupAsk.second.mapIndexed { i, a -> a to { onLive(true, a); onSetupAnswer(i) } },
+                    answers = setupAsk.second.mapIndexed { i, a -> a to { onLive(true, a); onSetupAnswer(i) } } +
+                        ("말로 답하기" to {
+                            val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
+                                .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "말씀해 주세요")
+                            runCatching { setupSpeech.launch(intent) }
+                            Unit
+                        }),
                 )
             }
         } else if (undoAsk != null && !showBuses && picked == null) {

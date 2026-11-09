@@ -50,8 +50,8 @@ sealed interface AssistantAction {
     /** Route to the nearest place of a kind ([NEARBY_KINDS] key). */
     data class GoNearby(override val say: String, val kind: String) : AssistantAction
 
-    /** Search for a place by name and route there. */
-    data class GoTo(override val say: String, val query: String) : AssistantAction
+    /** Search for a place by name and route there. [onPhone]: the phone's own ("문화전당 가자"), not the server's. */
+    data class GoTo(override val say: String, val query: String, val onPhone: Boolean = false) : AssistantAction
 
     /**
      * Route to a place the server already found (its recommendation or a nearby place) or a saved place.
@@ -124,6 +124,8 @@ object RuleAppAssistant : AppAssistant {
             if (wantsGo || s.length <= name.length + 3) return AssistantAction.GoNearby("가까운 ${withDirection(name)} 길을 찾을게요.", kind)
         }
         undoAdaptation(s, context.usage)?.let { return it }
+        // "문화전당 가자": straight to the route (사용성 점검표 5번).
+        placeToGo(said)?.let { place -> return AssistantAction.GoTo("${withDirection(place)} 길을 찾을게요.", place, onPhone = true) }
         return when {
             // Only about the words on screen: "글씨가 안 보여", "화면이 잘 안 보여", or just "잘 안 보여".
             // "편의점이 안 보여" is about a place, not the text size.
@@ -312,7 +314,8 @@ class FavoriteAppAssistant(
 private fun AssistantAction.staysOnPhone(): Boolean = this is AssistantAction.Emergency ||
     this is AssistantAction.ChangeSettings || this is AssistantAction.ShowBuses ||
     this is AssistantAction.OpenReport || this is AssistantAction.GoNearby ||
-    (this is AssistantAction.Ask && onPhone) || (this is AssistantAction.Answer && onPhone)
+    (this is AssistantAction.Ask && onPhone) || (this is AssistantAction.Answer && onPhone) ||
+    (this is AssistantAction.GoTo && onPhone)
 
 /** Server tools that save settings on the server, which the app does not read; the phone does these. */
 private val SERVER_SETTING_TOOLS = setOf("update_my_info", "set_map_layers")

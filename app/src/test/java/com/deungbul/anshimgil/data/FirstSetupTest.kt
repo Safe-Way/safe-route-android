@@ -51,6 +51,21 @@ class FirstSetupTest {
     }
 
     @Test
+    fun answersCanBeSaid() {
+        assertEquals(0, setupAnswerFromSpeech(SetupStep.START, "네 좋아요"))
+        assertEquals(1, setupAnswerFromSpeech(SetupStep.START, "아니 다음에 할게"))
+        assertEquals(2, setupAnswerFromSpeech(SetupStep.TEXT, "글씨가 너무 작아"))
+        assertEquals(1, setupAnswerFromSpeech(SetupStep.TEXT, "조금 작아요"))
+        assertEquals(0, setupAnswerFromSpeech(SetupStep.TEXT, "잘 보여요"))
+        assertEquals(0, setupAnswerFromSpeech(SetupStep.VOICE, "소리로 알려 줘"))
+        assertEquals(1, setupAnswerFromSpeech(SetupStep.VOICE, "화면만 볼게"))
+        assertEquals(0, setupAnswerFromSpeech(SetupStep.SOS, "응 둬"))
+        assertEquals(1, setupAnswerFromSpeech(SetupStep.SOS, "필요 없어요"))
+        assertEquals(SETUP_UNDO_INDEX, setupAnswerFromSpeech(SetupStep.DONE, "처음대로 되돌려 줘"))
+        assertNull(setupAnswerFromSpeech(SetupStep.TEXT, "오늘 날씨 어때"))
+    }
+
+    @Test
     fun aChangedModeIsAskedTheSameWay() {
         assertEquals(SetupStep.TEXT, answerSetup(SetupStep.CHANGED, 0, SetupAnswers()).first)
         assertNull(answerSetup(SetupStep.CHANGED, 1, SetupAnswers()).first)

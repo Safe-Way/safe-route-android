@@ -57,6 +57,7 @@ import com.deungbul.anshimgil.data.adaptationToOffer
 import com.deungbul.anshimgil.data.preferredRoute
 import com.deungbul.anshimgil.data.ShownHints
 import com.deungbul.anshimgil.data.SETUP_UNDO_INDEX
+import com.deungbul.anshimgil.data.setupAnswerFromSpeech
 import com.deungbul.anshimgil.data.SetupStep
 import com.deungbul.anshimgil.data.SetupAnswers
 import com.deungbul.anshimgil.data.answerSetup
@@ -242,6 +243,7 @@ fun AppRoot(
     // 사용성 점검표 21번: what was set before a change, so a mistaken tap or answer can be taken back at once.
     var setupBefore by remember { mutableStateOf<SettingsSnapshot?>(null) }
     var assistantUndo by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
+    val savedFavorites by savedPlaces.favorites.collectAsStateWithLifecycle(initialValue = emptyList())
     var homeUndo by remember { mutableStateOf<Pair<String, suspend () -> Unit>?>(null) }
     val setupAssistant = remember { SetupAssistant.create() }
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
@@ -616,6 +618,7 @@ fun AppRoot(
                 }
                 else -> HomeScreen(
                     mode = mode,
+                    saved = savedFavorites,
                     extraMapItems = settings.extraMapItems,
                     facilityRepository = facilityRepository,
                     placeRepository = placeRepository,
@@ -641,6 +644,7 @@ fun AppRoot(
                     usage = usage,
                     adaptation = if (askTripConsent || setupStep != null) null else adaptationToOffer(usage),
                     setupAsk = setupStep?.let { setupQuestion(it, setupAnswers) to it.answers },
+                    setupFromSpeech = { said -> setupStep?.let { setupAnswerFromSpeech(it, said) } },
                     undoAsk = homeUndo?.first,
                     onUndoAnswer = { undo ->
                         val u = homeUndo
