@@ -78,3 +78,38 @@ fun stopTitle(leg: TransitLeg): String = "${leg.to.name ?: "들를 곳"}에 들�
 /** The parts after a stop, found again from there: those done so far, then the new route's parts. */
 fun withRestFoundAgain(legs: List<TransitLeg>, step: Int, rest: TransitRoute): List<TransitLeg> =
     legs.take(step + 1) + guideLegs(rest)
+
+/** At a stop when this close (m): the bus is there, so the next one is the one after. */
+const val AT_STOP_M = 30
+
+/**
+ * Riding: which of [stops] comes next from [here], never going back before [before] (GPS on a bus wobbles).
+ * Past stop k (nearer to k+1 than k is) means k+1 is next; at stop k means the one after it.
+ */
+fun nextStopIndex(stops: List<LatLon>, here: LatLon, before: Int = 0): Int {
+    if (stops.isEmpty()) return 0
+    fun d(a: LatLon, b: LatLon) = distanceMeters(a.lat, a.lon, b.lat, b.lon)
+    val k = stops.indices.minBy { d(here, stops[it]) }
+    val next = when {
+        k == stops.lastIndex -> k
+        d(here, stops[k]) <= AT_STOP_M -> k + 1
+        d(here, stops[k + 1]) < d(stops[k], stops[k + 1]) -> k + 1
+        else -> k
+    }
+    return maxOf(next, before).coerceAtMost(stops.lastIndex)
+}
+
+/** How many stops until getting off, counting that one: 1 means the next stop is it. */
+fun stopsToAlight(stops: List<TransitStop>, next: Int): Int = (stops.lastIndex - next + 1).coerceAtLeast(0)
+
+/** "정거장" for a bus, "역" for a subway. */
+private fun stopWord(leg: TransitLeg) = if (leg.type == LegType.SUBWAY) "역" else "정거장"
+
+/** The line under a ride, e.g. "내릴 곳까지 5정거장 남았어요" or "다음 정거장에서 내려요". */
+fun stopsLeftLine(leg: TransitLeg, left: Int): String =
+    if (left <= 1) "다음 ${stopWord(leg)} ${leg.to.name ?: ""}에서 내려요".replace("  ", " ")
+    else "내릴 곳까지 ${left}${if (leg.type == LegType.SUBWAY) "개 역" else "정거장"} 남았어요"
+
+/** What AI 비서 says when one stop is left. */
+fun oneStopLeftSpoken(leg: TransitLeg): String =
+    "한 ${stopWord(leg)} 남았어요. 다음 ${stopWord(leg)}${leg.to.name?.let { " $it" } ?: ""}에서 내릴 준비를 하세요."

@@ -11,6 +11,10 @@ import com.deungbul.anshimgil.data.stopTitle
 import com.deungbul.anshimgil.data.withRestFoundAgain
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import com.deungbul.anshimgil.data.nextStopIndex
+import com.deungbul.anshimgil.data.stopsToAlight
+import com.deungbul.anshimgil.data.stopsLeftLine
+import com.deungbul.anshimgil.data.oneStopLeftSpoken
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -173,7 +177,7 @@ fun TransitGuideScreen(
                         onStop = onFinish, onOpenAssistant = onOpenAssistant,
                     )
                 } else {
-                    RidePart(leg, voiceByDefault, nextLabel = nextLabel, onDone = ::next, onStop = onFinish, onOpenAssistant = onOpenAssistant)
+                    RidePart(leg, voiceByDefault, nextLabel = nextLabel, onDone = ::next, onStop = onFinish, onOpenAssistant = onOpenAssistant, onLive = onLive)
                 }
             }
         }
@@ -339,6 +343,7 @@ private fun RidePart(
     onDone: () -> Unit,
     onStop: () -> Unit,
     onOpenAssistant: (() -> Unit)?,
+    onLive: (Boolean, String) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     val tts = rememberTts(context)
@@ -349,8 +354,20 @@ private fun RidePart(
     }
     // How far the stop to get off at is, from the phone's position while riding.
     var toStopM by remember { mutableStateOf<Int?>(null) }
+    // Which stop comes next, from the stops on the way (#110): "N정거장 남았어요", and AI 비서 speaks at one left.
+    val stopPoints = remember(leg) { leg.stops.map { it.point } }
+    var nextStop by remember { mutableIntStateOf(0) }
     if (hasLocationPermission(context)) LocationUpdates(context) { here: LatLon ->
         toStopM = distanceMeters(here.lat, here.lon, leg.to.point.lat, leg.to.point.lon)
+        if (stopPoints.size >= 2) nextStop = nextStopIndex(stopPoints, here, before = nextStop)
+    }
+    val left = if (stopPoints.size >= 2 && toStopM != null) stopsToAlight(leg.stops, nextStop) else null
+    LaunchedEffect(left == 1) {
+        if (left == 1) {
+            val said = oneStopLeftSpoken(leg)
+            onLive(false, said)
+            if (voiceByDefault) tts.speak(said, TextToSpeech.QUEUE_FLUSH, null, "one-left")
+        }
     }
     val near = toStopM?.let { it <= ALIGHT_NEAR_M } == true
     var warned by remember { mutableStateOf(false) }
@@ -381,6 +398,8 @@ private fun RidePart(
                     modifier = Modifier.padding(14.dp),
                 )
             }
+        } else if (left != null) {
+            Text(stopsLeftLine(leg, left), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (left <= 1) Color(0xFF7A5310) else Ink)
         } else toStopM?.let { m ->
             Text("내릴 곳까지 직선 ${if (m < 1000) "${m}m" else "%.1fkm".format(m / 1000.0)}", fontSize = 15.sp, color = Muted)
         }

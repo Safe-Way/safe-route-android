@@ -32,6 +32,8 @@ data class TransitLeg(
     val path: List<LatLon>,
     val buses: List<BusComing>,
     val trains: List<Train>,
+    /** Every stop or station of a ride in order, the one to get on first and the one to get off last (#110). */
+    val stops: List<TransitStop> = emptyList(),
 )
 
 data class TransitRoute(val totalMin: Int, val fare: Int?, val transfers: Int, val walkM: Int, val legs: List<TransitLeg>)
@@ -112,6 +114,8 @@ private fun parseLeg(l: JSONObject): TransitLeg {
             val t = trains.getJSONObject(i)
             Train(t.optString("direction"), t.optInt("inMin"), if (t.isNull("stopsAway")) null else t.optInt("stopsAway"))
         },
+        stops = l.optJSONArray("stops")?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it) }.filter { it.has("lat") && it.has("lon") }.map { stop(it) } }
+            .orEmpty(),
     )
 }
 
