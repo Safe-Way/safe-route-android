@@ -150,4 +150,14 @@ class StopsTest {
         assertEquals(listOf("다이소"), joined.stops.map { it.name })
         assertEquals(90.0, joined.stops[0].atM, 0.1)
     }
+
+    /** The school server's real answer (11/9 15:30) to "퇴근길에 다이소 들르고 택배 찾고 집 갈래" with 집 saved. */
+    @Test
+    fun realServerAnswerOpensARouteWithStops() {
+        val text = javaClass.classLoader!!.getResource("assistant_stops_1109.json").readText()
+        val reply = parseServerAssistantReply(JSONObject(text))!!.action as AssistantAction.GoPlace
+        assertEquals("집", reply.place.name)
+        assertEquals(listOf("GS25 조대정문점", "다이소 광주충장로점"), reply.stops.map { it.name })
+        assertTrue(reply.say.contains("들렀다 집까지"))
+    }
 }
