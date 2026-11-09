@@ -715,12 +715,21 @@ private fun KakaoMap.visibleBbox(): Bbox? {
 }
 
 /**
+ * The details split one per line, without where the data came from: "경사로 없음 (OSM)" reads "경사로 없음"
+ * (a walker does not need the map's name; the video check of 11/9 found it).
+ */
+internal fun detailParts(detail: String?): List<String> =
+    detail.orEmpty().split(" · ")
+        .map { it.replace(Regex("\\s*\\((OSM|osm|OpenStreetMap|공공데이터|data\\.go\\.kr)\\)"), "").trim() }
+        .filter { it.isNotEmpty() }
+
+/**
  * A tapped place: what its picture means, then its details one item per line: for a station, which exits have elevators,
  * accessible toilets, wheelchair chargers and train hours, as the server words them.
  */
 @Composable
 internal fun PlaceDetailCard(place: Facility, exits: List<String>, onClose: () -> Unit, modifier: Modifier = Modifier) {
-    val parts = place.detail.orEmpty().split(" · ").map { it.trim() }.filter { it.isNotEmpty() }
+    val parts = detailParts(place.detail)
     // The first part repeats the kind ("지하철역"), so it goes next to the name instead.
     val kindText = parts.firstOrNull()?.takeIf { place.name != null && parts.size > 1 }
     val lines = if (kindText != null) parts.drop(1) else parts

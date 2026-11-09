@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import androidx.compose.runtime.SideEffect
 import com.deungbul.anshimgil.ui.common.AI_BUBBLE_ALPHA
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.ButtonDefaults
@@ -471,6 +472,14 @@ fun GuideScreen(
     // Closes by itself after a while, so it does not stay over the map while walking.
     LaunchedEffect(tapped) { if (tapped != null) { delay(TAPPED_CARD_MS); tapped = null } }
 
+    // The arrival time moves only when it changes by 2 minutes or more, so it does not flick 10:01 ↔ 10:02 as
+    // the minutes round (11/9 video).
+    val arrivalNow = java.time.LocalTime.now().plusMinutes(walkMinutes(state.remainingM.toDouble(), speed).toLong())
+    var arrivalShown by remember { mutableStateOf<java.time.LocalTime?>(null) }
+    val keepArrival = arrivalShown?.let { steadyArrival(it, arrivalNow) }
+    if (keepArrival != arrivalShown) SideEffect { arrivalShown = keepArrival }
+    val shownArrival = (keepArrival ?: arrivalNow).format(java.time.format.DateTimeFormatter.ofPattern("a h:mm", java.util.Locale.KOREAN))
+
     Box(modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -587,10 +596,11 @@ fun GuideScreen(
                             modifier = Modifier.size(26.dp).background(Color(help?.kind?.color ?: 0xFF7C2D12), CircleShape),
                         ) { Text("!", color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp) }
                         Text(
-                            if (help != null) "가까운 도움  ${help.kind.label} · ${sideText(help.side)} ${help.meters}m"
+                            if (help != null) "가까운 도움 ${help.kind.label} · ${sideText(help.side)} ${help.meters}m"
                             else "가는 길에 도움 장소 ${ahead.size}곳",
-                            fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            // Two lines rather than cutting off the side and distance ("오른쪽 …", 11/9 video).
+                            fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink, lineHeight = 21.sp,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
                         Text("목록", fontSize = 14.sp, color = Color(0xFF7C2D12), fontWeight = FontWeight.Bold)
@@ -601,7 +611,7 @@ fun GuideScreen(
                     val minutes = walkMinutes(state.remainingM.toDouble(), speed)
                     Stat("남은 거리", formatDistance(state.remainingM), Modifier.weight(1f))
                     Stat("남은 시간", "${minutes}분", Modifier.weight(1f))
-                    Stat("도착", arrivalTime(minutes), Modifier.weight(1f))
+                    Stat("도착", shownArrival, Modifier.weight(1f))
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -765,6 +775,10 @@ private suspend fun warnRunning(context: Context) {
         tone.release()
     }
 }
+
+/** The arrival time to show: [shown] until [now] differs from it by 2 minutes or more, then [now]. */
+internal fun steadyArrival(shown: java.time.LocalTime, now: java.time.LocalTime): java.time.LocalTime =
+    if (kotlin.math.abs(java.time.Duration.between(shown, now).toMinutes()) >= 2) now else shown
 
 /** Shown after a while off the route: tell the guardians where the walker is, or dismiss. */
 /** AI 비서's short word under the status line, e.g. that a new route was found. */
