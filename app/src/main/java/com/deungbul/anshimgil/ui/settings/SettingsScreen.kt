@@ -77,6 +77,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onChangeMode: () -> Unit,
     onManagePlaces: () -> Unit,
+    /** 내 정보 (m06). */
+    onOpenMyInfo: () -> Unit = {},
     onVoiceChange: (Boolean) -> Unit,
     onAutoConditionsChange: (Boolean) -> Unit,
     onTextSizeChange: (TextSize) -> Unit,
@@ -135,6 +137,7 @@ fun SettingsScreen(
         SectionTitle("내 설정")
         LinkRow("모드 바꾸기", "지금: ${mode.style().label}", onClick = onChangeMode)
         LinkRow("자주 가는 곳 관리", "집, 학교, 직장 등록과 변경", onClick = onManagePlaces)
+        LinkRow("내 정보", "계단, 돌아가는 정도, 쉬는 간격, 기록 남기기", onClick = onOpenMyInfo)
 
         SectionTitle("귀가 지킴이")
         Text(
@@ -207,8 +210,8 @@ fun SettingsScreen(
 
         SectionTitle("이동 기록")
         SwitchRow(
-            "자주 가는 길 기억하기",
-            "도착한 곳(약 100m 범위)과 시간을 저장해서 AI 비서가 먼저 길을 알려 줘요" +
+            "다닌 기록 남기기",
+            "간 곳 이름, 요일·시간대(30분 단위), 걸었는지 버스였는지, 날씨, 한마디를 남겨요. 지나온 길·집 주소·정확한 시각은 남기지 않아요" +
                 if (tripConsent && tripCount != null) " · 지금 ${tripCount}번 기억함" else "",
             tripConsent,
             onTripConsentChange,

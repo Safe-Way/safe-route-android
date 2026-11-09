@@ -94,6 +94,7 @@ import com.deungbul.anshimgil.data.RouteRequest
 import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.routeCriteria
 import com.deungbul.anshimgil.data.RouteType
+import com.deungbul.anshimgil.data.eventLine
 import com.deungbul.anshimgil.data.routeSpoken
 import com.deungbul.anshimgil.data.transitSpoken
 import kotlinx.coroutines.delay
@@ -597,6 +598,18 @@ private fun RouteDetails(
                     modifier = Modifier.size(20.dp),
                 )
                 Text(note.text, fontSize = 15.sp, color = if (note.warn) Color(0xFF7A5310) else Ink, lineHeight = 21.sp)
+            }
+        }
+        // Events and incidents on this route (팀 할 일 m08): a caution when this mode keeps away from them.
+        result.route(if (fast) RouteType.SHORTEST else RouteType.SAFE)?.events.orEmpty().forEach { e ->
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(end = 8.dp)) {
+                Icon(
+                    if (e.avoid) Icons.Filled.WarningAmber else Icons.Filled.Info,
+                    contentDescription = if (e.avoid) "주의" else "알림",
+                    tint = if (e.avoid) Color(0xFFB45309) else Color(0xFF2F5BB7),
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(eventLine(e), fontSize = 15.sp, color = if (e.avoid) Color(0xFF7A5310) else Ink, lineHeight = 21.sp)
             }
         }
         if (items.isNotEmpty()) {

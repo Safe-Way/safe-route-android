@@ -112,6 +112,20 @@ internal fun parseRouteResult(json: JSONObject, mode: UserMode? = null): RouteRe
             crossings = route.optJSONArray("crossings")?.objects()?.map { c ->
                 pointAtMeters(line, (c.optDouble("fromM") + c.optDouble("toM")) / 2)
             },
+            events = route.optJSONArray("events").objects().mapNotNull { e ->
+                fun text(k: String) = e.optString(k).takeIf { !e.isNull(k) && it.isNotBlank() }
+                RouteEvent(
+                    kind = text("kind") ?: "행사",
+                    title = text("title") ?: return@mapNotNull null,
+                    place = text("place"),
+                    message = text("message"),
+                    endsAt = text("endsAt"),
+                    fromM = e.optInt("fromM"),
+                    toM = e.optInt("toM"),
+                    avoid = e.optBoolean("avoid"),
+                    near = text("near"),
+                )
+            },
         ).withoutEndDetours()
     }
     val shortest = routes.firstOrNull { it.type == RouteType.SHORTEST }

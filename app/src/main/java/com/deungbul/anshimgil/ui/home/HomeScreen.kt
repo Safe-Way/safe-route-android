@@ -180,6 +180,9 @@ fun HomeScreen(
     onSetupAnswer: (Int) -> Unit = {},
     /** Saved places with a place set (집, 학교, …): one tap each finds the way there (사용성 점검표 7번). */
     saved: List<com.deungbul.anshimgil.data.Favorite> = emptyList(),
+    /** 도착 뒤 한마디 (m07): AI 비서's question after arriving and its answers, answered with [onFeedbackAnswer]. */
+    feedbackAsk: Pair<String, List<String>>? = null,
+    onFeedbackAnswer: (Int) -> Unit = {},
     /** A change just made from a bubble, told with 좋아요 / 되돌리기 ([onUndoAnswer] true to take it back). */
     undoAsk: String? = null,
     onUndoAnswer: (Boolean) -> Unit = {},
@@ -278,6 +281,7 @@ fun HomeScreen(
         if (index != null) onSetupAnswer(index) else onLive(false, "잘 못 알아들었어요. 버튼을 누르거나 다시 말해 주세요.")
     }
     LaunchedEffect(undoAsk) { undoAsk?.let { onLive(false, it) } }
+    LaunchedEffect(feedbackAsk?.first) { feedbackAsk?.let { onLive(false, it.first) } }
     LaunchedEffect(hint) {
         val shown = hint ?: return@LaunchedEffect
         onLive(false, shown.text)
@@ -594,6 +598,13 @@ fun HomeScreen(
                             runCatching { setupSpeech.launch(intent) }
                             Unit
                         }),
+                )
+            }
+        } else if (feedbackAsk != null && !showBuses && picked == null) {
+            Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
+                AiAskBubble(
+                    feedbackAsk.first,
+                    answers = feedbackAsk.second.mapIndexed { i, a -> a to { onLive(true, a); onFeedbackAnswer(i) } },
                 )
             }
         } else if (undoAsk != null && !showBuses && picked == null) {

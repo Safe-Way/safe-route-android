@@ -27,6 +27,8 @@ data class RouteOption(
      * say. Guidance uses it to tell crossing over from the pavement jogging aside a few meters.
      */
     val crossings: List<LatLon>? = null,
+    /** Events and incidents the route passes (routes[].events, 팀 할 일 m08). */
+    val events: List<RouteEvent> = emptyList(),
 )
 
 enum class SidewalkSide { LEFT, RIGHT, BOTH, NONE, UNKNOWN }

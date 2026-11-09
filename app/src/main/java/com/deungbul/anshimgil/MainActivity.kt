@@ -57,6 +57,9 @@ import com.deungbul.anshimgil.data.adaptationToOffer
 import com.deungbul.anshimgil.data.preferredRoute
 import com.deungbul.anshimgil.data.ShownHints
 import com.deungbul.anshimgil.data.SETUP_UNDO_INDEX
+import com.deungbul.anshimgil.data.nextFeedbackStep
+import com.deungbul.anshimgil.data.feedbackFor
+import com.deungbul.anshimgil.data.FeedbackStep
 import com.deungbul.anshimgil.data.setupAnswerFromSpeech
 import com.deungbul.anshimgil.data.SetupStep
 import com.deungbul.anshimgil.data.SetupAnswers
@@ -123,6 +126,7 @@ class MainActivity : ComponentActivity() {
         val settingsRepository = SettingsRepository(applicationContext)
         val walkSpeedRepository = WalkSpeedRepository(applicationContext)
         val tripLog = TripLogRepository(applicationContext, guestId = { walkSpeedRepository.guestId() })
+        val myInfoRepository = com.deungbul.anshimgil.data.MyInfoRepository(guestId = { walkSpeedRepository.guestId() })
         val usageRepository = UsageRepository(applicationContext)
         // Walks that could not be sent last time (offline, server not ready) go now.
         lifecycleScope.launch { runCatching { walkSpeedRepository.uploadPending() } }
@@ -157,6 +161,7 @@ class MainActivity : ComponentActivity() {
                             modeRepository, savedPlaces, placeRepository, facilityRepository, routeRepository,
                             settingsRepository, settings, walkSpeedRepository, Modifier.padding(innerPadding),
                             tripLog = tripLog,
+                            myInfoRepository = myInfoRepository,
                             usageRepository = usageRepository,
                             reminded = reminded.value,
                             onRemindedHandled = { reminded.value = null },
@@ -195,6 +200,8 @@ private sealed interface Screen {
     /** [startFor] is set while choosing a new start for that route. */
     data class Search(val startFor: Route? = null) : Screen
     data object Settings : Screen
+    /** 내 정보 (m06): stairs, going round, resting, transit, keeping trips. */
+    data object MyInfo : Screen
     /** 불편 신고 (FR-49). */
     data object Report : Screen
 
@@ -227,6 +234,7 @@ fun AppRoot(
     walkSpeedRepository: WalkSpeedRepository,
     modifier: Modifier = Modifier,
     tripLog: TripLogRepository? = null,
+    myInfoRepository: com.deungbul.anshimgil.data.MyInfoRepository = com.deungbul.anshimgil.data.MyInfoRepository(guestId = { walkSpeedRepository.guestId() }),
     usageRepository: UsageRepository? = null,
     /** From the 출발 시간 알림: open the route there. */
     reminded: Pair<Place, Boolean>? = null,
@@ -323,6 +331,10 @@ fun AppRoot(
             }.getOrNull()
         }
     }
+    // 도착 뒤 한마디 (m07): the trip to send it with, the question now, and what the server learned from it.
+    var feedbackTrip by remember { mutableStateOf<Pair<Long, Int>?>(null) }
+    var feedbackStep by remember { mutableStateOf<FeedbackStep?>(null) }
+    var learnedSay by remember { mutableStateOf<String?>(null) }
     /** At the end: close the record (arrived or stopped), or ask the first time. */
     fun finishTrip(arrived: Boolean) {
         if (arrived) tripDestination?.let { place ->
@@ -334,6 +346,8 @@ fun AppRoot(
             TripConsent.YES -> tripId?.let { id ->
                 val minutes = java.time.Duration.between(guideStartedAt, java.time.LocalDateTime.now()).toMinutes().toInt()
                 scope.launch { runCatching { log.end(id, arrived, minutes) } }
+                // Arrived: ask how the way was, to send with the trip.
+                if (arrived) { feedbackTrip = id to minutes; feedbackStep = FeedbackStep.HOW }
             }
             TripConsent.NO -> Unit
         }
@@ -470,6 +484,18 @@ fun AppRoot(
                         initialMemo = prefill?.memo.orEmpty(),
                     )
                 }
+                screen == Screen.MyInfo -> {
+                    BackHandler { screen = Screen.Settings }
+                    com.deungbul.anshimgil.ui.settings.MyInfoScreen(
+                        mode = mode,
+                        repository = myInfoRepository,
+                        onBack = { screen = Screen.Settings },
+                        onChangeMode = { changingMode = true },
+                        onConsent = { yes -> tripLog?.setConsent(if (yes) TripConsent.YES else TripConsent.NO, mode) },
+                        onDeletedAll = { tripLog?.setConsent(TripConsent.UNASKED, mode) },
+                        modifier = modifier,
+                    )
+                }
                 screen == Screen.Settings -> {
                     BackHandler { screen = Screen.Home }
                     SettingsScreen(
@@ -478,6 +504,7 @@ fun AppRoot(
                         onBack = { screen = Screen.Home },
                         onChangeMode = { changingMode = true },
                         onManagePlaces = { screen = Screen.Search() },
+                        onOpenMyInfo = { screen = Screen.MyInfo },
                         onVoiceChange = { scope.launch { settingsRepository.setVoiceGuide(it) } },
                         onAutoConditionsChange = { scope.launch { settingsRepository.setAutoConditions(it) } },
                         onTextSizeChange = { scope.launch { settingsRepository.setTextSize(it) } },
@@ -639,6 +666,7 @@ fun AppRoot(
                     askTripConsent = askTripConsent,
                     onTripConsent = { yes ->
                         askTripConsent = false
+                        if (!yes) assistantChat.note(false, com.deungbul.anshimgil.data.CONSENT_NO_REPLY)
                         scope.launch { tripLog?.setConsent(if (yes) TripConsent.YES else TripConsent.NO, mode) }
                     },
                     usage = usage,
@@ -646,6 +674,23 @@ fun AppRoot(
                     setupAsk = setupStep?.let { setupQuestion(it, setupAnswers) to it.answers },
                     setupFromSpeech = { said -> setupStep?.let { setupAnswerFromSpeech(it, said) } },
                     undoAsk = homeUndo?.first,
+                    feedbackAsk = feedbackStep?.let { it.question to it.answers } ?: learnedSay?.let { it to listOf("알겠어요") },
+                    onFeedbackAnswer = { i ->
+                        val step = feedbackStep
+                        if (step == null) {
+                            learnedSay = null
+                        } else {
+                            val trip = feedbackTrip
+                            feedbackStep = nextFeedbackStep(step, i)
+                            val send = feedbackFor(step, i)
+                            if (feedbackStep == null) feedbackTrip = null
+                            if (send != null && trip != null) scope.launch {
+                                val says = tripLog?.feedback(trip.first, true, trip.second, send.first, send.second).orEmpty()
+                                learnedSay = says.firstOrNull()
+                                if (says.isEmpty()) assistantChat.note(false, if (send.first == "good") "다행이에요. 다음에도 편한 길로 안내할게요." else "알려 주셔서 고마워요. 다음 길을 고를 때 참고할게요.")
+                            }
+                        }
+                    },
                     onUndoAnswer = { undo ->
                         val u = homeUndo
                         homeUndo = null
