@@ -16,6 +16,8 @@ private val TRAILING = listOf("으로", "로", "까지", "에", "에게", "쪽�
 
 /** The place named in [said] when it asks to go there, e.g. "문화전당" in "문화전당 가자"; null otherwise. */
 fun placeToGo(said: String): String? {
+    // Stopping somewhere on the way ("다이소 들렀다가 집에 갈래") is for AI 비서 on the server, which plans the stops.
+    if (mentionsStops(said)) return null
     var s = said.trim().trimEnd('.', '!', '?', '~').trim()
     val ending = GO_ENDINGS.sortedByDescending { it.length }.firstOrNull { s.endsWith(it) } ?: return null
     s = s.removeSuffix(ending).trim()
@@ -49,3 +51,16 @@ fun pickLandmark(results: List<Place>): Place? {
     if (top.value < 2) return results.first()
     return results.first { base(it) == top.key }
 }
+
+/**
+ * Words for stopping somewhere on the way: 들르다 and how speech recognition often hears it (11/9 on the phone,
+ * "다이소 들렀다" came out as "다이소 드렸다").
+ */
+private val STOP_WORDS = Regex("들르|들렀|들러|들리고|들려서|드렸다|드르고|드르고서|들렸다")
+
+/** Whether [said] asks to stop somewhere on the way (들를 곳). */
+fun mentionsStops(said: String): Boolean = STOP_WORDS.containsMatchIn(said)
+
+/** [said] with the usual mishearings of 들르다 put right, so the server reads the stops. */
+fun withStopWordsFixed(said: String): String =
+    said.replace("드렸다가", "들렀다가").replace("드렸다", "들렀다").replace("드르고", "들르고").replace("들렸다", "들렀다")
