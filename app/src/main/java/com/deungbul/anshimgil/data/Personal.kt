@@ -159,10 +159,16 @@ fun nearbyOrder(usage: Usage): List<String> {
     return order
 }
 
-/** The kind of route to show first: the one chosen at least [ROUTE_CHOICES_AGREE] of the last [ROUTE_CHOICES_KEPT] times. */
-fun preferredRoute(usage: Usage): RouteChoice? {
+/**
+ * The kind of route to show first. Walking or transit is the team server's call (PreferenceLearner: of the last 10
+ * finished trips, at least 5, transit 70% or more gives prefer_transit 2, 30% or less gives 0), read from /api/me as
+ * [preferTransit]; the app's own rule of 11/8 (3 of the last 4 picks) now only picks between the two walking routes,
+ * which the team has no rule for.
+ */
+fun preferredRoute(usage: Usage, preferTransit: Int? = null): RouteChoice? {
+    if (preferTransit == 2) return RouteChoice.TRANSIT
     if (!usage.adapt) return null
-    val recent = usage.routeChoices.takeLast(ROUTE_CHOICES_KEPT)
+    val recent = usage.routeChoices.filter { it != RouteChoice.TRANSIT }.takeLast(ROUTE_CHOICES_KEPT)
     return recent.groupingBy { it }.eachCount().entries.firstOrNull { it.value >= ROUTE_CHOICES_AGREE }?.key
 }
 

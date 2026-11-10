@@ -269,6 +269,8 @@ fun AppRoot(
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     // 몸 상태가 잠깐 바뀜 (TempMode.kt): the end-day question, and telling the server (PATCH /api/me temp fields).
     var tempAsk by remember { mutableStateOf<String?>(null) }
+    // The server's prefer_transit (0 walking, 1 either, 2 transit), read when the app opens.
+    var serverPreferTransit by remember { mutableStateOf<Int?>(null) }
     val tempScope = rememberCoroutineScope()
     fun tellServerTemp(st: com.deungbul.anshimgil.data.TempState?, usual: UserMode? = st?.usual) {
         val u = usual ?: return
@@ -413,6 +415,8 @@ fun AppRoot(
                 // During a temporary change the server keeps the usual mode and the temporary one apart (temp_mode).
                 val usual = com.deungbul.anshimgil.data.TempModeStore.get(appContext)?.usual ?: m
                 if (com.deungbul.anshimgil.data.ServerApi.isConfigured) runCatching { myInfoRepository.syncMode(usual) }
+                // Walking or transit first: the server learns it from the trip records (PreferenceLearner).
+                if (com.deungbul.anshimgil.data.ServerApi.isConfigured) runCatching { serverPreferTransit = myInfoRepository.load().preferTransit }
             }
             // 몸 상태가 잠깐 바뀜: past the end day the usual way of walking is back; on the end day, ask (team server rule).
             LaunchedEffect(Unit) {
@@ -636,7 +640,7 @@ fun AppRoot(
                         RouteScreen(
                             mode = mode,
                             startWithTransit = route.transit,
-                            preferred = preferredRoute(usage),
+                            preferred = preferredRoute(usage, serverPreferTransit),
                             autoStart = route.autoStart,
                             voiceOn = settings.voiceGuide,
                             onChosen = { choice -> scope.launch { usageRepository?.chooseRoute(choice) } },

@@ -33,8 +33,10 @@ class PersonalTest {
         val t = RouteChoice.TRANSIT
         assertNull(preferredRoute(Usage(routeChoices = listOf(s, s))))
         assertEquals(s, preferredRoute(Usage(routeChoices = listOf(s, RouteChoice.SAFE, s, s))))
-        assertEquals(t, preferredRoute(Usage(routeChoices = listOf(t, t, t))))
-        assertNull(preferredRoute(Usage(routeChoices = listOf(s, t, s, t))))
+        // Walking or transit is the server's prefer_transit (PreferenceLearner), not the app's count.
+        assertNull(preferredRoute(Usage(routeChoices = listOf(t, t, t))))
+        assertEquals(t, preferredRoute(Usage(routeChoices = listOf(s, s, s)), preferTransit = 2))
+        assertEquals(s, preferredRoute(Usage(routeChoices = listOf(s, t, s, t, s)), preferTransit = 0))
     }
 
     @Test
