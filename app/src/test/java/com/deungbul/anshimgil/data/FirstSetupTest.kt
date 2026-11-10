@@ -28,6 +28,17 @@ class FirstSetupTest {
     }
 
     @Test
+    fun aNewWalkerIsAskedFirstWhetherToAnswerByVoice() {
+        // Team, 11/10: asked once at the start, then the answers go on by voice.
+        val (next, a) = answerSetup(SetupStep.WAY, 0, SetupAnswers())
+        assertEquals(SetupStep.AID, next)
+        assertTrue(a.byVoice)
+        assertEquals(false, answerSetup(SetupStep.WAY, 1, SetupAnswers()).second.byVoice)
+        assertEquals(0, setupAnswerFromSpeech(SetupStep.WAY, "말로 할게"))
+        assertEquals(1, setupAnswerFromSpeech(SetupStep.WAY, "버튼으로 할래"))
+    }
+
+    @Test
     fun aNewWalkerIsAskedTheServersQuestionsFirst() {
         // RuleBrain.startSetup · setupAid · setupStairs · setupConfirm, then consent.md 1번.
         assertEquals("처음 오셨네요. 어떻게 다니세요? 걸어서, 지팡이, 휠체어, 유모차 중에 말씀해 주세요.", setupQuestion(SetupStep.AID, SetupAnswers()))

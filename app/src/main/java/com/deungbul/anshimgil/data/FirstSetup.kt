@@ -46,6 +46,11 @@ const val SETUP_CONSENT_QUESTION =
 
 /** One question, its answers in order (the first is the suggested one). */
 enum class SetupStep(val question: String, val answers: List<String>) {
+    /**
+     * Asked first (team, 11/10): answer by voice or by tapping. By voice, each next question is read out and the
+     * microphone opens by itself, so [말로 답하기] need not be pressed every time.
+     */
+    WAY("처음 몇 가지를 여쭤볼게요. 말로 답하실래요, 버튼을 누르실래요?", listOf("말로 할게요", "버튼으로 할게요")),
     /** The server's first setup question for a new walker. */
     AID("처음 오셨네요. 어떻게 다니세요? 걸어서, 지팡이, 휠체어, 유모차 중에 말씀해 주세요.", SETUP_AIDS.map { it.second }),
     /** The server's stairs question; the words depend on the answer before ([setupQuestion]). */
@@ -67,6 +72,8 @@ const val SETUP_UNDO_INDEX = 1
 
 /** What the answers set; null is left as it is. */
 data class SetupAnswers(
+    /** Answering by voice ([SetupStep.WAY]). */
+    val byVoice: Boolean = false,
     /** The server's setup: the way of getting about ([SETUP_AIDS] key) and steps (0 못 가요, 1 몇 칸, 2 괜찮아요). */
     val aid: String? = null,
     val stairs: Int? = null,
@@ -82,6 +89,7 @@ data class SetupAnswers(
 
 /** The next step after answer [index] to [step], with the settings so far; null step means finished or skipped. */
 fun answerSetup(step: SetupStep, index: Int, so: SetupAnswers, current: TextSize = TextSize.NORMAL): Pair<SetupStep?, SetupAnswers> = when (step) {
+    SetupStep.WAY -> SetupStep.AID to so.copy(byVoice = index == 0)
     // A wheelchair: no steps, straight to the check (RuleBrain.setupAid).
     SetupStep.AID -> SETUP_AIDS[index].first.let { aid ->
         if (aid == "wheelchair") SetupStep.CONFIRM to so.copy(aid = aid, stairs = 0) else SetupStep.STAIRS to so.copy(aid = aid)
@@ -140,6 +148,7 @@ fun setupAnswerFromSpeech(step: SetupStep, said: String): Int? {
     val no = has("아니", "싫어", "괜찮아", "필요없", "필요 없", "안 해", "안해", "다음에", "나중에", "그대로", "됐어")
     val yes = has("좋아", "응", "네", "예", "그래", "해 줘", "해줘", "해주세요", "부탁", "맞춰")
     return when (step) {
+        SetupStep.WAY -> when { has("버튼", "누를", "눌러") -> 1; has("말로", "말할", "목소리", "음성") || yes -> 0; no -> 1; else -> null }
         // The server's readings (RuleBrain.aid, setupStairs).
         SetupStep.AID -> when {
             has("휠체어") -> 2

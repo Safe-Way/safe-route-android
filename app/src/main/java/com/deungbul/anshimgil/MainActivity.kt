@@ -527,7 +527,7 @@ fun AppRoot(
                         onStart = { picked ->
                             // The first pick on a new install, or another mode later: AI 비서 offers to set up the rest.
                             // A new walker: the team server's setup questions first (FirstSetup.kt).
-                            if (mode == null) setupStep = SetupStep.AID
+                            if (mode == null) setupStep = SetupStep.WAY
                             else if (picked != mode) setupStep = SetupStep.CHANGED
                             setupAnswers = SetupAnswers()
                             val firstPick = mode == null
@@ -752,6 +752,7 @@ fun AppRoot(
                     adaptation = if (askTripConsent || setupStep != null) null else adaptationToOffer(usage),
                     setupAsk = setupStep?.let { setupQuestion(it, setupAnswers) to it.answers },
                     setupFromSpeech = { said -> setupStep?.let { setupAnswerFromSpeech(it, said) } },
+                    setupByVoice = setupAnswers.byVoice,
                     undoAsk = homeUndo?.first,
                     feedbackAsk = tempAsk?.let { it to com.deungbul.anshimgil.data.YES_NO } ?: feedbackStep?.let { it.question to it.answers } ?: learnedSay?.let { it to listOf("알겠어요") },
                     onFeedbackAnswer = feedback@{ i ->

@@ -182,6 +182,8 @@ fun HomeScreen(
     setupAsk: Pair<String, List<String>>? = null,
     /** The index meant by words said to the current 처음 맞추기 question; null when unclear. */
     setupFromSpeech: (String) -> Int? = { null },
+    /** The walker chose to answer the setup by voice: read each question out and listen by itself. */
+    setupByVoice: Boolean = false,
     onSetupAnswer: (Int) -> Unit = {},
     /** Saved places with a place set (집, 학교, …): one tap each finds the way there (사용성 점검표 7번). */
     saved: List<com.deungbul.anshimgil.data.Favorite> = emptyList(),
@@ -292,11 +294,53 @@ fun HomeScreen(
     LaunchedEffect(adaptation) { adaptation?.let { onLive(false, it.question) } }
     LaunchedEffect(setupAsk?.first) { setupAsk?.let { onLive(false, it.first) } }
     // 처음 맞추기 by voice (사용성 점검표 2번): the words go to the answer they mean.
+    // 처음 설정 by voice (team, 11/10): each question read out, then the microphone opens by itself. Not understood:
+    // asked once more; again, or the listening closed with nothing said: back to the buttons for the rest.
+    val setupTts = com.deungbul.anshimgil.ui.guide.rememberTts(context)
+    var voiceMisses by remember { mutableIntStateOf(0) }
+    var voiceOff by remember { mutableStateOf(false) }
+    val listening = setupByVoice && !voiceOff
+    var listenAgain by remember { mutableIntStateOf(0) }
     val setupSpeech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val said = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: return@rememberLauncherForActivityResult
+        val said = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (said == null) {
+            if (listening) { voiceOff = true; onLive(false, "버튼을 눌러 답해 주세요.") }
+            return@rememberLauncherForActivityResult
+        }
         onLive(true, said)
         val index = setupFromSpeech(said)
-        if (index != null) onSetupAnswer(index) else onLive(false, "잘 못 알아들었어요. 버튼을 누르거나 다시 말해 주세요.")
+        if (index != null) {
+            voiceMisses = 0
+            onSetupAnswer(index)
+        } else if (listening && voiceMisses == 0) {
+            voiceMisses = 1
+            onLive(false, "잘 못 알아들었어요. 다시 말해 주세요.")
+            listenAgain++
+        } else {
+            if (listening) voiceOff = true
+            onLive(false, "잘 못 알아들었어요. 버튼을 눌러 답해 주세요.")
+        }
+    }
+    fun listenToSetup() {
+        val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "말씀해 주세요")
+        runCatching { setupSpeech.launch(intent) }
+    }
+    // Read the question (or "다시 말해 주세요"), then listen.
+    LaunchedEffect(setupAsk?.first, listening, listenAgain) {
+        val q = setupAsk?.first ?: return@LaunchedEffect
+        if (!listening) return@LaunchedEffect
+        val words = if (voiceMisses > 0) "잘 못 알아들었어요. 다시 말해 주세요." else q + " " + setupAsk.second.joinToString(", ")
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        setupTts.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+            override fun onStart(id: String?) {}
+            override fun onDone(id: String?) { if (id == "setup") main.post { listenToSetup() } }
+            @Deprecated("Deprecated in Java") override fun onError(id: String?) { if (id == "setup") main.post { listenToSetup() } }
+        })
+        delay(400)
+        setupTts.speak(words, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "setup")
     }
     LaunchedEffect(undoAsk) { undoAsk?.let { onLive(false, it) } }
     LaunchedEffect(feedbackAsk?.first) { feedbackAsk?.let { onLive(false, it.first) } }
@@ -619,15 +663,9 @@ fun HomeScreen(
             Box(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 132.dp).tracked("_ask")) {
                 AiAskBubble(
                     setupAsk.first,
-                    answers = setupAsk.second.mapIndexed { i, a -> a to { onLive(true, a); onSetupAnswer(i) } } +
-                        ("말로 답하기" to {
-                            val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
-                                .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "말씀해 주세요")
-                            runCatching { setupSpeech.launch(intent) }
-                            Unit
-                        }),
+                    // A tap answers as before; by voice, a tap means the walker would rather tap from now on.
+                    answers = setupAsk.second.mapIndexed { i, a -> a to { if (listening) { voiceOff = true; setupTts.stop() }; onLive(true, a); onSetupAnswer(i) } } +
+                        ("말로 답하기" to { setupTts.stop(); listenToSetup() }),
                 )
             }
         } else if (feedbackAsk != null && !showBuses && picked == null && pickedReport == null) {
