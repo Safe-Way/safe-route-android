@@ -86,6 +86,7 @@ import com.deungbul.anshimgil.data.AssistantAction
 import com.deungbul.anshimgil.data.AssistantContext
 import com.deungbul.anshimgil.data.pickLandmark
 import com.deungbul.anshimgil.data.placeDetailAnswer
+import com.deungbul.anshimgil.data.spokenNumbers
 import com.deungbul.anshimgil.data.withDirection
 import com.deungbul.anshimgil.data.ChatLine
 import com.deungbul.anshimgil.data.NEARBY_KINDS
@@ -190,7 +191,7 @@ fun AssistantScreen(
         lines += ChatLine(fromUser = false, text = text)
         if (context.settings.voiceGuide || voiceChat) {
             speaking++
-            tts.speak(text, TextToSpeech.QUEUE_ADD, null, "assistant-${lines.size}")
+            tts.speak(spokenNumbers(text), TextToSpeech.QUEUE_ADD, null, "assistant-${lines.size}")
         }
     }
 
@@ -486,6 +487,32 @@ fun AssistantScreen(
                         android.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:112")))
                     },
                     onGuardian = onAlertGuardian,
+                    // go_police: straight to the route to the nearest police box; the button is the yes, so no
+                    // "지도에서 보여 드릴까요?" in a hurry.
+                    onPolice = {
+                        urgent = false
+                        lines += ChatLine(fromUser = true, text = POLICE_CHOICE)
+                        scope.launch {
+                            thinking = "찾는 중…"
+                            val from = phoneOrigin(android).point
+                            val place = try {
+                                placeRepository.nearby("police", context.mode, from.lat, from.lon).places.firstOrNull()
+                                    // None within 1 km: in a hurry the nearest one farther away still helps.
+                                    ?: placeRepository.search("파출소", from.lat, from.lon).firstOrNull()
+                            } catch (e: ApiException) {
+                                null
+                            }
+                            thinking = null
+                            if (place == null) {
+                                say("가까운 파출소를 찾지 못했어요. 위험하면 바로 112에 전화하세요.")
+                                urgent = true
+                                return@launch
+                            }
+                            chat.lastPlace = place
+                            say("${withDirection(place.name)} 안내할게요.")
+                            onRoute(place)
+                        }
+                    },
                     onFine = { urgent = false; say("다행이에요. 필요하면 언제든 말해 주세요.") },
                 )
             }
@@ -624,9 +651,15 @@ private const val SLOW_MS = 3_000L
 /** How far back a live bubble's line counts as already said. */
 private const val RECENT_LINES = 8
 
-/** 급한 말에: the team server's three answers, 112 / 보호자 / 괜찮아요 (RuleBrain.emergency), big enough to hit in a hurry. */
+/** The 급한 말 button for the nearest police box (the server's go_police). */
+const val POLICE_CHOICE = "가까운 파출소로 안내"
+
+/**
+ * 급한 말에: the team server's four answers, 112 / 보호자 / 가까운 파출소로 안내 / 괜찮아요 (RuleBrain.emergency, #188),
+ * big enough to hit in a hurry.
+ */
 @Composable
-private fun EmergencyCard(onCall: () -> Unit, onGuardian: () -> Unit, onFine: () -> Unit) {
+private fun EmergencyCard(onCall: () -> Unit, onGuardian: () -> Unit, onPolice: () -> Unit, onFine: () -> Unit) {
     val red = Color(0xFFB42318)
     Surface(shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -635,6 +668,9 @@ private fun EmergencyCard(onCall: () -> Unit, onGuardian: () -> Unit, onFine: ()
             }
             Button(onClick = onGuardian, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB45309)), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
                 Text("보호자에게 알리기", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+            Button(onClick = onPolice, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1F4E9A)), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                Text(POLICE_CHOICE, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
             OutlinedButton(onClick = onFine, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("괜찮아요", fontSize = 16.sp) }
         }
