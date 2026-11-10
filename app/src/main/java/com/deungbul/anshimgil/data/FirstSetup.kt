@@ -44,6 +44,12 @@ const val SETUP_CONSENT_QUESTION =
         "남기는 것: 간 곳의 이름, 나간 요일과 시간대(30분 단위), 걸어갔는지 버스를 탔는지, 그날 날씨, 다녀와서 남긴 한마디. " +
         "남기지 않는 것: 이름, 전화번호, 집 주소, 지나온 길, 정확한 시각. 언제든 [내 기록 지우기]를 누르면 바로 모두 지워져요."
 
+/**
+ * Read out instead of [SETUP_CONSENT_QUESTION] when answering by voice: the whole text took about 25 seconds before the
+ * microphone opened (11/10 phone test). The screen still shows the team's full words (consent.md 1번).
+ */
+const val SETUP_CONSENT_SPOKEN = "다닌 기록을 남겨도 될까요? 남기는 것과 남기지 않는 것은 화면에 적어 두었어요."
+
 /** One question, its answers in order (the first is the suggested one). */
 enum class SetupStep(val question: String, val answers: List<String>) {
     /**

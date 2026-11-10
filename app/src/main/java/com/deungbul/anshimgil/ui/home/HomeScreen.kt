@@ -332,7 +332,8 @@ fun HomeScreen(
     LaunchedEffect(setupAsk?.first, listening, listenAgain) {
         val q = setupAsk?.first ?: return@LaunchedEffect
         if (!listening) return@LaunchedEffect
-        val words = if (voiceMisses > 0) "잘 못 알아들었어요. 다시 말해 주세요." else q + " " + setupAsk.second.joinToString(", ")
+        val spoken = if (q == com.deungbul.anshimgil.data.SETUP_CONSENT_QUESTION) com.deungbul.anshimgil.data.SETUP_CONSENT_SPOKEN else q
+        val words = if (voiceMisses > 0) "잘 못 알아들었어요. 다시 말해 주세요." else spoken + " " + setupAsk.second.joinToString(", ")
         val main = android.os.Handler(android.os.Looper.getMainLooper())
         setupTts.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
             override fun onStart(id: String?) {}
