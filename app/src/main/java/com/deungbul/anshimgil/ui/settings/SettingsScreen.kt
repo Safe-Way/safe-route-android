@@ -80,6 +80,7 @@ fun SettingsScreen(
     /** 내 정보 (m06). */
     onOpenMyInfo: () -> Unit = {},
     onVoiceChange: (Boolean) -> Unit,
+    onVoiceChatChange: (Boolean) -> Unit = {},
     onAutoConditionsChange: (Boolean) -> Unit,
     onTextSizeChange: (TextSize) -> Unit,
     onExtraMapItemChange: (key: String, on: Boolean) -> Unit,
@@ -175,6 +176,7 @@ fun SettingsScreen(
 
         SectionTitle("길찾기")
         SwitchRow("음성 안내", "걷는 동안 다음 방향을 읽어 줘요", settings.voiceGuide, onVoiceChange)
+        SwitchRow("AI 비서와 말로 대화", "AI 비서를 열면 바로 듣고, 대답한 뒤 다시 들어요", settings.voiceChat, onVoiceChatChange)
         SwitchRow("상황 자동 판단", "밤, 비, 폭염 등을 알아서 경로에 반영해요", settings.autoConditions, onAutoConditionsChange)
         SwitchRow("꺾는 곳 표시", "길안내 지도에서 크게 꺾는 곳에 ↰ ↱ 표시를 보여 줘요", settings.turnSigns, onTurnSignsChange)
 

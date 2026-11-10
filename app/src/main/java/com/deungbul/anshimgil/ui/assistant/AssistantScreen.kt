@@ -8,6 +8,14 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.speech.RecognitionListener
+import android.speech.SpeechRecognizer
+import android.speech.tts.UtteranceProgressListener
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -42,6 +50,8 @@ import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -139,11 +149,27 @@ fun AssistantScreen(
     var heard by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
 
-    // Replies are read aloud when 음성 안내 is on.
+    // Replies are read aloud when 음성 안내 is on (or in a voice chat).
     val tts = rememberTts(android)
+    val voiceChat = context.settings.voiceChat
+    // Lines still being read aloud; the voice chat listens again once they are done.
+    var speaking by remember { mutableIntStateOf(0) }
+    var spoken by remember { mutableIntStateOf(0) }
+    DisposableEffect(tts) {
+        val main = Handler(Looper.getMainLooper())
+        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(id: String?) {}
+            override fun onDone(id: String?) { if (id?.startsWith("assistant") == true) main.post { speaking = (speaking - 1).coerceAtLeast(0); spoken++ } }
+            @Deprecated("Deprecated in Java") override fun onError(id: String?) { onDone(id) }
+        })
+        onDispose { }
+    }
     fun say(text: String) {
         lines += ChatLine(fromUser = false, text = text)
-        if (context.settings.voiceGuide) tts.speak(text, TextToSpeech.QUEUE_ADD, null, "assistant")
+        if (context.settings.voiceGuide || voiceChat) {
+            speaking++
+            tts.speak(text, TextToSpeech.QUEUE_ADD, null, "assistant-${lines.size}")
+        }
     }
 
     suspend fun findAndGo(find: suspend (lat: Double, lon: Double) -> Place?, missing: String) {
@@ -229,10 +255,20 @@ fun AssistantScreen(
         }
     }
 
+    // Listening happens inside the app (no Google dialog over the chat, 11/10): the microphone button shows it.
+    var listening by remember { mutableStateOf(false) }
+    var partial by remember { mutableStateOf("") }
+    // The voice chat goes on until nothing is heard twice in a row, or the walker types or taps.
+    var chatOn by remember { mutableStateOf(voiceChat) }
+    var silences by remember { mutableIntStateOf(0) }
+    val recognizer = remember {
+        if (SpeechRecognizer.isRecognitionAvailable(android)) SpeechRecognizer.createSpeechRecognizer(android) else null
+    }
+    DisposableEffect(recognizer) { onDispose { recognizer?.destroy() } }
     val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { send(it, byVoice = true) }
     }
-    fun listen() {
+    fun listenWithDialog() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
@@ -243,8 +279,58 @@ fun AssistantScreen(
             say("이 휴대폰은 음성 입력을 쓸 수 없어요. 글로 써 주세요.")
         }
     }
+    fun listenInApp() {
+        val r = recognizer ?: return listenWithDialog()
+        tts.stop(); speaking = 0
+        r.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) { listening = true; partial = "" }
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+            override fun onPartialResults(b: Bundle?) {
+                b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { partial = it }
+            }
+            override fun onResults(b: Bundle?) {
+                listening = false; partial = ""
+                val said = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                if (said.isNullOrBlank()) onError(SpeechRecognizer.ERROR_NO_MATCH) else { silences = 0; send(said, byVoice = true) }
+            }
+            override fun onError(error: Int) {
+                listening = false; partial = ""
+                if (chatOn) {
+                    silences++
+                    if (silences >= 2) { chatOn = false; lines += ChatLine(false, "말씀이 없으셔서 듣기를 멈췄어요. 마이크를 누르면 다시 들어요.") }
+                    else spoken++ // listen once more
+                }
+            }
+        })
+        r.startListening(
+            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
+                .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true),
+        )
+    }
+    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) listenInApp() else listenWithDialog()
+    }
+    fun listen() {
+        if (listening) { recognizer?.stopListening(); return }
+        val ok = androidx.core.content.ContextCompat.checkSelfPermission(android, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        if (ok) listenInApp() else micPermission.launch(Manifest.permission.RECORD_AUDIO)
+    }
 
-    LaunchedEffect(Unit) { if (listenAtStart) listen() }
+    LaunchedEffect(Unit) { if (listenAtStart || voiceChat) listen() }
+    // Voice chat: once the answer has been read out (and nothing else is going on), listen again.
+    LaunchedEffect(spoken, thinking, speaking) {
+        if (!chatOn || listening || thinking != null || speaking > 0 || urgent) return@LaunchedEffect
+        if (lines.lastOrNull()?.fromUser != false) return@LaunchedEffect
+        delay(400)
+        listen()
+    }
 
     LaunchedEffect(lines.size, thinking) { listState.animateScrollToItem(maxOf(0, lines.size)) }
 
@@ -309,23 +395,24 @@ fun AssistantScreen(
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(12.dp)) {
             OutlinedTextField(
                 value = input,
-                onValueChange = { input = it.take(300) },
-                placeholder = { Text("여기에 쓰거나 마이크를 눌러 말해요") },
+                onValueChange = { input = it.take(300); if (chatOn) { chatOn = false; recognizer?.cancel(); listening = false } },
+                placeholder = { Text(if (listening) partial.ifBlank { "듣고 있어요… 말씀해 주세요" } else "여기에 쓰거나 마이크를 눌러 말해요") },
                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp, color = Ink),
                 colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Ink, unfocusedTextColor = Ink, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White),
                 modifier = Modifier.weight(1f),
             )
             // The same simple rounded square as the microphone in walking guidance.
+            // While listening it turns solid green, so it is plain the app is listening (the chat stays in view).
             Surface(
-                onClick = ::listen,
+                onClick = { if (!listening && voiceChat) { chatOn = true; silences = 0 }; listen() },
                 shape = RoundedCornerShape(14.dp),
-                color = Color.White,
-                contentColor = Green,
+                color = if (listening) Green else Color.White,
+                contentColor = if (listening) Color.White else Green,
                 border = androidx.compose.foundation.BorderStroke(1.5.dp, Green),
                 modifier = Modifier.padding(start = 8.dp).size(52.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Outlined.Mic, contentDescription = "말로 하기", modifier = Modifier.size(26.dp))
+                    Icon(if (listening) Icons.Filled.Mic else Icons.Outlined.Mic, contentDescription = if (listening) "듣는 중, 누르면 멈춤" else "말로 하기", modifier = Modifier.size(26.dp))
                 }
             }
             IconButton(onClick = { send(input) }, enabled = input.isNotBlank() && thinking == null) {
