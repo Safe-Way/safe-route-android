@@ -78,4 +78,10 @@ class MotionTest {
         assertEquals(0f, arrowHeading(moving = true, heading = 0f, compass = 200f))
         assertEquals(0f, arrowHeading(moving = false, heading = 0f, compass = null))
     }
+
+    @Test
+    fun walkingAnotherWayTheMapFollowsTheCourse() {
+        assertEquals(90f, guideHeading(onRoute = true, moving = true, routeAhead = 0f, course = 90f, compass = null))
+        assertEquals(0f, guideHeading(onRoute = true, moving = true, routeAhead = 0f, course = 30f, compass = null))
+    }
 }

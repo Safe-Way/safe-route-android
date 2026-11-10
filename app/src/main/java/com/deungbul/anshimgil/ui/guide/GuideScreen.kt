@@ -211,7 +211,7 @@ private const val CROSSWALK_ON_ROUTE_M = 8.0
 private const val FOLLOW_MS = 900
 private val FOLLOW = CameraAnimation.from(FOLLOW_MS, false, true)
 /** The map turns only when the walker turns by at least this much. */
-private const val MAP_TURN_DEGREES = 25f
+private const val MAP_TURN_DEGREES = 15f
 
 /** Standing still the map follows a turn of the body from this many degrees. */
 private const val MAP_TURN_STILL_DEGREES = 10f
