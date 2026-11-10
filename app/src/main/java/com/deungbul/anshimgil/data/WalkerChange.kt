@@ -27,8 +27,6 @@ const val KEEP_AS_IS = "그대로 둘래"
 private const val HOW_LONG = "휠체어는 언제까지 타세요?"
 private val HOW_LONG_ANSWERS = listOf("오늘만", "며칠 동안", "한동안 계속")
 
-/** Words that make even a remark about a wheelchair urgent (then 112 is offered as before). */
-private val URGENT_WORDS = listOf("살려", "쓰러", "넘어졌", "넘어져", "피가", "피 나", "위험", "따라와", "따라오", "무서워", "도와주세요", "112", "119")
 
 private fun String.squeezed() = replace(" ", "")
 
@@ -57,7 +55,8 @@ fun walkerChange(said: String, history: List<ChatLine>, current: UserMode): Assi
         return if (mode == current) AssistantAction.Answer("지금도 ${current.spokenName}예요.", onPhone = true)
         else AssistantAction.ChangeSettings("${mode.spokenName}로 바꿀게요.", mode = mode)
     }
-    if (!has("휠체어") || URGENT_WORDS.any { s.contains(it.squeezed()) }) return null
+    // Anything urgent goes to the emergency rule first (the server's urgent words, Assistant.kt).
+    if (!has("휠체어") || isEmergency(said)) return null
     // "오늘은 휠체어 안 타": walking without it today.
     if (has("안타", "안 타", "안써", "안 써", "안탈", "없이", "내려", "그만")) {
         if (current != UserMode.DISABLED) return AssistantAction.Answer("지금은 휠체어 모드가 아니에요. ${current.spokenName} 그대로 둘게요.", onPhone = true)
