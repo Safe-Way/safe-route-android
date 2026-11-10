@@ -55,6 +55,11 @@ sealed interface AssistantAction {
         val textBoostUp: Boolean = false,
         val calendar: Boolean? = null,
         val adapt: Boolean? = null,
+        /** [mode] only until this day (몸 상태가 잠깐 바뀜, the team server's temp_until), for [tempReason]. */
+        val tempUntil: java.time.LocalDate? = null,
+        val tempReason: String? = null,
+        /** Back to the usual way of walking (the server's clear_temp). */
+        val clearTemp: Boolean = false,
     ) : AssistantAction
 
     /** Route to the nearest place of a kind ([NEARBY_KINDS] key). */
@@ -92,6 +97,8 @@ data class AssistantContext(
     val usage: Usage = Usage(),
     /** The phone's position when there is a real fix; asked only by the server assistant. */
     val where: suspend () -> LatLon? = { null },
+    /** The usual way of walking while a temporary one is on (TempMode.kt); else [mode]. */
+    val usualMode: UserMode = mode,
 )
 
 interface AppAssistant {
@@ -124,7 +131,7 @@ object RuleAppAssistant : AppAssistant {
         fun has(vararg w: String) = w.any { s.contains(it.replace(" ", "")) }
         // Who walks and how ("다리를 다쳐서 휠체어 타", "오늘은 휠체어 안 타"): before the emergency words, which
         // would take "다쳐서" for a fall; walkerChange leaves anything urgent to them.
-        walkerChange(said, history, context.mode)?.let { return it }
+        walkerChange(said, history, context.mode, context.usualMode)?.let { return it }
         if (isEmergency(said)) return AssistantAction.Emergency(EMERGENCY_SAY)
         // "집에 하트 그려진 아이콘 뭐야?": before the places, so "화장실 아이콘 뭐야" is told, not routed to.
         iconAnswer(said)?.let { return AssistantAction.Answer(it) }
@@ -526,7 +533,7 @@ internal fun assistantStops(json: JSONObject): List<StopPlace> {
 class MapChatAssistant(private val fallback: AppAssistant) : AppAssistant {
     override suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction {
         // The phone's own: who walks and how (asked back first), and the app's pictures.
-        walkerChange(history.lastOrNull { it.fromUser }?.text.orEmpty(), history, context.mode)?.let { return it }
+        walkerChange(history.lastOrNull { it.fromUser }?.text.orEmpty(), history, context.mode, context.usualMode)?.let { return it }
         // The server does not know the app's pictures.
         if (iconAnswer(history.lastOrNull { it.fromUser }?.text.orEmpty()) != null) return fallback.reply(history, context)
         val s = context.settings

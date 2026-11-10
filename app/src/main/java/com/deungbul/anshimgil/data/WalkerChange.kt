@@ -18,33 +18,86 @@ val UserMode.spokenName: String
     }
 
 const val KEEP_AS_IS = "그대로 둘래"
-private const val HOW_LONG = "휠체어는 언제까지 타세요?"
-private val HOW_LONG_ANSWERS = listOf("오늘만", "며칠 동안", "한동안 계속")
 
+/** The server's yes / no buttons (RuleBrain.YES_NO). */
+val YES_NO = listOf("네", "아니요")
 
 private fun String.squeezed() = replace(" ", "")
 
+private fun isYes(s: String) = s.startsWith("네") || s.startsWith("응") || s.startsWith("예") || s.contains("맞아") || s.contains("좋아")
+private fun isNo(s: String) = s.startsWith("아니") || s.contains("싫어") || s.contains("괜찮아요")
+
+private val ASKED_DAY = Regex("(\\d{1,2})월 (\\d{1,2})일까지")
+
 /**
- * AI 비서's reply when [said] is about who walks or how (a mode), given the conversation so far and the [current]
- * mode; null when it is not. Answers here stay on the phone.
+ * AI 비서's reply when [said] is about who walks or how, given the conversation so far, the [current] mode and the
+ * walker's [usual] mode (differs from [current] during a temporary change); null when it is not. The steps are the
+ * team server's (RuleBrain.tempBody · tempUntil · 다 나음 · 오늘만, TempMode.kt); answers stay on the phone.
  */
-fun walkerChange(said: String, history: List<ChatLine>, current: UserMode): AssistantAction? {
+fun walkerChange(
+    said: String,
+    history: List<ChatLine>,
+    current: UserMode,
+    usual: UserMode = current,
+    today: java.time.LocalDate = java.time.LocalDate.now(),
+): AssistantAction? {
     val s = said.squeezed()
     fun has(vararg w: String) = w.any { s.contains(it.squeezed()) }
     val lastAsked = history.lastOrNull { !it.fromUser }?.text.orEmpty()
 
+    // Answers to the server's yes/no checks.
+    if (lastAsked.endsWith("맞으세요?") && (isYes(s) || isNo(s))) {
+        if (isNo(s)) return AssistantAction.Answer("알겠어요. 바꾸지 않을게요.", onPhone = true)
+        if (lastAsked.contains("그때 다시 여쭤볼게요")) {
+            val (m, d) = ASKED_DAY.find(lastAsked)?.destructured ?: return null
+            var until = java.time.LocalDate.of(today.year, m.toInt(), d.toInt())
+            if (until.isBefore(today)) until = until.plusYears(1)
+            val mode = serverModeWord(lastAsked) ?: modeFromWord(lastAsked) ?: UserMode.DISABLED
+            val reason = if (history.any { it.fromUser && it.text.contains("다리") }) "다리 다침" else "몸이 불편함"
+            return AssistantAction.ChangeSettings(
+                "알겠어요. ${dayText(until)}까지 ${modeWord(mode)} 안내할게요.",
+                mode = mode,
+                addMapItems = if (mode == UserMode.DISABLED) setOf("toilet:wheelchair", "crosswalk:curb_low") else emptySet(),
+                tempUntil = until,
+                tempReason = reason,
+            )
+        }
+        if (lastAsked.contains("오늘은 걸어서 다니시는 걸로")) {
+            return AssistantAction.ChangeSettings(
+                "알겠어요. 오늘은 걸어서 다니시는 걸로 안내할게요. 내일은 다시 평소대로 할게요.",
+                mode = UserMode.GENERAL, tempUntil = today, tempReason = "오늘만",
+            )
+        }
+        if (lastAsked.contains("이제 평소처럼") || lastAsked.contains("내일부터 평소처럼")) {
+            return AssistantAction.ChangeSettings("다행이에요. 평소처럼 ${modeWord(usual)} 안내할게요.", mode = usual, clearTemp = true)
+        }
+    }
+    // The answer to "언제까지 … 타세요?": the end day, or 7 days when not known.
+    if (lastAsked.contains("타세요? 날짜나")) {
+        val mode = serverModeWord(lastAsked.replace("를", "로")) ?: modeFromWord(lastAsked) ?: UserMode.DISABLED
+        val day = untilIn(said, today)
+        return AssistantAction.Ask(tempConfirmQuestion(mode, day ?: today.plusDays(TEMP_DEFAULT_DAYS), day != null), YES_NO, onPhone = true)
+    }
+    // "다리를 다쳐서 휠체어 타고 다녀": for a while, so until when.
+    val named = serverModeWord(said)
+    if (has("다쳐", "다쳤", "깁스", "수술") && named != null) {
+        val day = untilIn(said, today) ?: return AssistantAction.Ask(howLongQuestion(named), emptyList(), onPhone = true)
+        return AssistantAction.Ask(tempConfirmQuestion(named, day, true), YES_NO, onPhone = true)
+    }
+    // 다 나음.
+    if (has("다나았", "나았어", "이제괜찮", "다시걸")) {
+        return AssistantAction.Ask("다행이에요! 이제 평소처럼 ${modeWord(usual)} 다니시는 걸로 바꿀까요? 맞으세요?", YES_NO, onPhone = true)
+    }
+    // 오늘만: "오늘은 휠체어 안 타".
+    if ((s.startsWith("오늘은") || s.startsWith("오늘만")) && named != null && has("안타", "안써")) {
+        return AssistantAction.Ask("오늘은 걸어서 다니시는 걸로 안내할까요? 내일은 다시 평소대로 할게요. 맞으세요?", YES_NO, onPhone = true)
+    }
+
     if (has(KEEP_AS_IS, "그대로 둘게", "그대로 두", "바꾸지 마", "안 바꿔")) {
         return AssistantAction.Answer("네, ${current.spokenName} 그대로 둘게요.", onPhone = true)
     }
-    // The answer to "언제까지 타세요?": the wheelchair was already said, and how long is known now.
-    if (HOW_LONG in lastAsked && (HOW_LONG_ANSWERS.any { s.contains(it.squeezed()) } || has("오늘", "내일", "며칠", "일주일", "주", "달", "계속", "당분간"))) {
-        return AssistantAction.ChangeSettings(
-            "알겠어요. ${UserMode.DISABLED.spokenName}로 바꿔 계단 없는 길로 안내할게요. 다 나으면 \"휠체어 안 타\"라고 말해 주세요.",
-            mode = UserMode.DISABLED,
-        )
-    }
     // The way of walking by the team server's words (RuleReader.MODE_WORDS), plus the app's own mode names.
-    val mode = serverModeWord(said) ?: when {
+    val mode = named ?: when {
         has("장애인") -> UserMode.DISABLED
         has("일반") -> UserMode.GENERAL
         else -> null
@@ -55,24 +108,19 @@ fun walkerChange(said: String, history: List<ChatLine>, current: UserMode): Assi
         else AssistantAction.ChangeSettings("${mode.spokenName}로 바꿀게요.", mode = mode)
     }
     // Anything urgent goes to the emergency rule first (the server's urgent words, Assistant.kt).
-    if (!has("휠체어") || isEmergency(said)) return null
-    // "오늘은 휠체어 안 타": walking without it today.
-    if (has("안타", "안 타", "안써", "안 써", "안탈", "없이", "내려", "그만")) {
-        if (current != UserMode.DISABLED) return AssistantAction.Answer("지금은 휠체어 모드가 아니에요. ${current.spokenName} 그대로 둘게요.", onPhone = true)
-        return AssistantAction.Ask(
-            "오늘은 휠체어 없이 걸으시는군요. 어떤 모드로 바꿀까요?",
-            listOf("어르신 모드로 바꿔 줘", "일반 모드로 바꿔 줘", KEEP_AS_IS),
-            onPhone = true,
-        )
-    }
-    // "다리를 다쳐서 휠체어 타": for a while, so ask how long.
-    if (has("다쳐", "다쳤", "다친", "수술", "깁스", "부러", "삐었", "골절")) {
-        return AssistantAction.Ask("다치셨군요. 얼른 나으시길 바라요. $HOW_LONG", HOW_LONG_ANSWERS, onPhone = true)
-    }
-    if (current == UserMode.DISABLED) return null
+    if (!has("휠체어") || isEmergency(said) || current == UserMode.DISABLED) return null
     return AssistantAction.Ask(
         "휠체어로 다니시면 ${UserMode.DISABLED.spokenName}로 바꿀까요? 계단 없는 길로 안내해요.",
         listOf("휠체어 모드로 바꿔 줘", KEEP_AS_IS),
         onPhone = true,
     )
+}
+
+/** The mode in one of the server's mode words ("어르신 걸음으로", "어린이와 함께", "걸어서"). */
+private fun modeFromWord(text: String): UserMode? = when {
+    text.contains("휠체어") -> UserMode.DISABLED
+    text.contains("어르신 걸음") -> UserMode.SENIOR
+    text.contains("어린이와 함께") -> UserMode.CHILD
+    text.contains("걸어서") -> UserMode.GENERAL
+    else -> null
 }
