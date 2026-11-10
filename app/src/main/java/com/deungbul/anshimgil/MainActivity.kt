@@ -522,7 +522,8 @@ fun AppRoot(
                         initial = mode,
                         onStart = { picked ->
                             // The first pick on a new install, or another mode later: AI 비서 offers to set up the rest.
-                            if (mode == null) setupStep = SetupStep.START
+                            // A new walker: the team server's setup questions first (FirstSetup.kt).
+                            if (mode == null) setupStep = SetupStep.AID
                             else if (picked != mode) setupStep = SetupStep.CHANGED
                             setupAnswers = SetupAnswers()
                             val firstPick = mode == null
@@ -798,6 +799,18 @@ fun AppRoot(
                             val (next, answers) = answerSetup(step, i, setupAnswers, settings.textSize)
                             setupAnswers = answers
                             setupStep = next
+                            // The server's setup answers go to its user_profile; the trip-record answer as consent.
+                            if (step == SetupStep.CONFIRM && answers.confirmed && answers.aid != null) scope.launch {
+                                runCatching {
+                                    myInfoRepository.update(mode ?: UserMode.GENERAL, org.json.JSONObject()
+                                        .put("mobilityAid", com.deungbul.anshimgil.data.aidProfileValue(answers.aid) ?: org.json.JSONObject.NULL)
+                                        .put("stairsOk", answers.stairs ?: 2).put("setupDone", true))
+                                }
+                            }
+                            if (step == SetupStep.CONSENT) answers.consent?.let { yes ->
+                                if (!yes) assistantChat.note(false, com.deungbul.anshimgil.data.CONSENT_NO_REPLY)
+                                scope.launch { tripLog?.setConsent(if (yes) TripConsent.YES else TripConsent.NO, mode ?: UserMode.GENERAL) }
+                            }
                             if ((step == SetupStep.START || step == SetupStep.CHANGED) && next == null) {
                                 assistantChat.note(false, "알겠어요. 필요하면 설정에서나 저에게 말해서 언제든 바꿀 수 있어요.")
                             }

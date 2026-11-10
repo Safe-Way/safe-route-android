@@ -11,9 +11,49 @@ package com.deungbul.anshimgil.data
  * The questions start from the current settings: an answer only changes what it is about.
  */
 
+/*
+ * New walkers are first asked the team server's setup questions (safe-route RuleBrain.startSetup · setupAid ·
+ * setupStairs · setupConfirm, dialogues.md 2번): how they get about, how many steps are fine, a check, then the
+ * trip-record consent (consent.md 1번, "처음 쓸 때, 비서의 다섯째 질문"). The app's own text / voice / SOS questions,
+ * which the team has no rule for, follow. The answers go to the server's user_profile (mobilityAid, stairsOk, setupDone).
+ */
+
+/** The server's ways of getting about (RuleBrain.AID_CHOICES), as said. */
+val SETUP_AIDS = listOf("walk" to "걸어서", "cane" to "지팡이", "wheelchair" to "휠체어", "stroller" to "유모차")
+
+/** The server's words for a way of getting about (RuleBrain.aidWord). */
+fun aidWord(aid: String?): String = when (aid) {
+    "wheelchair", "manual_wheelchair" -> "휠체어"
+    "power_wheelchair" -> "전동 휠체어"
+    "cane" -> "지팡이"
+    "walker" -> "보행기"
+    "stroller" -> "유모차"
+    else -> "걸어서"
+}
+
+/** The server's user_profile value for a way of getting about (RuleBrain.aidFields: mobility_aid). */
+fun aidProfileValue(aid: String): String? = when (aid) {
+    "wheelchair" -> "manual_wheelchair"
+    "cane", "walker", "stroller", "power_wheelchair" -> aid
+    else -> null
+}
+
+/** The team's consent question for the trip record (consent.md 1번), asked in the setup. */
+const val SETUP_CONSENT_QUESTION =
+    "다닌 기록을 남겨도 될까요? 기록을 남기면 비서가 더 잘 도와드려요. " +
+        "남기는 것: 간 곳의 이름, 나간 요일과 시간대(30분 단위), 걸어갔는지 버스를 탔는지, 그날 날씨, 다녀와서 남긴 한마디. " +
+        "남기지 않는 것: 이름, 전화번호, 집 주소, 지나온 길, 정확한 시각. 언제든 [내 기록 지우기]를 누르면 바로 모두 지워져요."
+
 /** One question, its answers in order (the first is the suggested one). */
 enum class SetupStep(val question: String, val answers: List<String>) {
-    START("처음 오셨네요. 세 가지만 여쭤보고 쓰기 편하게 맞춰 드릴까요?", listOf("좋아요", "다음에 할게요")),
+    /** The server's first setup question for a new walker. */
+    AID("처음 오셨네요. 어떻게 다니세요? 걸어서, 지팡이, 휠체어, 유모차 중에 말씀해 주세요.", SETUP_AIDS.map { it.second }),
+    /** The server's stairs question; the words depend on the answer before ([setupQuestion]). */
+    STAIRS("", listOf("못 가요", "몇 칸은 괜찮아요", "괜찮아요")),
+    /** The server's check before saving ([setupQuestion]). */
+    CONFIRM("", listOf("네", "아니요")),
+    CONSENT(SETUP_CONSENT_QUESTION, listOf(CONSENT_YES, CONSENT_NO)),
+    START("세 가지만 더 여쭤보고 쓰기 편하게 맞춰 드릴까요?", listOf("좋아요", "다음에 할게요")),
     CHANGED("모드를 바꾸셨네요. 세 가지만 다시 여쭤보고 새 모드에 맞춰 드릴까요?", listOf("좋아요", "지금 그대로 둘게요")),
     TEXT("화면의 글씨가 잘 보이세요?", listOf("잘 보여요", "조금 작아요", "많이 작아요")),
     VOICE("걸을 때 소리로 길을 알려 드릴까요?", listOf("소리로 알려 줘", "화면만 볼게요")),
@@ -27,6 +67,13 @@ const val SETUP_UNDO_INDEX = 1
 
 /** What the answers set; null is left as it is. */
 data class SetupAnswers(
+    /** The server's setup: the way of getting about ([SETUP_AIDS] key) and steps (0 못 가요, 1 몇 칸, 2 괜찮아요). */
+    val aid: String? = null,
+    val stairs: Int? = null,
+    /** "맞으세요?" answered yes: send aid and stairs to the server. */
+    val confirmed: Boolean = false,
+    /** The trip-record answer, when given here. */
+    val consent: Boolean? = null,
     val textSize: TextSize? = null,
     val textBoost: Float? = null,
     val voiceGuide: Boolean? = null,
@@ -35,6 +82,13 @@ data class SetupAnswers(
 
 /** The next step after answer [index] to [step], with the settings so far; null step means finished or skipped. */
 fun answerSetup(step: SetupStep, index: Int, so: SetupAnswers, current: TextSize = TextSize.NORMAL): Pair<SetupStep?, SetupAnswers> = when (step) {
+    // A wheelchair: no steps, straight to the check (RuleBrain.setupAid).
+    SetupStep.AID -> SETUP_AIDS[index].first.let { aid ->
+        if (aid == "wheelchair") SetupStep.CONFIRM to so.copy(aid = aid, stairs = 0) else SetupStep.STAIRS to so.copy(aid = aid)
+    }
+    SetupStep.STAIRS -> SetupStep.CONFIRM to so.copy(stairs = index)
+    SetupStep.CONFIRM -> SetupStep.CONSENT to so.copy(confirmed = index == 0)
+    SetupStep.CONSENT -> SetupStep.START to so.copy(consent = index == 0)
     SetupStep.START, SetupStep.CHANGED -> (if (index == 0) SetupStep.TEXT else null) to so
     SetupStep.TEXT -> SetupStep.VOICE to when (index) {
         // Readable as it is: left as it is (a walker on 크게 who changes the mode keeps it).
@@ -64,7 +118,17 @@ fun setupSummary(a: SetupAnswers): String {
 }
 
 /** What AI 비서 says for [step] ([SetupStep.DONE] says what was set). */
-fun setupQuestion(step: SetupStep, so: SetupAnswers): String = if (step == SetupStep.DONE) setupSummary(so) else step.question
+fun setupQuestion(step: SetupStep, so: SetupAnswers): String = when (step) {
+    SetupStep.DONE -> setupSummary(so)
+    // RuleBrain.setupAid / setupConfirm, word for word.
+    SetupStep.STAIRS -> "${aidWord(so.aid)}(으)로 다니시는군요. 계단은 몇 칸 괜찮으세요?"
+    SetupStep.CONFIRM -> "${aidWord(so.aid)}(으)로 다니고, " + when (so.stairs) {
+        0 -> "계단은 못 가요"
+        1 -> "계단은 몇 칸 괜찮아요"
+        else -> "계단은 괜찮아요"
+    } + ". 이렇게 기억할까요? 맞으세요?"
+    else -> step.question
+}
 
 /**
  * The answer meant by words said to a 처음 맞추기 question (사용성 점검표 2번: answered by voice alone), as the
@@ -76,6 +140,21 @@ fun setupAnswerFromSpeech(step: SetupStep, said: String): Int? {
     val no = has("아니", "싫어", "괜찮아", "필요없", "필요 없", "안 해", "안해", "다음에", "나중에", "그대로", "됐어")
     val yes = has("좋아", "응", "네", "예", "그래", "해 줘", "해줘", "해주세요", "부탁", "맞춰")
     return when (step) {
+        // The server's readings (RuleBrain.aid, setupStairs).
+        SetupStep.AID -> when {
+            has("휠체어") -> 2
+            has("지팡이", "보행기") -> 1
+            has("유모차") -> 3
+            has("걸어", "그냥") -> 0
+            else -> null
+        }
+        SetupStep.STAIRS -> when {
+            has("못", "안돼", "안 돼", "힘들") -> 0
+            has("몇", "조금", "한두") -> 1
+            has("괜찮", "다", "돼") -> 2
+            else -> null
+        }
+        SetupStep.CONFIRM, SetupStep.CONSENT -> when { no -> 1; yes || has("남길") -> 0; else -> null }
         SetupStep.START, SetupStep.CHANGED -> when { no -> 1; yes -> 0; else -> null }
         SetupStep.TEXT -> when {
             has("많이", "너무", "안 보여", "안보여", "하나도") -> 2
