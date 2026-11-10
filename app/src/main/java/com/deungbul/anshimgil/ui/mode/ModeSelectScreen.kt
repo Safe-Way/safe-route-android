@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextAlign
 import com.deungbul.anshimgil.data.UserMode
 
 private val Ink = Color(0xFF17211B)
@@ -187,8 +188,9 @@ fun ModeSelectScreen(
             }
         }
         Text(
-            "고른 모드는 이 휴대폰에만 저장돼요",
-            fontSize = 13.sp, color = Muted,
+            // consent.md §0 (11-10): 모드와 무작위 번호는 길찾기에 쓰려고 서버에도 둔다 (#96)
+            "길을 맞게 찾으려고 고른 모드와 앱이 만든 무작위 번호만 서버에 둬요. 이름·전화번호는 알 수 없어요",
+            fontSize = 13.sp, color = Muted, textAlign = TextAlign.Center,
             modifier = Modifier.align(Alignment.CenterHorizontally),
         )
     }

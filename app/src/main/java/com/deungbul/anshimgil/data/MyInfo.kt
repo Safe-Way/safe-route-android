@@ -59,7 +59,8 @@ const val CONSENT_BODY = "기록을 남기면 비서가 더 잘 도와드려요.
     "언제든 [내 기록 지우기]를 누르면 바로 모두 지워져요."
 const val CONSENT_YES = "네, 남길게요"
 const val CONSENT_NO = "아니요"
-const val CONSENT_NO_REPLY = "알겠어요. 기록은 이 휴대폰에만 두고 서버에는 보내지 않을게요."
+/** consent.md §1 [아니요] (11-10 고침: 동의하지 않으면 휴대폰 안 습관 기록도 남기지 않음, #101). */
+const val CONSENT_NO_REPLY = "알겠어요. 기록은 남기지 않을게요. 길찾기는 그대로 다 쓸 수 있어요."
 
 /** consent.md §5: deleting everything. */
 const val DELETE_ALL_TITLE = "비서가 기억한 것을 모두 지울까요?"
