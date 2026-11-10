@@ -9,35 +9,33 @@ import java.time.LocalTime
 
 /*
  * 이동 패턴 (11/8): where the walker goes at about the same time, learned on this phone from the guidance they
- * start, so that within the first week of use the app can offer the trip before they think of it
+ * start (only with the trip-record consent), so the app can offer the trip before they think of it
  * ("보통 8시 반쯤 학교에 가셨어요. 지금 길 안내할까요?"), in its bubble and as a notification.
  *
- * The server's suggestion needs the same weekday three times (three weeks at least), so this one groups the
- * days the way people live: weekdays together, weekends together. Three different days within two weeks,
- * starting within [HABIT_SPREAD_MIN] minutes of each other to places within [SAME_PLACE_M] of each other, make a
- * habit: Monday, Tuesday and Wednesday are enough to offer it on Thursday.
+ * What counts as a habit is the team server's rule (safe-route 027 trip_habit view, MemoryRepository.habits,
+ * TodayService): the same weekday, the same 30-minute start slot and the same place, 3 times or more; offered when
+ * its slot is from 30 minutes ago to 90 minutes ahead. The app's own rule of 11/8 (any 3 days in 14, weekdays
+ * together, ±40 minutes, within 150 m) was dropped for it.
  *
- * Not offered when it would be wrong: on a day the walker already started that trip, while already there, or
- * outside the time around it. Nothing leaves the phone.
+ * Not offered when it would be wrong: on a day the walker already started that trip, or while already there.
  */
 
-/** Days looked back for a habit, and how long trips are kept at all. */
-const val HABIT_WINDOW_DAYS = 14L
+/** How long trips are kept on the phone at all, and how many. */
 const val TRIPS_KEPT_DAYS = 28L
 const val TRIPS_KEPT = 80
 
-/** Different days needed for a habit. */
-const val HABIT_DAYS = 3
+/** Times needed for a habit (MemoryRepository.habits: times >= 3). */
+const val HABIT_TIMES = 3
 
-/** Starts this close in time (minutes, either way) count as the same time. */
-const val HABIT_SPREAD_MIN = 40
+/** Start slots this long (trip_log.start_slot, 30 minutes). */
+const val HABIT_SLOT_MIN = 30
 
-/** Destinations this close (metres) count as the same place. */
+/** Destinations this close (metres) count as already gone to today. */
 const val SAME_PLACE_M = 150
 
-/** The habit is offered from this long before its usual time until [OFFER_AFTER_MIN] after it. */
-const val OFFER_BEFORE_MIN = 30
-const val OFFER_AFTER_MIN = 10
+/** A habit is offered while its slot is from [OFFER_AFTER_MIN] minutes ago to [OFFER_BEFORE_MIN] ahead (TodayService). */
+const val OFFER_BEFORE_MIN = 90
+const val OFFER_AFTER_MIN = 30
 
 /** A guidance the walker started. */
 data class TripRecord(val name: String, val lat: Double, val lon: Double, val at: LocalDateTime, val transit: Boolean) {
@@ -65,39 +63,28 @@ fun keepTrips(trips: List<TripRecord>, now: LocalDateTime): List<TripRecord> =
 /** A learned habit: going to [place] at about [time] on [days] different days lately. */
 data class Habit(val place: Place, val time: LocalTime, val days: Int, val transit: Boolean)
 
-private fun LocalDate.isWeekend() = dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY
-
 private fun minuteOfDay(t: LocalDateTime) = t.hour * 60 + t.minute
 
-/** All habits for days like [today] (weekday or weekend), from trips before today. */
-fun habits(trips: List<TripRecord>, today: LocalDate): List<Habit> {
-    val past = trips.filter {
-        val day = it.at.toLocalDate()
-        day.isBefore(today) && day.isAfter(today.minusDays(HABIT_WINDOW_DAYS + 1)) && day.isWeekend() == today.isWeekend()
-    }
-    // Places: each trip joins the first group whose first trip is close enough.
-    val groups = mutableListOf<MutableList<TripRecord>>()
-    past.sortedBy { it.at }.forEach { t ->
-        groups.firstOrNull { g -> distanceMeters(g[0].lat, g[0].lon, t.lat, t.lon) <= SAME_PLACE_M }?.add(t) ?: groups.add(mutableListOf(t))
-    }
-    return groups.mapNotNull { group ->
-        // Around each start, the days that started within the spread; the time with the most days wins.
-        val best = group.map { anchor ->
-            group.filter { kotlin.math.abs(minuteOfDay(it.at) - minuteOfDay(anchor.at)) <= HABIT_SPREAD_MIN }
-                // One trip a day: the first one at that time.
-                .groupBy { it.at.toLocalDate() }.values.map { day -> day.minBy { it.at } }
-        }.maxByOrNull { it.size } ?: return@mapNotNull null
-        if (best.size < HABIT_DAYS) return@mapNotNull null
-        val minutes = best.map { minuteOfDay(it.at) }.sorted().let { it[it.size / 2] }
-        val latest = best.maxBy { it.at }
-        Habit(
-            place = Place(null, latest.name, "", latest.lat, latest.lon, null),
-            time = LocalTime.of(minutes / 60, minutes % 60),
-            days = best.size,
-            transit = best.count { it.transit } * 2 > best.size,
-        )
-    }
-}
+/** The 30-minute start slot of a trip (trip_log.start_slot). */
+private fun slotOf(t: LocalDateTime): LocalTime = LocalTime.of(t.hour, t.minute / HABIT_SLOT_MIN * HABIT_SLOT_MIN)
+
+/**
+ * All habits for [today]'s weekday, as the server's trip_habit: trips grouped by weekday, start slot and place
+ * (name and position), [HABIT_TIMES] or more; most often first.
+ */
+fun habits(trips: List<TripRecord>, today: LocalDate): List<Habit> =
+    trips.filter { it.at.dayOfWeek == today.dayOfWeek }
+        .groupBy { Triple(slotOf(it.at), it.name, it.lat to it.lon) }
+        .filter { it.value.size >= HABIT_TIMES }
+        .map { (key, group) ->
+            Habit(
+                place = Place(null, key.second, "", key.third.first, key.third.second, null),
+                time = key.first,
+                days = group.size,
+                transit = group.count { it.transit } * 2 > group.size,
+            )
+        }
+        .sortedWith(compareByDescending<Habit> { it.days }.thenBy { it.time })
 
 /**
  * The habit to offer at [now], if any: its usual time is from [before] minutes ahead to [after] minutes past,
