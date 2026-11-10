@@ -13,9 +13,9 @@ import kotlin.math.sqrt
 /*
  * 신고된 곳 (FR-49, team 결정 57 of 2026-11-10): the team's server view `road_report_active`
  * (safe-route 032_road_report_active.sql) decides which reports count right now, so the route engine, the server
- * and this map agree. The server does not offer that view to the app yet, so [activeSpots] does the same
- * calculation on `GET /api/reports?bbox`, rule for rule, and its tests are the team's own cases
- * (scripts/check_report_active.py). When the server sends the view, read it instead of this.
+ * and this map agree. The app reads it from `GET /api/reports/active` (server #151); [activeSpots] is the same
+ * calculation on `GET /api/reports?bbox`, rule for rule (its tests are the team's own cases,
+ * scripts/check_report_active.py), used only while a server without that window answers.
  *
  * 결정 57:
  *   - Same place = same kind within 30 m; the spot is named by the first report in it (the lowest number).
@@ -48,7 +48,7 @@ data class RoadReport(
     val photoCount: Int,
 )
 
-/** A place with reports valid today, as the team's `road_report_active` gives it. */
+/** A place with reports valid today, as the team's `road_report_active` gives it (`GET /api/reports/active`). */
 data class ReportSpot(
     /** The first report in the place; also where the place is drawn. */
     val spotId: Long,
@@ -57,17 +57,15 @@ data class ReportSpot(
     val point: LatLon,
     val startsOn: LocalDate,
     val endsOn: LocalDate,
-    /** The reports of this period, oldest first. */
-    val reports: List<RoadReport>,
+    /** Reports of this period (report_count). */
+    val count: Int,
     val confirmed: Boolean,
-) {
-    val count: Int get() = reports.size
-    val latest: LocalDateTime? get() = reports.mapNotNull { it.createdAt }.maxOrNull()
-    val photoCount: Int get() = reports.sumOf { it.photoCount }
-
-    /** The newest note (the view's last_memo). */
-    val lastMemo: String? get() = reports.lastOrNull { !it.memo.isNullOrBlank() }?.memo
-}
+    /** The newest report's time (last_at). */
+    val latest: LocalDateTime? = null,
+    val photoCount: Int = 0,
+    /** The newest note (last_memo). */
+    val lastMemo: String? = null,
+)
 
 /** The school server's times are Korean time. */
 fun koreaNow(): LocalDateTime = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
@@ -132,8 +130,11 @@ fun activeSpots(reports: List<RoadReport>, today: LocalDate = koreaNow().toLocal
             .sortedWith(compareBy<RoadReport> { it.createdAt }.thenBy { it.id })
         ReportSpot(
             spotId = spotId, code = first.code, label = first.label, point = first.point,
-            startsOn = s, endsOn = e, reports = inPeriod,
+            startsOn = s, endsOn = e, count = inPeriod.size,
             confirmed = inPeriod.size >= 2 || inPeriod.any { it.teamConfirmed },
+            latest = inPeriod.mapNotNull { it.createdAt }.maxOrNull(),
+            photoCount = inPeriod.sumOf { it.photoCount },
+            lastMemo = inPeriod.lastOrNull { !it.memo.isNullOrBlank() }?.memo,
         )
     }.sortedBy { it.spotId }
 }
@@ -181,7 +182,46 @@ fun reportSpotsAhead(spots: List<ReportSpot>, progressM: Double, onRoute: (LatLo
         if (ahead < 0 || ahead > REPORT_AHEAD_M || off > REPORT_NEAR_ROUTE_M) null else s to ahead.toInt()
     }.sortedBy { it.second }
 
+/** The server's view rows (`GET /api/reports/active`). */
+internal fun parseActiveSpots(json: JSONObject): List<ReportSpot> {
+    val list = json.optJSONArray("spots") ?: return emptyList()
+    fun str(o: JSONObject, k: String) = o.optString(k).takeUnless { o.isNull(k) || it.isBlank() }
+    return (0 until list.length()).mapNotNull { i ->
+        val o = list.optJSONObject(i) ?: return@mapNotNull null
+        val code = str(o, "reportType") ?: "other"
+        val starts = str(o, "startsOn")?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() } ?: return@mapNotNull null
+        val ends = str(o, "endsOn")?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() } ?: return@mapNotNull null
+        ReportSpot(
+            spotId = o.optLong("spotId"),
+            code = code,
+            label = ReportType.entries.firstOrNull { it.code == code }?.label ?: "기타",
+            point = LatLon(o.optDouble("lat"), o.optDouble("lon")),
+            startsOn = starts,
+            endsOn = ends,
+            count = o.optInt("reportCount", 1),
+            confirmed = o.optBoolean("confirmed") || o.optInt("confirmed", 0) == 1,
+            latest = str(o, "lastAt")?.let { runCatching { LocalDateTime.parse(it.take(19).replace(' ', 'T')) }.getOrNull() },
+            photoCount = o.optInt("photoCount"),
+            lastMemo = str(o, "lastMemo"),
+        )
+    }
+}
+
 object RoadReportRepository {
+    /**
+     * The places valid today in [area]: the server's view (`/api/reports/active`), or, from a server without it,
+     * the same calculation here on its report list. Throws [ApiException].
+     */
+    suspend fun activeWithin(area: Bbox): List<ReportSpot> {
+        val box = "%.6f,%.6f,%.6f,%.6f".format(java.util.Locale.US, area.west, area.south, area.east, area.north)
+        return try {
+            parseActiveSpots(ServerApi.get("/api/reports/active", mapOf("bbox" to box)))
+        } catch (e: ApiException) {
+            if (e.code == "NETWORK") throw e
+            activeSpots(within(area))
+        }
+    }
+
     /** Open and confirmed reports in [area], newest first. Throws [ApiException]. */
     suspend fun within(area: Bbox): List<RoadReport> = parseReports(
         ServerApi.get(
