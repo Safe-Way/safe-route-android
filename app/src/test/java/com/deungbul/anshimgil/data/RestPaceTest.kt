@@ -100,4 +100,20 @@ class RestPaceTest {
         assertFalse(restReachedAt(250.0, 280.0))
         assertTrue(restReachedAt(270.0, 280.0))
     }
+
+    @Test
+    fun restPlacesAreTheTeamsAndNoToiletsAtNight() {
+        // route-weights.md rest: shelters and public toilets; no convenience store; no toilets at night.
+        val path = listOf(LatLon(35.0, 126.0), LatLon(35.0, 126.0 + 600 / 91_290.0))
+        val g = Guidance(path, emptyList())
+        fun at(kind: FacilityKind, alongM: Double) = Facility(kind, 35.0 + 10 / 111_320.0, 126.0 + alongM / 91_290.0)
+        val here = LatLon(35.0, 126.0 + 200 / 91_290.0)
+        val store = at(FacilityKind.CONVENIENCE_STORE, 230.0)
+        val toilet = at(FacilityKind.TOILET, 260.0)
+        val shelter = at(FacilityKind.COLD_SHELTER, 290.0)
+        assertNull(restPlaceOnTheWay(listOf(store), here, 200.0) { g.alongAndOff(LatLon(it.lat, it.lon)) })
+        assertEquals(FacilityKind.TOILET, restPlaceOnTheWay(listOf(store, toilet), here, 200.0) { g.alongAndOff(LatLon(it.lat, it.lon)) }!!.facility.kind)
+        assertNull(restPlaceOnTheWay(listOf(toilet), here, 200.0, night = true) { g.alongAndOff(LatLon(it.lat, it.lon)) })
+        assertEquals(FacilityKind.COLD_SHELTER, restPlaceOnTheWay(listOf(toilet, shelter), here, 200.0, night = true) { g.alongAndOff(LatLon(it.lat, it.lon)) }!!.facility.kind)
+    }
 }

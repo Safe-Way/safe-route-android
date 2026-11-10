@@ -25,11 +25,18 @@ const val REST_NEAR_M = 200
 /** Not asked this close to the destination. */
 const val REST_NOT_NEAR_END_M = 150
 
-/** Places to rest at, best first: shelters, then toilets, then a shop (it may have a seat, and help). */
+/**
+ * Places to rest at, best first: the team's 쉼 곳 (route-weights.md 4장 `rest`): 무더위·한파쉼터 and public toilets,
+ * only those open now (the route's places come from the server, which keeps only those open now, `Availability`),
+ * and no toilets at night ("밤에는 화장실을 경로에 넣지 않는다"). The app's convenience store (11/9) was dropped.
+ */
 val REST_KINDS = listOf(
-    FacilityKind.HEAT_SHELTER, FacilityKind.COLD_SHELTER, FacilityKind.ACCESSIBLE_TOILET,
-    FacilityKind.TOILET, FacilityKind.CONVENIENCE_STORE,
+    FacilityKind.HEAT_SHELTER, FacilityKind.COLD_SHELTER, FacilityKind.ACCESSIBLE_TOILET, FacilityKind.TOILET,
 )
+
+/** The rest kinds at [night]: shelters only. */
+fun restKinds(night: Boolean): List<FacilityKind> =
+    if (night) REST_KINDS.filter { it != FacilityKind.TOILET && it != FacilityKind.ACCESSIBLE_TOILET } else REST_KINDS
 
 /** Who is asked: those for whom tiring out matters most (team idea: 어르신·장애인). */
 fun asksToRest(mode: UserMode) = mode == UserMode.SENIOR || mode == UserMode.DISABLED
@@ -89,9 +96,11 @@ fun restPlaceOnTheWay(
     facilities: List<Facility>,
     here: LatLon,
     progressM: Double,
+    night: Boolean = false,
     onRoute: (Facility) -> Pair<Double, Double>,
 ): RestPlace? {
-    val ahead = facilities.filter { it.kind in REST_KINDS }.mapNotNull { f ->
+    val kinds = restKinds(night)
+    val ahead = facilities.filter { it.kind in kinds && it.look == FacilityLook.NORMAL }.mapNotNull { f ->
         val (along, off) = onRoute(f)
         val toGo = along - progressM
         if (toGo < -REST_BEHIND_M || toGo > REST_AHEAD_M || off > REST_OFF_ROUTE_M) null
