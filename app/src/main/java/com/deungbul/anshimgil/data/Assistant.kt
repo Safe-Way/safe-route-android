@@ -497,6 +497,10 @@ internal fun parseServerAssistantReply(json: JSONObject): ServerAssistantReply? 
         else -> null
     }
     if (ask != null && !say.contains(ask)) say = "$say\n$ask"
+    // Why this trip came first (because, up to 3, the tool's own numbers; 진행표 추천 카드 #68), under what is said.
+    val because = json.optJSONArray("because")?.let { a -> (0 until a.length()).map { a.optString(it).trim() } }.orEmpty()
+        .filter { it.isNotEmpty() && !say.contains(it) }
+    if (place != null && ask == null && choices.isEmpty() && because.isNotEmpty()) say = say + "\n" + because.joinToString("\n") { "· $it" }
     val action = when {
         // A question waits for the walker, even when a place came with it.
         ask != null || choices.isNotEmpty() -> AssistantAction.Ask(say, choices.map { it.second })

@@ -109,7 +109,7 @@ class RoadReportsTest {
         assertEquals("공사 2", reportSpotTag(spot))
         assertEquals("공사 신고 2건 · 마지막 신고 20분 전 · 확인됨", reportSpotTitle(spot, LocalDateTime.of(2026, 11, 10, 8, 41)))
         assertEquals("11월 16일까지 지도에 보여요.", reportSpotUntil(spot))
-        assertEquals("앞 60m에 공사 신고가 2건 있어요. 조심해서 가세요.", reportAheadText(spot, 60))
+        assertEquals("앞에 공사 신고가 있는 곳을 지나요.", reportAheadText(spot, 60))
     }
 
     @Test

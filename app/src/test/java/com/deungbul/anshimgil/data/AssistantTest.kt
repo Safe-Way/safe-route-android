@@ -344,4 +344,15 @@ class AssistantTest {
         assertTrue(rule("가까운 버스 보여 줘") is AssistantAction.ShowBuses)
         assertTrue(rule("여기 턱이 높아서 신고할래") is AssistantAction.OpenReport)
     }
+
+    @Test
+    fun whyTheTripCameFirstIsShown() {
+        // The server's because (TripScorer reasons) under what it says, for a recommended trip.
+        val json = org.json.JSONObject(
+            """{"say":"문화전당까지 19분 걸려요.","pick":{"type":"walk","request":{"destination":{"name":"국립아시아문화전당","lat":35.1467,"lon":126.9203}}},
+            "because":["지난번 이런 날씨에도 걸어가셨어요","내 걸음 속도로 계산"],"choices":[],"tools":["recommend_trip"]}""",
+        )
+        val action = parseServerAssistantReply(json)!!.action
+        assertEquals("문화전당까지 19분 걸려요.\n· 지난번 이런 날씨에도 걸어가셨어요\n· 내 걸음 속도로 계산", action.say)
+    }
 }
