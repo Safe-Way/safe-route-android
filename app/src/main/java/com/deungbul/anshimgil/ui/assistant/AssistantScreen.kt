@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -50,6 +51,9 @@ import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.LaunchedEffect
@@ -258,6 +262,8 @@ fun AssistantScreen(
     // Listening happens inside the app (no Google dialog over the chat, 11/10): the microphone button shows it.
     var listening by remember { mutableStateOf(false) }
     var partial by remember { mutableStateOf("") }
+    // How loud the voice is now (0..1), so the walker can see they are being heard.
+    var level by remember { mutableFloatStateOf(0f) }
     // The voice chat goes on until nothing is heard twice in a row, or the walker types or taps.
     var chatOn by remember { mutableStateOf(voiceChat) }
     var silences by remember { mutableIntStateOf(0) }
@@ -283,9 +289,9 @@ fun AssistantScreen(
         val r = recognizer ?: return listenWithDialog()
         tts.stop(); speaking = 0
         r.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) { listening = true; partial = "" }
+            override fun onReadyForSpeech(params: Bundle?) { listening = true; partial = ""; level = 0f }
             override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onRmsChanged(rmsdB: Float) { level = ((rmsdB - 1f) / 9f).coerceIn(0f, 1f) }
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
             override fun onEvent(eventType: Int, params: Bundle?) {}
@@ -310,7 +316,11 @@ fun AssistantScreen(
             Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
-                .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true),
+                .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                // Older walkers pause mid-sentence: wait longer for silence before the sentence counts as said.
+                .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_DONE_MS)
+                .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_DONE_MS)
+                .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, MIN_LISTEN_MS),
         )
     }
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -328,7 +338,12 @@ fun AssistantScreen(
     LaunchedEffect(spoken, thinking, speaking) {
         if (!chatOn || listening || thinking != null || speaking > 0 || urgent) return@LaunchedEffect
         if (lines.lastOrNull()?.fromUser != false) return@LaunchedEffect
-        delay(400)
+        // A breath after the answer before the walker's turn (11/10: it came back too fast), then a short tone so it
+        // is plain the microphone is on.
+        delay(VOICE_CHAT_PAUSE_MS)
+        if (!chatOn || listening || thinking != null || speaking > 0) return@LaunchedEffect
+        runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, 50).startTone(ToneGenerator.TONE_PROP_ACK, 120) }
+        delay(250)
         listen()
     }
 
@@ -392,6 +407,8 @@ fun AssistantScreen(
                 OutlinedButton(onClick = { input = h; heard = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("글자 고치기", fontSize = 16.sp) }
             }
         }
+        // While listening: a big strip that moves with the voice and shows the words as they are heard (11/10).
+        if (listening) ListeningStrip(level, partial, onStop = { recognizer?.stopListening() })
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(12.dp)) {
             OutlinedTextField(
                 value = input,
@@ -402,18 +419,26 @@ fun AssistantScreen(
                 modifier = Modifier.weight(1f),
             )
             // The same simple rounded square as the microphone in walking guidance.
-            // While listening it turns solid green, so it is plain the app is listening (the chat stays in view).
+            // While listening it turns solid green, and a ring around it swells with the voice, so each word
+            // shows on the microphone itself (11/10).
+            val ring by androidx.compose.animation.core.animateFloatAsState(if (listening) level else 0f, label = "mic")
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(start = 8.dp).size(64.dp)) {
+            if (listening) Box(
+                Modifier.size((52 + 12 * ring).dp)
+                    .background(Green.copy(alpha = 0.18f + 0.3f * ring), RoundedCornerShape(18.dp)),
+            )
             Surface(
                 onClick = { if (!listening && voiceChat) { chatOn = true; silences = 0 }; listen() },
                 shape = RoundedCornerShape(14.dp),
                 color = if (listening) Green else Color.White,
                 contentColor = if (listening) Color.White else Green,
                 border = androidx.compose.foundation.BorderStroke(1.5.dp, Green),
-                modifier = Modifier.padding(start = 8.dp).size(52.dp),
+                modifier = Modifier.size(52.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(if (listening) Icons.Filled.Mic else Icons.Outlined.Mic, contentDescription = if (listening) "듣는 중, 누르면 멈춤" else "말로 하기", modifier = Modifier.size(26.dp))
+                    Icon(if (listening) Icons.Filled.Mic else Icons.Outlined.Mic, contentDescription = if (listening) "듣는 중, 누르면 멈춤" else "말로 하기", modifier = Modifier.size((26 + 6 * ring).dp))
                 }
+            }
             }
             IconButton(onClick = { send(input) }, enabled = input.isNotBlank() && thinking == null) {
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "보내기", tint = if (input.isNotBlank()) Green else Muted)
@@ -423,8 +448,48 @@ fun AssistantScreen(
     }
 }
 
+/** "듣고 있어요" with five bars that follow the voice's loudness, the words heard so far, and 다 말했어요. */
+@Composable
+private fun ListeningStrip(level: Float, heardSoFar: String, onStop: () -> Unit) {
+    val shown by androidx.compose.animation.core.animateFloatAsState(level, label = "voice")
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFE7F3EC),
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, Green),
+        modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.height(32.dp)) {
+                    listOf(0.5f, 0.8f, 1f, 0.8f, 0.5f).forEach { w ->
+                        Box(
+                            Modifier.width(6.dp).height((6 + 26 * shown * w).dp)
+                                .background(Green, RoundedCornerShape(3.dp)),
+                        )
+                    }
+                }
+                Text(
+                    if (shown > 0.4f) "잘 들려요" else "듣고 있어요… 말씀해 주세요",
+                    fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Green, modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onStop) { Text("다 말했어요", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+            }
+            if (heardSoFar.isNotBlank()) Text(heardSoFar, fontSize = 20.sp, lineHeight = 27.sp, color = Ink)
+        }
+    }
+}
+
 /** The chip that takes back AI 비서's last change. */
 const val UNDO_CHOICE = "되돌리기"
+
+/** Voice chat: the pause after an answer is read before listening again. */
+private const val VOICE_CHAT_PAUSE_MS = 1_500L
+
+/** Silence this long ends what is said (the phone's default is about 1 s, too short mid-sentence). */
+private const val SILENCE_DONE_MS = 2_000L
+
+/** Listen at least this long, so a slow start is not cut off. */
+private const val MIN_LISTEN_MS = 4_000L
 
 /** How long AI 비서 may think before it says it is still looking. */
 private const val SLOW_MS = 3_000L
