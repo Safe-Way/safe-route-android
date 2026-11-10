@@ -266,8 +266,28 @@ fun AppRoot(
     var assistantUndo by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
     val savedFavorites by savedPlaces.favorites.collectAsStateWithLifecycle(initialValue = emptyList())
     var homeUndo by remember { mutableStateOf<Pair<String, suspend () -> Unit>?>(null) }
-    val setupAssistant = remember { SetupAssistant.create() }
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    // 몸 상태가 잠깐 바뀜 (TempMode.kt): the end-day question, and telling the server (PATCH /api/me temp fields).
+    var tempAsk by remember { mutableStateOf<String?>(null) }
+    val tempScope = rememberCoroutineScope()
+    fun tellServerTemp(st: com.deungbul.anshimgil.data.TempState?, usual: UserMode? = st?.usual) {
+        val u = usual ?: return
+        if (!com.deungbul.anshimgil.data.ServerApi.isConfigured) return
+        tempScope.launch {
+            runCatching {
+                val f = if (st == null) org.json.JSONObject().put("clearTemp", true)
+                else org.json.JSONObject().put("tempMode", st.temp.key).put("tempUntil", st.until.toString()).put("tempReason", st.reason)
+                myInfoRepository.update(u, f)
+            }
+        }
+    }
+    suspend fun endTempMode(st: com.deungbul.anshimgil.data.TempState) {
+        modeRepository.save(st.usual)
+        if (st.temp == UserMode.DISABLED) listOf("toilet:wheelchair", "crosswalk:curb_low").forEach { settingsRepository.setExtraMapItem(it, false) }
+        com.deungbul.anshimgil.data.TempModeStore.clear(appContext)
+        tellServerTemp(null, st.usual)
+    }
+    val setupAssistant = remember { SetupAssistant.create() }
     val appAssistant = remember {
         AppAssistant.create(
             guestId = { walkSpeedRepository.guestId() },
@@ -390,7 +410,15 @@ fun AppRoot(
             // The server keeps this phone's guest number and mode (진행표 10); quietly, and again next time if offline.
             LaunchedEffect(mode) {
                 val m = mode ?: return@LaunchedEffect
-                if (com.deungbul.anshimgil.data.ServerApi.isConfigured) runCatching { myInfoRepository.syncMode(m) }
+                // During a temporary change the server keeps the usual mode and the temporary one apart (temp_mode).
+                val usual = com.deungbul.anshimgil.data.TempModeStore.get(appContext)?.usual ?: m
+                if (com.deungbul.anshimgil.data.ServerApi.isConfigured) runCatching { myInfoRepository.syncMode(usual) }
+            }
+            // 몸 상태가 잠깐 바뀜: past the end day the usual way of walking is back; on the end day, ask (team server rule).
+            LaunchedEffect(Unit) {
+                val st = com.deungbul.anshimgil.data.TempModeStore.get(appContext) ?: return@LaunchedEffect
+                val today = java.time.LocalDate.now()
+                if (today.isAfter(st.until)) endTempMode(st) else if (today == st.until) tempAsk = com.deungbul.anshimgil.data.tempEndQuestion(st)
             }
             // AI 비서, as its own screen from the map or laid over walking guidance (which keeps running underneath).
             val assistantPanel: @Composable (UserMode, () -> Unit) -> Unit = { mode, onClose ->
@@ -399,11 +427,26 @@ fun AppRoot(
                         listenAtStart = assistantListen,
                         chat = assistantChat,
                         assistant = appAssistant,
-                        context = AssistantContext(mode, settings, usage = usage, where = { currentLocation(appContext, 4_000) }),
+                        context = AssistantContext(mode, settings, usage = usage, where = { currentLocation(appContext, 4_000) }, usualMode = com.deungbul.anshimgil.data.TempModeStore.get(appContext)?.usual ?: mode),
                         placeRepository = placeRepository,
                         onChangeSettings = { change ->
                             val before = SettingsSnapshot(mode, settings, usage)
+                            val tempBefore = com.deungbul.anshimgil.data.TempModeStore.get(appContext)
+                            change.tempUntil?.let { until ->
+                                val st = com.deungbul.anshimgil.data.TempState(tempBefore?.usual ?: mode, change.mode ?: mode, until, change.tempReason.orEmpty())
+                                com.deungbul.anshimgil.data.TempModeStore.save(appContext, st)
+                                tellServerTemp(st)
+                            }
+                            if (change.clearTemp) {
+                                com.deungbul.anshimgil.data.TempModeStore.clear(appContext)
+                                tellServerTemp(null, tempBefore?.usual ?: change.mode ?: mode)
+                            }
                             assistantUndo = {
+                                if (change.tempUntil != null || change.clearTemp) {
+                                    if (tempBefore != null) com.deungbul.anshimgil.data.TempModeStore.save(appContext, tempBefore)
+                                    else com.deungbul.anshimgil.data.TempModeStore.clear(appContext)
+                                    tellServerTemp(tempBefore, tempBefore?.usual ?: before.mode)
+                                }
                                 if (change.mode != null) before.mode?.let { modeRepository.save(it) }
                                 change.textSize?.let { settingsRepository.setTextSize(before.settings.textSize) }
                                 change.voiceGuide?.let { settingsRepository.setVoiceGuide(before.settings.voiceGuide) }
@@ -705,8 +748,14 @@ fun AppRoot(
                     setupAsk = setupStep?.let { setupQuestion(it, setupAnswers) to it.answers },
                     setupFromSpeech = { said -> setupStep?.let { setupAnswerFromSpeech(it, said) } },
                     undoAsk = homeUndo?.first,
-                    feedbackAsk = feedbackStep?.let { it.question to it.answers } ?: learnedSay?.let { it to listOf("알겠어요") },
-                    onFeedbackAnswer = { i ->
+                    feedbackAsk = tempAsk?.let { it to com.deungbul.anshimgil.data.YES_NO } ?: feedbackStep?.let { it.question to it.answers } ?: learnedSay?.let { it to listOf("알겠어요") },
+                    onFeedbackAnswer = feedback@{ i ->
+                        if (tempAsk != null) {
+                            tempAsk = null
+                            val st = com.deungbul.anshimgil.data.TempModeStore.get(appContext)
+                            if (i == 0 && st != null) scope.launch { endTempMode(st) }
+                            return@feedback
+                        }
                         val step = feedbackStep
                         if (step == null) {
                             learnedSay = null
