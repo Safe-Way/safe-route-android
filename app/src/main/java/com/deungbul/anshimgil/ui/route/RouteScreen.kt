@@ -96,6 +96,7 @@ import com.deungbul.anshimgil.data.RouteRepository
 import com.deungbul.anshimgil.data.RouteRequest
 import com.deungbul.anshimgil.data.RouteResult
 import com.deungbul.anshimgil.data.routeCriteria
+import com.deungbul.anshimgil.data.headlineFor
 import com.deungbul.anshimgil.data.RouteType
 import com.deungbul.anshimgil.data.eventLine
 import com.deungbul.anshimgil.data.routeSpoken
@@ -574,6 +575,13 @@ private fun RouteDetails(
             if (m > 0) "안전한 길보다 ${m}m(${min}분) 짧아요." else null
         }
     }
+    // The mode's line ("계단을 피하고, …") is what the engine aims for; when the server says it could not
+    // (stairs on every way), its own summary leads instead, so the two lines never disagree (채림 확인 요청, 11/10).
+    val headline = when {
+        fast -> "가장 빠른 길이에요."
+        else -> headlineFor(criteria.short, result.explanation)
+    }
+    val summaryShown = if (fast) fastSummary else result.explanation.summary.takeIf { it.isNotBlank() && it != headline }
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
@@ -583,13 +591,13 @@ private fun RouteDetails(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                if (fast) "가장 빠른 길이에요." else criteria.short, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink, lineHeight = 24.sp,
+                headline, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink, lineHeight = 24.sp,
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = { more = !more }) { Text(if (more) "접기" else "자세히", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
         }
         // The server's real difference, e.g. "24m(1분) 더 돌지만 쉼 곳 +1곳".
-        (if (fast) fastSummary else result.explanation.summary.takeIf { it.isNotBlank() })?.let {
+        summaryShown?.let {
             Text(it, fontSize = 15.sp, color = Muted, lineHeight = 21.sp, modifier = Modifier.padding(end = 8.dp))
         }
         // Warnings and notices stay in view: stairs that could not be avoided, an event on the way.

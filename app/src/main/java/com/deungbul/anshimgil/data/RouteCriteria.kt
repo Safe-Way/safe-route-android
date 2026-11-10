@@ -98,3 +98,13 @@ fun routeCriteria(mode: UserMode, night: Boolean): RouteCriteria = when (mode) {
     }
 }
 
+/**
+ * The first line under the routes: the mode's line ([RouteCriteria.short]), unless the server's notes say the route
+ * could not do what that line promises — stairs left on every way ("계단을 피하는 길은 없습니다") while the line says
+ * the stairs are avoided — when the server's own summary ("가장 짧은 길로 갑니다") leads instead.
+ */
+fun headlineFor(modeLine: String, explanation: Explanation): String {
+    val stairsLeft = explanation.notes.any { it.warn && it.kind == "stairs" }
+    val promisesNoStairs = modeLine.contains("계단을 피") || modeLine.contains("못 지나는 곳을 빼고")
+    return if (stairsLeft && promisesNoStairs && explanation.summary.isNotBlank()) explanation.summary else modeLine
+}
