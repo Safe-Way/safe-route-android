@@ -348,14 +348,19 @@ fun GuideScreen(
     // once for a while, like a walker tiring, so the rest offer shows in a demonstration.
     // The route changes on the way (a rest stop, setting off again, finding the way again), so the loop reads
     // the current one: with the first route's length it stopped for good after a rest (영상 11/9, 925m에서 멈춤).
+    // 들를 곳 not yet seen, and where each lies along the route.
+    val leftStops = plannedStops.indices.filter { it !in stopsDone }
+    val leftAlong = remember(guidance, stopsDone) { guidance.alongInOrder(leftStops.map { plannedStops[it].point }) }
     val currentGuidance by rememberUpdatedState(guidance)
     // On the way to a rest the demo walker stops there until [다시 출발].
     val currentRestStop by rememberUpdatedState(restAlongM?.takeIf { !restReached })
+    // …and at the next 들를 곳 until [다 봤어요] (it walked on past it; 11/10 phone check).
+    val currentNextStop by rememberUpdatedState(leftAlong.firstOrNull())
     LaunchedEffect(demo) {
         var second = 0
         while (demo) {
             delay(1000)
-            val end = currentRestStop?.coerceAtMost(currentGuidance.totalM) ?: currentGuidance.totalM
+            val end = listOfNotNull(currentRestStop, currentNextStop, currentGuidance.totalM).min()
             if (demoProgress < end) demoProgress = (demoProgress + demoStepM(second++, DEMO_STEP_M, slows = asksToRest(mode))).coerceAtMost(end)
         }
     }
@@ -626,8 +631,6 @@ fun GuideScreen(
 
     // Reaching the next stop: say where, and what comes next, until [다 봤어요].
     val stopNames = plannedStops.map { it.name }
-    val leftStops = plannedStops.indices.filter { it !in stopsDone }
-    val leftAlong = remember(guidance, stopsDone) { guidance.alongInOrder(leftStops.map { plannedStops[it].point }) }
     val reached = if (atStop == null) stopReached(leftAlong, state.progressM, emptySet())?.let { leftStops[it] } else null
     LaunchedEffect(reached) {
         val i = reached ?: return@LaunchedEffect
