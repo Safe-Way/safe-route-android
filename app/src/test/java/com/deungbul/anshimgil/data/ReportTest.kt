@@ -19,4 +19,11 @@ class ReportTest {
     fun reportTypesMatchTheServer() {
         assertEquals(listOf("steep", "construction", "curb", "broken", "obstacle", "accident", "other"), ReportType.entries.map { it.code })
     }
+
+    @Test
+    fun theGuestNumberGoesWithAReport() {
+        // Server c17 ③ keeps HMAC(secret, guestId) to tell one person reporting again (결정 57, 033).
+        val f = reportFields(ReportType.CURB, LatLon(35.14, 126.93), null, UserMode.SENIOR, "") + ("guestId" to "abc")
+        assertEquals("abc", f["guestId"])
+    }
 }

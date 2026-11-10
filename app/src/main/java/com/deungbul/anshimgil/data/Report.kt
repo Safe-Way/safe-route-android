@@ -34,10 +34,15 @@ object ReportRepository {
         mode: UserMode,
         memo: String,
         photos: List<ByteArray>,
+        /**
+         * This phone's guest number, so the server can tell one person reporting again (결정 57, 033 reporter_hash:
+         * the server keeps only HMAC(secret, guestId), never the number itself; filled in by the server's c17 ③).
+         */
+        guestId: String? = null,
     ): Long {
         val json = ServerApi.postMultipart(
             "/api/reports",
-            reportFields(type, at, accuracyM, mode, memo),
+            reportFields(type, at, accuracyM, mode, memo) + ("guestId" to guestId),
             photos.take(REPORT_MAX_PHOTOS).mapIndexed { i, bytes -> ServerApi.Part("photos", "photo${i + 1}.jpg", "image/jpeg", bytes) },
         )
         return json.optLong("id")

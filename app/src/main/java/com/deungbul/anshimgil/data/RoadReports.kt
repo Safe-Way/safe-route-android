@@ -170,9 +170,12 @@ fun reportSpotTitle(spot: ReportSpot, now: LocalDateTime = koreaNow()): String =
 /** Until when it shows: "11월 16일까지 지도에 보여요." */
 fun reportSpotUntil(spot: ReportSpot): String = "${spot.endsOn.monthValue}월 ${spot.endsOn.dayOfMonth}일까지 지도에 보여요."
 
-/** Said during guidance: "앞 60m에 공사 신고가 2건 있어요. 조심해서 가세요." */
-fun reportAheadText(spot: ReportSpot, aheadM: Int): String =
-    (if (aheadM < 10) "바로 앞에" else "앞 ${aheadM}m에") + " ${spot.label} 신고가 ${spot.count}건 있어요. 조심해서 가세요."
+/**
+ * Said during guidance, in the team's words (결정 57: a spot the route could not go round is passed with
+ * "앞에 ○○ 신고가 있는 곳을 지나요"). [aheadM] only decides when it is said.
+ */
+@Suppress("UNUSED_PARAMETER")
+fun reportAheadText(spot: ReportSpot, aheadM: Int): String = "앞에 ${spot.label} 신고가 있는 곳을 지나요."
 
 /** Spots ahead on the route, nearest first, as (spot, meters ahead); [onRoute] gives meters along and off the route. */
 fun reportSpotsAhead(spots: List<ReportSpot>, progressM: Double, onRoute: (LatLon) -> Pair<Double, Double>): List<Pair<ReportSpot, Int>> =
