@@ -166,7 +166,9 @@ fun KakaoMap.showRoutes(
             LabelOptions.from(path.last().toLatLng())
                 .setStyles(
                     LabelStyles.from(
-                        LabelStyle.from(pillBitmap(destinationName.take(12), 0xFFB42318.toInt(), density))
+                        // On a stem like the report tags: on arrival the walker's arrow stands on the destination and
+                        // covered its name (11/10 phone video).
+                        LabelStyle.from(stemmed(pillBitmap(destinationName.take(12), 0xFFB42318.toInt(), density), 0xFFB42318.toInt(), density))
                             .setAnchorPoint(0.5f, 1f)
                             .setApplyDpScale(false),
                     ),
