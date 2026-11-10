@@ -145,6 +145,7 @@ import com.deungbul.anshimgil.data.Facility
 import com.deungbul.anshimgil.data.Guidance
 import com.deungbul.anshimgil.data.GuidanceState
 import com.deungbul.anshimgil.data.LatLon
+import com.deungbul.anshimgil.data.arrowHeading
 import com.deungbul.anshimgil.data.guideHeading
 import com.deungbul.anshimgil.data.MotionTracker
 import com.deungbul.anshimgil.ui.mode.ModeBadge
@@ -211,6 +212,9 @@ private const val FOLLOW_MS = 900
 private val FOLLOW = CameraAnimation.from(FOLLOW_MS, false, true)
 /** The map turns only when the walker turns by at least this much. */
 private const val MAP_TURN_DEGREES = 25f
+
+/** The arrow turns quicker than the map, so a turn of the body shows right away. */
+private const val ARROW_TURN_MS = 300
 
 
 
@@ -459,7 +463,9 @@ fun GuideScreen(
     }
     // Marker rotation is measured on the screen, not the map, so take off the map's own turn; it turns over
     // the same time as the map, so the two stay together.
-    LaunchedEffect(me, heading, mapBearing) { me?.pointTo(heading - mapBearing, FOLLOW_MS) }
+    // Standing still, the arrow turns with the walker (compass) while the map stays put (11/10).
+    val arrow = if (demo) heading else arrowHeading(moving, heading, compass)
+    LaunchedEffect(me, arrow, mapBearing) { me?.pointTo(arrow - mapBearing, ARROW_TURN_MS) }
 
     // 귀가 지킴이: off the planned route for a while, offer to tell the guardians (once per stretch off route).
     // In a car or bus the route is left on purpose: no off-route warning, no new route.

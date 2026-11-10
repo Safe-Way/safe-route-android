@@ -44,7 +44,7 @@ fun rememberCompassHeading(): Float? {
                 }
                 val degrees = ((Math.toDegrees(orientation[0].toDouble()) + 360) % 360).toFloat()
                 // The raw reading shakes with every step, so it is smoothed heavily (a slow average
-                // that follows a real turn within a second or so) and only turns of 12° or more count.
+                // that follows a real turn within about half a second) and only turns of 8° or more count.
                 val prev = smooth
                 smooth = if (prev == null) degrees else {
                     val diff = ((degrees - prev + 540) % 360) - 180
@@ -67,10 +67,10 @@ fun rememberCompassHeading(): Float? {
 private const val UPRIGHT_PITCH_DEGREES = 45.0
 
 /** Share of each new compass reading in the running average (lower is steadier). */
-private const val COMPASS_SMOOTHING = 0.08f
+private const val COMPASS_SMOOTHING = 0.15f
 
 /** The heading shown changes only when the phone turns at least this much. */
-private const val COMPASS_STEP_DEGREES = 12f
+private const val COMPASS_STEP_DEGREES = 8f
 
 /** Smallest angle between two headings in degrees (0..180). */
 fun angleBetween(a: Float, b: Float): Float {
