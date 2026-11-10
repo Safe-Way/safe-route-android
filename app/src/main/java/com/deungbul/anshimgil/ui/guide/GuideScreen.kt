@@ -448,9 +448,10 @@ fun GuideScreen(
     // the screen (11/10). Walking, it keeps to the route ahead.
     val arrow = if (demo) heading else arrowHeading(moving, heading, compass)
     var mapBearing by remember { mutableFloatStateOf(heading) }
-    LaunchedEffect(arrow, moving) {
+    LaunchedEffect(arrow, heading, moving) {
+        val target = if (moving || demo) heading else arrow
         val step = if (moving || demo) MAP_TURN_DEGREES else MAP_TURN_STILL_DEGREES
-        if (angleBetween(mapBearing, arrow) >= step) mapBearing = arrow
+        if (angleBetween(mapBearing, target) >= step) mapBearing = target
     }
     // Moving and turning in one camera move: two moves sent apart cut each other off, so the map jerked at
     // every fix while it turned (11/9 video). Kakao turns the map the other way round from a compass bearing,

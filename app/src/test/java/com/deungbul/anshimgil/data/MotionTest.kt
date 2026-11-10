@@ -75,7 +75,7 @@ class MotionTest {
     @Test
     fun standingStillTheArrowTurnsWithTheWalker() {
         assertEquals(200f, arrowHeading(moving = false, heading = 0f, compass = 200f))
-        assertEquals(0f, arrowHeading(moving = true, heading = 0f, compass = 200f))
+        assertEquals(200f, arrowHeading(moving = true, heading = 0f, compass = 200f))
         assertEquals(0f, arrowHeading(moving = false, heading = 0f, compass = null))
     }
 

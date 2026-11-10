@@ -87,10 +87,11 @@ fun guideHeading(onRoute: Boolean, moving: Boolean, routeAhead: Float, course: F
 }
 
 /**
- * Which way the walker's arrow and the map face. Walking: [heading] (above). Standing still: the compass, so
- * turning round turns the arrow and the map instead of the screen staying fixed (11/10).
+ * Which way the walker's arrow points: always the compass (where the phone faces), walking or not, so every
+ * turn of the body shows at once (11/10); without a compass, [heading]. The map uses it only standing still;
+ * walking, the map keeps to [heading] so it does not swing.
  */
-fun arrowHeading(moving: Boolean, heading: Float, compass: Float?): Float = if (!moving && compass != null) compass else heading
+fun arrowHeading(moving: Boolean, heading: Float, compass: Float?): Float = compass ?: heading
 
 /** Walking this far off the route's direction (degrees), the map follows the GPS course instead. */
 const val COURSE_DIFFERS_DEGREES = 45f
