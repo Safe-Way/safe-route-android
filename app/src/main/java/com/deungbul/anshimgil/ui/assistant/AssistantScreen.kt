@@ -146,6 +146,8 @@ fun AssistantScreen(
         true
     }
     var choices by chat::choices
+    // Showing something on the map waits for the walker's yes (11/10): what to open, until [지도에서 볼게요].
+    var pendingGo by remember { mutableStateOf<(() -> Unit)?>(null) }
     var thinking by remember { mutableStateOf<String?>(null) }
     var urgent by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
@@ -176,6 +178,13 @@ fun AssistantScreen(
         }
     }
 
+    /** Asks before leaving the chat for the map; the answer is a button or said ("응", "보여 줘"). */
+    fun offerGo(go: () -> Unit) {
+        pendingGo = go
+        say(GO_QUESTION)
+        choices = listOf(GO_YES, GO_NO)
+    }
+
     suspend fun findAndGo(find: suspend (lat: Double, lon: Double) -> Place?, missing: String) {
         thinking = "찾는 중…"
         val from = phoneOrigin(android).point
@@ -191,14 +200,32 @@ fun AssistantScreen(
         }
         chat.lastPlace = place
         say("${withDirection(place.name)} 길을 찾았어요.")
-        delay(600)
-        onRoute(place)
+        offerGo { onRoute(place) }
     }
 
     fun send(text: String, byVoice: Boolean = false) {
         val said = text.trim()
         if (said.isEmpty() || thinking != null) return
         heard = if (byVoice) said else null
+        pendingGo?.let { go ->
+            when (goAnswer(said)) {
+                true -> {
+                    lines += ChatLine(fromUser = true, text = said)
+                    pendingGo = null
+                    choices = emptyList()
+                    go()
+                    return
+                }
+                false -> {
+                    lines += ChatLine(fromUser = true, text = said)
+                    pendingGo = null
+                    choices = emptyList()
+                    say("알겠어요. 더 필요한 게 있으면 말씀해 주세요.")
+                    return
+                }
+                null -> pendingGo = null // something else was said: carry on with it
+            }
+        }
         if (said == UNDO_CHOICE) {
             lines += ChatLine(fromUser = true, text = said)
             choices = emptyList()
@@ -213,7 +240,7 @@ fun AssistantScreen(
         chat.lastPlace?.let { place ->
             placeDetailAnswer(said, place)?.let { answer ->
                 say(answer.text)
-                if (answer.showOnMap) scope.launch { delay(1500); onRoute(place) }
+                if (answer.showOnMap) offerGo { onRoute(place) }
                 return
             }
         }
@@ -245,12 +272,12 @@ fun AssistantScreen(
                     { lat, lon -> pickLandmark(placeRepository.search(action.query, lat, lon)) },
                     "'${action.query}'을(를) 찾지 못했어요. 이름을 조금 다르게 말해 주세요.",
                 )
-                is AssistantAction.GoPlace -> { chat.lastPlace = action.place; delay(1200); when {
+                is AssistantAction.GoPlace -> { chat.lastPlace = action.place; offerGo { when {
                     action.stops.isNotEmpty() -> onRouteWithStops(action.place, action.stops, action.transit)
                     action.transit -> onRouteByTransit(action.place)
                     else -> onRoute(action.place)
-                } }
-                is AssistantAction.ShowBuses -> { delay(500); onShowBuses() }
+                } } }
+                is AssistantAction.ShowBuses -> offerGo { onShowBuses() }
                 is AssistantAction.OpenReport -> { delay(1200); onOpenReport(action) }
                 is AssistantAction.Ask -> choices = action.choices
                 is AssistantAction.Answer -> Unit
@@ -477,6 +504,22 @@ private fun ListeningStrip(level: Float, heardSoFar: String, onStop: () -> Unit)
             if (heardSoFar.isNotBlank()) Text(heardSoFar, fontSize = 20.sp, lineHeight = 27.sp, color = Ink)
         }
     }
+}
+
+/** Asked before the map opens (11/10), and its two answers. */
+const val GO_QUESTION = "지도에서 보여 드릴까요?"
+const val GO_YES = "지도에서 볼게요"
+const val GO_NO = "괜찮아요"
+
+/** The answer to [GO_QUESTION] in what was said: true to open the map, false not to, null for something else. */
+internal fun goAnswer(said: String): Boolean? {
+    val s = said.replace(" ", "")
+    if (s == GO_YES.replace(" ", "")) return true
+    if (s == GO_NO.replace(" ", "")) return false
+    if (listOf("아니", "괜찮", "됐어", "싫어", "나중에", "말고").any { s.contains(it) }) return false
+    if (s in setOf("어", "어어", "응응")) return true
+    if (s.length <= 12 && listOf("네", "응", "예", "좋아", "그래", "보여", "볼게", "보자", "가자", "열어", "부탁", "알겠").any { s.contains(it) }) return true
+    return null
 }
 
 /** The chip that takes back AI 비서's last change. */
