@@ -168,6 +168,13 @@ fun ReportScreen(
                     ) { Text("앨범에서 고르기", fontSize = 16.sp) }
                 }
             }
+            // The team's consent words for reports (safe-route docs/assistant/consent.md 3번, 결정 59).
+            Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFF4F6F3), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(REPORT_PHOTO_NOTE, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink, lineHeight = 21.sp)
+                    REPORT_KEEP_NOTES.forEach { Text(it, fontSize = 14.sp, color = Muted, lineHeight = 20.sp) }
+                }
+            }
 
             OutlinedTextField(
                 value = memo,
@@ -217,3 +224,12 @@ fun ReportScreen(
         }
     }
 }
+
+/** consent.md 3번, the line in bold. */
+const val REPORT_PHOTO_NOTE = "사진에 다른 사람 얼굴이나 차 번호판이 나오지 않게 찍어 주세요."
+
+/** consent.md 3번, the rest (who reported is kept only as a changed number; photos and reports are deleted, 결정 59). */
+val REPORT_KEEP_NOTES = listOf(
+    "신고한 곳은 지도에 \"신고된 곳\"으로 보여요. 사진은 확인하는 데만 써요.",
+    "같은 분이 여러 번 신고했는지만 알 수 있게, 앱 번호는 알아볼 수 없게 바꿔서 둬요. 사진은 신고 기간이 끝나고 7일 뒤, 신고는 30일 뒤 지워요.",
+)

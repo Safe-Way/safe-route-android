@@ -204,8 +204,18 @@ internal val URGENT_WORDS = listOf(
     "숨이", "너무아파", "많이아파", "못일어나", "다쳤어", "다쳤어요",
 )
 
-/** The team server's answer to an urgent remark (RuleBrain.emergency()); the buttons are 112 / 보호자 / 괜찮아요. */
-const val EMERGENCY_SAY = "괜찮으세요? 위험하면 바로 112에 전화하세요. 112에 전화할까요, 보호자에게 알릴까요?"
+/**
+ * The team server's answer to an urgent remark (RuleBrain.emergency(), safe-route #188); the buttons are
+ * 112 / 보호자 / 가까운 파출소로 안내 / 괜찮아요 (진행표 #68).
+ */
+const val EMERGENCY_SAY = "괜찮으세요? 위험하면 바로 112에 전화하세요. 112에 전화할까요, 보호자에게 알릴까요, 가까운 파출소로 안내할까요?"
+
+/**
+ * How an emergency number is read aloud: digit by digit, "일일이", not "백십이" (the TTS reads 112 as a number).
+ * Only the read-aloud words change; the screen still shows 112.
+ */
+fun spokenNumbers(text: String): String =
+    text.replace(Regex("(?<!\\d)112(?!\\d)"), "일일이").replace(Regex("(?<!\\d)119(?!\\d)"), "일일구")
 
 /** Whether [said] is urgent, as the server decides: an urgent word, except "다쳐서" with a way of walking ("다쳐서 휠체어 타"). */
 internal fun isEmergency(said: String): Boolean {
