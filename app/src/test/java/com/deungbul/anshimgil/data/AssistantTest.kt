@@ -209,11 +209,15 @@ class AssistantTest {
 
     @Test
     fun reportKindIsHeard() {
+        // The team server's rule (RuleBrain.reportType): a "here" word, then the kind.
         assertEquals(ReportType.CONSTRUCTION, reportTypeIn("여기 공사 중이라 못 지나가"))
-        assertEquals(ReportType.BROKEN, reportTypeIn("보도블록이 깨졌어"))
-        assertEquals(ReportType.STEEP, reportTypeIn("길이 너무 가팔라요"))
-        assertEquals(ReportType.CURB, reportTypeIn("턱이 높아서 휠체어가 못 올라가"))
-        assertEquals(ReportType.OBSTACLE, reportTypeIn("킥보드가 길을 막고 있어"))
+        assertEquals(ReportType.BROKEN, reportTypeIn("여기 보도블록이 깨져 있어"))
+        assertEquals(ReportType.STEEP, reportTypeIn("여기 길이 너무 가팔라요"))
+        assertEquals(ReportType.CURB, reportTypeIn("턱이 높아서 휠체어가 못 가"))
+        assertEquals(ReportType.OBSTACLE, reportTypeIn("여기 킥보드가 길을 막아 놨어"))
+        assertEquals(ReportType.ACCIDENT, reportTypeIn("여기 사고 났어"))
+        // Without a "here" word it is not a report (as on the server).
+        assertNull(reportTypeIn("보도블록이 깨졌어"))
         assertNull(reportTypeIn("신고하고 싶어"))
         assertNull(reportTypeIn("주차장 가자"))
     }

@@ -7,12 +7,6 @@ package com.deungbul.anshimgil.data
  * assistant does not know the app's modes.
  */
 
-private val MODE_WORDS: List<Pair<List<String>, UserMode>> = listOf(
-    listOf("휠체어", "장애인") to UserMode.DISABLED,
-    listOf("어르신", "노인") to UserMode.SENIOR,
-    listOf("어린이", "아이 모드", "아이모드") to UserMode.CHILD,
-    listOf("일반") to UserMode.GENERAL,
-)
 
 /** A mode's name as AI 비서 says it. */
 val UserMode.spokenName: String
@@ -49,7 +43,12 @@ fun walkerChange(said: String, history: List<ChatLine>, current: UserMode): Assi
             mode = UserMode.DISABLED,
         )
     }
-    val mode = MODE_WORDS.firstOrNull { (words, _) -> words.any { s.contains(it.squeezed()) } }?.second
+    // The way of walking by the team server's words (RuleReader.MODE_WORDS), plus the app's own mode names.
+    val mode = serverModeWord(said) ?: when {
+        has("장애인") -> UserMode.DISABLED
+        has("일반") -> UserMode.GENERAL
+        else -> null
+    }
     // Asked for in so many words: change it (it can be taken back at once).
     if (mode != null && has("모드로", "모드 바꿔", "바꿔줘", "바꿔 줘", "바꿔주세요", "로 바꿔", "으로 바꿔", "모드 해", "모드로 해")) {
         return if (mode == current) AssistantAction.Answer("지금도 ${current.spokenName}예요.", onPhone = true)
