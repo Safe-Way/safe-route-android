@@ -329,8 +329,11 @@ class AssistantTest {
         assertTrue(rule("도와줘") is AssistantAction.Emergency)
         // "다쳐서" with a way of walking is about walking, not a fall (as on the server).
         assertTrue(rule("다리를 다쳐서 휠체어 타고 다녀") !is AssistantAction.Emergency)
-        // Not on the server's list, so not urgent on the phone either (asked of the server team, 11/10).
-        assertTrue(rule("119 불러 줘") !is AssistantAction.Emergency)
+        // Added on the server on 11/10 (safe-route #136), so on the phone too.
+        assertTrue(rule("119 불러 줘") is AssistantAction.Emergency)
+        assertTrue(rule("누가 자꾸 쫓아오는 것 같아") is AssistantAction.Emergency)
+        assertTrue(rule("구급차 좀 불러 줘") is AssistantAction.Emergency)
+        assertTrue(rule("누가 미행하는 것 같아") is AssistantAction.Emergency)
         assertTrue(rule("오늘 무릎이 아파") !is AssistantAction.Emergency)
         assertTrue(rule("집에 갈 건데 밤이라 무서워") !is AssistantAction.Emergency)
     }

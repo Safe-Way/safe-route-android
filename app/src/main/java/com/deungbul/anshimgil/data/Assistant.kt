@@ -195,12 +195,13 @@ fun reportTypeIn(said: String): ReportType? {
 
 /**
  * 급한 말: the team server's rule word for word (safe-route RuleBrain.URGENT and urgent()), so the phone and the server
- * agree on what is urgent. The app's own words of 11/9 (119, 112, 쫓아오, a short 아파·무서워·어지러) were dropped for it;
- * "119" and "쫓아오" were missed in the 11/9 test, so they were asked of the server team instead.
+ * agree on what is urgent. The app's own words of 11/9 were dropped for it; the server added 쫓아와·쫓아오·쫓아온·미행·
+ * 119·구급차 on 11/10 (safe-route #136), so they are here too.
  */
 internal val URGENT_WORDS = listOf(
     "넘어졌", "넘어짐", "넘어져서", "쓰러", "피가", "피나", "살려",
-    "도와줘", "도와주세요", "위험해", "따라와", "따라오", "숨이", "너무아파", "많이아파", "못일어나", "다쳤어", "다쳤어요",
+    "도와줘", "도와주세요", "위험해", "따라와", "따라오", "쫓아와", "쫓아오", "쫓아온", "미행", "119", "구급차",
+    "숨이", "너무아파", "많이아파", "못일어나", "다쳤어", "다쳤어요",
 )
 
 /** The team server's answer to an urgent remark (RuleBrain.emergency()); the buttons are 112 / 보호자 / 괜찮아요. */
