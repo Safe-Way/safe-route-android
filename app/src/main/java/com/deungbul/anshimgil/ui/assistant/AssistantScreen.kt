@@ -141,6 +141,8 @@ fun AssistantScreen(
     onUndo: () -> Boolean = { false },
     /** A saved place (자주 가는 곳, 집) named in what was said, for a booked guidance; null when none. */
     findSaved: suspend (String) -> Place? = { null },
+    /** AI 비서 sent a report (the server's 신고했어요): during guidance the guidance asks to find the way again. */
+    onReported: () -> Unit = {},
 ) {
     val android = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -356,7 +358,7 @@ fun AssistantScreen(
                 is AssistantAction.ShowBuses -> offerGo { onShowBuses() }
                 is AssistantAction.OpenReport -> { delay(1200); onOpenReport(action) }
                 is AssistantAction.Ask -> choices = action.choices
-                is AssistantAction.Answer -> Unit
+                is AssistantAction.Answer -> if (action.say.startsWith(REPORTED_SAY)) { delay(1200); onReported() }
             }
             thinking = null
         }
@@ -581,6 +583,9 @@ private fun ListeningStrip(level: Float, heardSoFar: String, onStop: () -> Unit)
         }
     }
 }
+
+/** The team server's words once a report said to AI 비서 is saved (AssistantTools.saveReport). */
+private const val REPORTED_SAY = "신고했어요"
 
 /** Now in Korea, for booked guidances. */
 private fun seoulNow(): java.time.LocalDateTime = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"))

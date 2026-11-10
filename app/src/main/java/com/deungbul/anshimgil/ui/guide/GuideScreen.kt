@@ -238,6 +238,10 @@ fun GuideScreen(
     finishLabel: String? = null,
     /** AI 비서's microphone on the map; it opens over the guidance, which keeps running. */
     onOpenAssistant: (() -> Unit)? = null,
+    /** 불편 신고 over the guidance (it keeps running underneath); null hides the button. */
+    onOpenReport: (() -> Unit)? = null,
+    /** Goes up by one each time a report was sent during this guidance: then "가시던 곳으로 다시 찾을까요?". */
+    reportedCount: Int = 0,
     /** Whether the walker has reached the destination (for the trip record). */
     onArrivedChange: (Boolean) -> Unit = {},
     /** AI 비서's live words here and the walker's answers, for the chat (fromUser, text). */
@@ -535,6 +539,16 @@ fun GuideScreen(
         }
     }
 
+    // After a report (button or AI 비서), as with a road event: offer a new way to the same place (진행표, 11/10).
+    var askRefind by remember { mutableStateOf(false) }
+    val reportsAtStart = remember { reportedCount }
+    LaunchedEffect(reportedCount) {
+        if (reportedCount <= reportsAtStart) return@LaunchedEffect
+        askRefind = true
+        onLive(false, REFIND_QUESTION)
+        if (voiceOn) tts.speak(REFIND_QUESTION, TextToSpeech.QUEUE_FLUSH, null, "refind")
+    }
+
     // Roadworks, an accident or a closure that started after the route was found: ask the server every few
     // minutes and tell the walker about a new one on the road ahead. Events there at the start are left out,
     // since the route was found with them in mind and the route screen already told the walker.
@@ -716,6 +730,24 @@ fun GuideScreen(
                         },
                     )
                 }
+                if (askRefind) {
+                    RefindCard(
+                        finding = rerouting,
+                        onRefind = {
+                            scope.launch {
+                                onLive(true, REFIND_YES)
+                                if (findNewRoute(fix ?: state.snapped, REFIND_DONE)) {
+                                    askRefind = false
+                                    aiNotice = REFIND_DONE
+                                } else {
+                                    askRefind = false
+                                    aiNotice = "새 길을 찾지 못해서 지금 길로 안내할게요."
+                                }
+                            }
+                        },
+                        onDismiss = { onLive(true, REFIND_NO); askRefind = false },
+                    )
+                } else
                 // Something new on the way, in AI 비서's words, here under the status line (team, 11/6).
                 eventAhead?.let { ahead ->
                     EventAheadCard(
@@ -756,6 +788,22 @@ fun GuideScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                         Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp))
                         Text("AI 비서", fontSize = 10.sp, fontWeight = FontWeight.Black, maxLines = 1)
+                    }
+                }
+            }
+            // 불편 신고 while walking: above AI 비서, in the report orange.
+            onOpenReport?.let { open ->
+                Surface(
+                    onClick = open,
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFFB45309),
+                    contentColor = Color.White,
+                    shadowElevation = 6.dp,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = if (onOpenAssistant != null) 144.dp else 80.dp).size(52.dp),
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                        Icon(Icons.Filled.WarningAmber, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Text("신고", fontSize = 11.sp, fontWeight = FontWeight.Black, maxLines = 1)
                     }
                 }
             }
@@ -1076,6 +1124,42 @@ private fun StopArrivedCard(text: String, onDone: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB45309)),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
             ) { Text("다 봤어요", fontSize = 17.sp, fontWeight = FontWeight.Bold) }
+        }
+    }
+}
+
+/** Asked after a report during the guidance, and its answers. */
+const val REFIND_QUESTION = "신고했어요. 가시던 곳으로 다시 찾을까요?"
+const val REFIND_YES = "다시 찾기"
+const val REFIND_NO = "이대로 갈게요"
+const val REFIND_DONE = "지금 자리에서 가시던 곳까지 길을 다시 찾았어요."
+
+/** After a report: 다시 찾기 (a new route from here to the same place) or carrying on. */
+@Composable
+private fun RefindCard(finding: Boolean, onRefind: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFFFF4E5).copy(alpha = AI_BUBBLE_ALPHA),
+        border = BorderStroke(1.5.dp, Color(0xFFB45309)),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = Green, modifier = Modifier.size(18.dp))
+                Text("AI 비서", fontSize = 14.sp, fontWeight = FontWeight.Black, color = Green)
+            }
+            Text(REFIND_QUESTION, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color(0xFF17211B), lineHeight = 23.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onRefind,
+                    enabled = !finding,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1F6B42)),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) { Text(if (finding) "찾는 중…" else REFIND_YES, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                    Text(REFIND_NO, fontSize = 16.sp)
+                }
+            }
         }
     }
 }

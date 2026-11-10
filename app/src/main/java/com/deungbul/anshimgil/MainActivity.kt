@@ -436,6 +436,24 @@ fun AppRoot(
                 val today = java.time.LocalDate.now()
                 if (today.isAfter(st.until)) endTempMode(st) else if (today == st.until) tempAsk = com.deungbul.anshimgil.data.tempEndQuestion(st)
             }
+            // 불편 신고 laid over guidance (it keeps running), and how many were sent during it (진행표: 다시 찾을까요?).
+            var reportOverGuide by remember(screen) { mutableStateOf(false) }
+            var reportedInGuide by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+            val guiding = screen is Screen.Guide || screen is Screen.TransitGuide
+            val reportPanel: @Composable (UserMode) -> Unit = { mode ->
+                if (reportOverGuide) {
+                    BackHandler { reportOverGuide = false; reportPrefill = null }
+                    val prefill = reportPrefill
+                    ReportScreen(
+                        mode = mode,
+                        onBack = { reportOverGuide = false; reportPrefill = null },
+                        modifier = modifier,
+                        initialType = prefill?.type,
+                        initialMemo = prefill?.memo.orEmpty(),
+                        onSent = { reportOverGuide = false; reportPrefill = null; reportedInGuide++ },
+                    )
+                }
+            }
             // AI 비서, as its own screen from the map or laid over walking guidance (which keeps running underneath).
             val assistantPanel: @Composable (UserMode, () -> Unit) -> Unit = { mode, onClose ->
                     AssistantScreen(
@@ -492,7 +510,8 @@ fun AppRoot(
                         onRouteByTransit = { place -> screen = Screen.Route(place, fromHome = true, transit = true) },
                         onRouteWithStops = { place, stops, transit -> screen = Screen.Route(place, fromHome = true, transit = transit, stops = stops) },
                         onShowBuses = { busesOnHome = true; screen = Screen.Home },
-                        onOpenReport = { r -> reportPrefill = r; screen = Screen.Report },
+                        onOpenReport = { r -> reportPrefill = r; if (guiding) { onClose(); reportOverGuide = true } else screen = Screen.Report },
+                        onReported = { if (screen is Screen.Guide) { onClose(); reportedInGuide++ } },
                         onAlertGuardian = { sosOnHome = true; screen = Screen.Home },
                         onUndo = {
                             val undo = assistantUndo
@@ -705,6 +724,7 @@ fun AppRoot(
                         BackHandler { assistantOverGuide = false }
                         assistantPanel(mode) { assistantOverGuide = false }
                     }
+                    reportPanel(mode)
                     }
                 }
                 screen is Screen.Guide -> {
@@ -716,6 +736,8 @@ fun AppRoot(
                         onArrivedChange = { guideArrived = it },
                         onLive = { fromUser, text -> assistantChat.note(fromUser, text) },
                         onOpenAssistant = openAssistantOverGuide,
+                        onOpenReport = { reportPrefill = null; reportOverGuide = true },
+                        reportedCount = reportedInGuide,
                         mode = mode,
                         result = guide.result,
                         type = guide.type,
@@ -734,6 +756,7 @@ fun AppRoot(
                         BackHandler { assistantOverGuide = false }
                         assistantPanel(mode) { assistantOverGuide = false }
                     }
+                    reportPanel(mode)
                     }
                 }
                 else -> HomeScreen(
