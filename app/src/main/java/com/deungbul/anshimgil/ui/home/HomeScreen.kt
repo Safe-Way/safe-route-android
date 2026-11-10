@@ -50,6 +50,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import com.deungbul.anshimgil.data.ShownHints
 import com.deungbul.anshimgil.data.MapHintSource
@@ -234,9 +235,20 @@ fun HomeScreen(
     val startCenter = remember { chooseOrigin(here).point.let { LatLng.from(it.lat, it.lon) } }
     var me by remember { mutableStateOf<Label?>(null) }
     var locating by remember { mutableStateOf(false) }
+    // Allowed from outside this screen (the first-run request, or the phone's settings): pick it up on coming back.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) hasPermission = hasLocationPermission(context)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     if (hasPermission) LocationUpdates(context) { here = it }
     // Whether the next fix should also move the map (pressed while the position was still unknown).
     var centerOnFix by remember { mutableStateOf(false) }
+    // Just allowed with the position still unknown: go to it when it comes, instead of staying on Chosun University.
+    LaunchedEffect(hasPermission) { if (hasPermission && here == null) centerOnFix = true }
 
     fun centerOn(p: LatLon) {
         map?.moveCamera(CameraUpdateFactory.newCenterPosition(LatLng.from(p.lat, p.lon), WALK_ZOOM))
