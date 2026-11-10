@@ -19,12 +19,36 @@ class FirstSetupTest {
         var a = SetupAnswers()
         listOf(0, 2, 0, 1).forEach { i -> answerSetup(step!!, i, a).let { (n, x) -> step = n; a = x } }
         assertEquals(SetupStep.DONE, step)
-        assertEquals(SetupAnswers(TextSize.LARGE, 1.15f, voiceGuide = true, sosButton = false), a)
+        assertEquals(SetupAnswers(textSize = TextSize.LARGE, textBoost = 1.15f, voiceGuide = true, sosButton = false), a)
         assertEquals(
             "이렇게 맞췄어요: 글씨 크게(한 단계 더), 음성 안내 켬, SOS 버튼 없음. 설정에서나 저에게 말해서 언제든 바꿀 수 있어요.",
             setupQuestion(SetupStep.DONE, a),
         )
         assertNull(answerSetup(SetupStep.DONE, 0, a).first)
+    }
+
+    @Test
+    fun aNewWalkerIsAskedTheServersQuestionsFirst() {
+        // RuleBrain.startSetup · setupAid · setupStairs · setupConfirm, then consent.md 1번.
+        assertEquals("처음 오셨네요. 어떻게 다니세요? 걸어서, 지팡이, 휠체어, 유모차 중에 말씀해 주세요.", setupQuestion(SetupStep.AID, SetupAnswers()))
+        var (step, a) = answerSetup(SetupStep.AID, 1, SetupAnswers())
+        assertEquals(SetupStep.STAIRS, step)
+        assertEquals("지팡이(으)로 다니시는군요. 계단은 몇 칸 괜찮으세요?", setupQuestion(step!!, a))
+        answerSetup(step, 1, a).let { step = it.first; a = it.second }
+        assertEquals("지팡이(으)로 다니고, 계단은 몇 칸 괜찮아요. 이렇게 기억할까요? 맞으세요?", setupQuestion(step!!, a))
+        answerSetup(step!!, 0, a).let { step = it.first; a = it.second }
+        assertTrue(a.confirmed)
+        assertEquals(SetupStep.CONSENT, step)
+        answerSetup(step!!, 0, a).let { step = it.first; a = it.second }
+        assertEquals(true, a.consent)
+        // Then the app's own questions.
+        assertEquals(SetupStep.START, step)
+        // A wheelchair: no steps (stairs 0), straight to the check.
+        val (w, wa) = answerSetup(SetupStep.AID, 2, SetupAnswers())
+        assertEquals(SetupStep.CONFIRM, w)
+        assertEquals("휠체어(으)로 다니고, 계단은 못 가요. 이렇게 기억할까요? 맞으세요?", setupQuestion(w!!, wa))
+        assertEquals(2, setupAnswerFromSpeech(SetupStep.AID, "휠체어 타요"))
+        assertEquals(0, setupAnswerFromSpeech(SetupStep.STAIRS, "계단은 못 가"))
     }
 
     @Test
