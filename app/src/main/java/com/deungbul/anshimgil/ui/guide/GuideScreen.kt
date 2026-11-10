@@ -211,7 +211,10 @@ private const val CROSSWALK_ON_ROUTE_M = 8.0
 private const val FOLLOW_MS = 900
 private val FOLLOW = CameraAnimation.from(FOLLOW_MS, false, true)
 /** The map turns only when the walker turns by at least this much. */
-private const val MAP_TURN_DEGREES = 25f
+private const val MAP_TURN_DEGREES = 15f
+
+/** Standing still the map follows a turn of the body from this many degrees. */
+private const val MAP_TURN_STILL_DEGREES = 10f
 
 /** The arrow turns quicker than the map, so a turn of the body shows right away. */
 private const val ARROW_TURN_MS = 300
@@ -441,8 +444,15 @@ fun GuideScreen(
 
     // Heading-up, like Naver's walking guidance: the map turns so the way ahead points up. It turns only
     // for a real change of direction and slowly, so it does not swing about (11/8).
+    // Standing still, the map turns with the walker too (compass), in smaller steps, so turning round moves
+    // the screen (11/10). Walking, it keeps to the route ahead.
+    val arrow = if (demo) heading else arrowHeading(moving, heading, compass)
     var mapBearing by remember { mutableFloatStateOf(heading) }
-    LaunchedEffect(heading) { if (angleBetween(mapBearing, heading) >= MAP_TURN_DEGREES) mapBearing = heading }
+    LaunchedEffect(arrow, heading, moving) {
+        val target = if (moving || demo) heading else arrow
+        val step = if (moving || demo) MAP_TURN_DEGREES else MAP_TURN_STILL_DEGREES
+        if (angleBetween(mapBearing, target) >= step) mapBearing = target
+    }
     // Moving and turning in one camera move: two moves sent apart cut each other off, so the map jerked at
     // every fix while it turned (11/9 video). Kakao turns the map the other way round from a compass bearing,
     // hence the minus.
@@ -463,8 +473,6 @@ fun GuideScreen(
     }
     // Marker rotation is measured on the screen, not the map, so take off the map's own turn; it turns over
     // the same time as the map, so the two stay together.
-    // Standing still, the arrow turns with the walker (compass) while the map stays put (11/10).
-    val arrow = if (demo) heading else arrowHeading(moving, heading, compass)
     LaunchedEffect(me, arrow, mapBearing) { me?.pointTo(arrow - mapBearing, ARROW_TURN_MS) }
 
     // 귀가 지킴이: off the planned route for a while, offer to tell the guardians (once per stretch off route).

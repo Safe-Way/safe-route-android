@@ -78,17 +78,28 @@ fun bearingDeg(a: LatLon, b: LatLon): Float {
  * shows where the phone points; without one, the route ahead.
  */
 fun guideHeading(onRoute: Boolean, moving: Boolean, routeAhead: Float, course: Float?, compass: Float?): Float = when {
+    // Walking on the route but clearly another way (turned the corner early, crossed over): the way they go,
+    // so the map turns while walking too (11/10).
+    onRoute && moving && course != null && courseAngle(course, routeAhead) >= COURSE_DIFFERS_DEGREES -> course
     onRoute -> routeAhead
     moving && course != null -> course
     else -> compass ?: routeAhead
 }
 
 /**
- * Which way the walker's arrow points. The map keeps facing the route ahead (above), but standing still the
- * arrow follows the compass, so turning round shows on screen at once instead of the arrow staying fixed (11/10).
- * Walking: the same way as the map.
+ * Which way the walker's arrow points: always the compass (where the phone faces), walking or not, so every
+ * turn of the body shows at once (11/10); without a compass, [heading]. The map uses it only standing still;
+ * walking, the map keeps to [heading] so it does not swing.
  */
-fun arrowHeading(moving: Boolean, heading: Float, compass: Float?): Float = if (!moving && compass != null) compass else heading
+fun arrowHeading(moving: Boolean, heading: Float, compass: Float?): Float = compass ?: heading
+
+/** Walking this far off the route's direction (degrees), the map follows the GPS course instead. */
+const val COURSE_DIFFERS_DEGREES = 45f
+
+private fun courseAngle(a: Float, b: Float): Float {
+    val d = Math.abs(a - b) % 360
+    return if (d > 180) 360 - d else d
+}
 
 /** Moving from this speed (m/s) up… */
 const val MOVING_ON_MPS = 0.6
