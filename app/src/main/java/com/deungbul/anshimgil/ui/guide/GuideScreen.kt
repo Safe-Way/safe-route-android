@@ -68,13 +68,12 @@ import androidx.compose.runtime.mutableFloatStateOf
 import com.deungbul.anshimgil.data.FacilityRepository
 import com.deungbul.anshimgil.data.ApiException
 import com.deungbul.anshimgil.data.bboxAround
-import com.deungbul.anshimgil.data.MyReports
 import com.deungbul.anshimgil.data.REPORT_NEAR_ROUTE_M
 import com.deungbul.anshimgil.data.ReportSpot
 import com.deungbul.anshimgil.data.RoadReportRepository
 import com.deungbul.anshimgil.data.reportAheadText
 import com.deungbul.anshimgil.data.reportSpotTitle
-import com.deungbul.anshimgil.data.reportSpots
+import com.deungbul.anshimgil.data.activeSpots
 import com.deungbul.anshimgil.data.reportSpotsAhead
 import com.deungbul.anshimgil.map.showReportSpots
 import com.deungbul.anshimgil.map.addTurnArrows
@@ -503,7 +502,7 @@ fun GuideScreen(
     var reportSpotsOnRoute by remember { mutableStateOf<List<ReportSpot>>(emptyList()) }
     LaunchedEffect(route) {
         while (true) {
-            runCatching { reportSpots(RoadReportRepository.within(bboxAround(route.path, marginDeg = 0.001)), mine = MyReports.ids(context)) }
+            runCatching { activeSpots(RoadReportRepository.within(bboxAround(route.path, marginDeg = 0.001))) }
                 .onSuccess { all -> reportSpotsOnRoute = all.filter { guidance.alongAndOff(it.point).second <= REPORT_NEAR_ROUTE_M } }
             delay(REPORTS_AGAIN_MS)
         }

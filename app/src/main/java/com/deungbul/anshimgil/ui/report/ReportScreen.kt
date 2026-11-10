@@ -59,8 +59,6 @@ import com.deungbul.anshimgil.data.Origin
 import com.deungbul.anshimgil.data.REPORT_MAX_MEMO
 import com.deungbul.anshimgil.data.REPORT_MAX_PHOTOS
 import com.deungbul.anshimgil.data.ReportRepository
-import com.deungbul.anshimgil.data.MyReports
-import com.deungbul.anshimgil.data.WalkSpeedRepository
 import com.deungbul.anshimgil.data.ReportType
 import com.deungbul.anshimgil.data.UserMode
 import com.deungbul.anshimgil.data.photoForUpload
@@ -197,11 +195,9 @@ fun ReportScreen(
                 error = null
                 scope.launch {
                     try {
-                        val guest = runCatching { WalkSpeedRepository(context).guestId() }.getOrNull()
-                        val id = ReportRepository.send(t, at, null, mode, memo, photos.toList(), guest)
-                        MyReports.add(context, id)
-                        // Drawn on the map once reports pile up there (11/10), so say so.
-                        Toast.makeText(context, "신고를 보냈어요. 고마워요! 같은 곳에 신고가 쌓이면 지도에 표시돼요.", Toast.LENGTH_LONG).show()
+                        ReportRepository.send(t, at, null, mode, memo, photos.toList())
+                        // The words of the team's consent text (consent.md 3번): one report already shows on the map.
+                        Toast.makeText(context, "신고를 보냈어요. 고마워요! 신고한 곳은 지도에 '신고된 곳'으로 보여요.", Toast.LENGTH_LONG).show()
                         File(context.cacheDir, "report_photos").deleteRecursively()
                         onBack()
                     } catch (e: ApiException) {

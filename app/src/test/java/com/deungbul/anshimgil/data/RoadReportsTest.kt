@@ -2,84 +2,119 @@ package com.deungbul.anshimgil.data
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
 import java.time.LocalDateTime
 
+/**
+ * 결정 57: the team's own cases for `road_report_active` (safe-route scripts/check_report_active.py, 21 checks),
+ * run through the app's copy of the rules, so the map shows what the route engine and the server count.
+ */
 class RoadReportsTest {
-    private val now = LocalDateTime.of(2026, 11, 10, 15, 0)
-    private var nextId = 1L
-    private fun r(
-        type: ReportType = ReportType.CONSTRUCTION,
-        northM: Double = 0.0,
-        hoursAgo: Long = 1,
-        reporter: String? = null,
-        confirmed: Boolean = false,
-    ) = RoadReport(nextId++, type, LatLon(35.14 + northM / 111_320.0, 126.93), null, confirmed, now.minusHours(hoursAgo), 0, reporter)
+    private fun r(id: Long, code: String, lat: Double, lon: Double, day: String, status: String = "open") =
+        RoadReport(id, code, code, LatLon(lat, lon), null, status == "confirmed", LocalDate.parse(day).atTime(9, 0), 0)
+
+    // The team's reports; hidden ones never reach the app (the server's list leaves them out), so 902 is not here.
+    private val all = listOf(
+        r(101, "construction", 35.1000, 126.9000, "2026-11-10"),
+        r(201, "construction", 35.1100, 126.9000, "2026-11-10"),
+        r(202, "construction", 35.11005, 126.9000, "2026-11-16"),
+        r(203, "construction", 35.1100, 126.90005, "2026-11-17"),
+        r(301, "construction", 35.1200, 126.9000, "2026-11-10"),
+        r(302, "construction", 35.1200, 126.9001, "2026-11-13"),
+        r(401, "construction", 35.1300, 126.9000, "2026-11-10"),
+        r(402, "construction", 35.1300, 126.9000, "2026-11-18"),
+        r(501, "accident", 35.1400, 126.9000, "2026-11-10"),
+        r(601, "curb", 35.1500, 126.9000, "2026-11-10"),
+        r(701, "construction", 35.1600, 126.9000, "2026-11-10"),
+        r(702, "curb", 35.1600, 126.9000, "2026-11-10"),
+        r(801, "construction", 35.1700, 126.9000, "2026-11-10"),
+        r(802, "construction", 35.17045, 126.9000, "2026-11-10"),
+        r(901, "obstacle", 35.1800, 126.9000, "2026-11-10"),
+        r(1001, "construction", 35.1900, 126.9000, "2026-11-10"),
+        r(1002, "construction", 35.1900, 126.9000, "2026-11-16"),
+        r(1003, "construction", 35.1900, 126.9000, "2026-11-16"),
+        r(1101, "broken", 35.2000, 126.9000, "2026-11-10", "confirmed"),
+    )
+
+    /** (today, spot, null = not shown, or (start, end, count, confirmed)) — the team's EXPECT list. */
+    private val expect = listOf(
+        Triple("2026-11-16", 101L, Exp("2026-11-10", "2026-11-16", 1, false)),
+        Triple("2026-11-17", 101L, null),
+        Triple("2026-11-17", 201L, Exp("2026-11-10", "2026-11-18", 3, true)),
+        Triple("2026-11-18", 201L, Exp("2026-11-10", "2026-11-18", 3, true)),
+        Triple("2026-11-19", 201L, null),
+        Triple("2026-11-14", 301L, Exp("2026-11-10", "2026-11-16", 2, true)),
+        Triple("2026-11-17", 301L, null),
+        Triple("2026-11-17", 401L, null),
+        Triple("2026-11-20", 401L, Exp("2026-11-18", "2026-11-24", 1, false)),
+        Triple("2026-11-10", 501L, Exp("2026-11-10", "2026-11-10", 1, false)),
+        Triple("2026-11-11", 501L, null),
+        Triple("2026-12-09", 601L, Exp("2026-11-10", "2026-12-09", 1, false)),
+        Triple("2026-12-10", 601L, null),
+        Triple("2026-11-12", 701L, Exp("2026-11-10", "2026-11-16", 1, false)),
+        Triple("2026-11-12", 702L, Exp("2026-11-10", "2026-12-09", 1, false)),
+        Triple("2026-11-12", 801L, Exp("2026-11-10", "2026-11-16", 1, false)),
+        Triple("2026-11-12", 802L, Exp("2026-11-10", "2026-11-16", 1, false)),
+        Triple("2026-11-10", 901L, Exp("2026-11-10", "2026-11-10", 1, false)),
+        Triple("2026-11-17", 1001L, Exp("2026-11-10", "2026-11-17", 3, true)),
+        Triple("2026-11-18", 1001L, null),
+        Triple("2026-11-12", 1101L, Exp("2026-11-10", "2026-12-09", 1, true)),
+    )
+
+    data class Exp(val start: String, val end: String, val count: Int, val confirmed: Boolean)
 
     @Test
-    fun twoPeopleShow() {
-        val spots = reportSpots(listOf(r(reporter = "a"), r(northM = 10.0, reporter = "b")), now)
-        assertEquals(1, spots.size)
-        assertEquals(2, spots[0].count)
+    fun theTeamsCasesForDecision57() {
+        val wrong = expect.mapNotNull { (today, spot, want) ->
+            val got = activeSpots(all, LocalDate.parse(today)).firstOrNull { it.spotId == spot }
+                ?.let { Exp(it.startsOn.toString(), it.endsOn.toString(), it.count, it.confirmed) }
+            if (got == want) null else "$today $spot: 기대 $want, 나옴 $got"
+        }
+        assertTrue(wrong.joinToString("\n"), wrong.isEmpty())
     }
 
     @Test
-    fun onePersonTwiceDoesNotShowButThreeTimesDoes() {
-        assertTrue(reportSpots(listOf(r(reporter = "a"), r(reporter = "a")), now).isEmpty())
-        assertEquals(1, reportSpots(listOf(r(reporter = "a"), r(reporter = "a"), r(reporter = "a")), now).size)
-        // Two of one person and one of another: two people.
-        assertEquals(1, reportSpots(listOf(r(reporter = "a"), r(reporter = "a"), r(reporter = "b")), now).size)
-    }
-
-    @Test
-    fun thisPhonesOwnReportsAreOnePerson() {
-        val mine = listOf(r(), r())
-        assertTrue(reportSpots(mine, now, mine = mine.map { it.id }.toSet()).isEmpty())
-    }
-
-    @Test
-    fun oneReportAloneDoesNotShowUnlessConfirmed() {
-        assertTrue(reportSpots(listOf(r()), now).isEmpty())
-        assertEquals(1, reportSpots(listOf(r(confirmed = true)), now).size)
-    }
-
-    @Test
-    fun olderThanADayDropsOff() {
-        assertTrue(reportSpots(listOf(r(reporter = "a", hoursAgo = 25), r(reporter = "b")), now).isEmpty())
-    }
-
-    @Test
-    fun farApartOrOtherKindsAreSeparate() {
-        assertTrue(reportSpots(listOf(r(reporter = "a"), r(northM = 80.0, reporter = "b")), now).isEmpty())
-        assertTrue(reportSpots(listOf(r(reporter = "a"), r(type = ReportType.CURB, reporter = "b")), now).isEmpty())
+    fun aSpotIsDrawnAtItsFirstReport() {
+        val spot = activeSpots(all, LocalDate.parse("2026-11-17")).first { it.spotId == 201L }
+        assertEquals(LatLon(35.1100, 126.9000), spot.point)
     }
 
     @Test
     fun readsTheServersList() {
         val json = JSONObject(
             """{"reports":[{"id":7,"type":"curb","typeName":"턱","mode":"senior","memo":null,"lat":35.14,"lon":126.93,
-            "status":"open","createdAt":"2026-11-10T14:40","photoUrls":["/api/reports/7/photos/1"]}],"truncated":false}""",
+            "status":"confirmed","createdAt":"2026-11-10T14:40","photoUrls":["/api/reports/7/photos/1"]}],"truncated":false}""",
         )
         val list = parseReports(json)
-        assertEquals(ReportType.CURB, list[0].type)
+        assertEquals("curb", list[0].code)
+        assertEquals("턱", list[0].label)
         assertEquals(LocalDateTime.of(2026, 11, 10, 14, 40), list[0].createdAt)
         assertEquals(1, list[0].photoCount)
-        assertEquals(null, list[0].memo)
+        assertTrue(list[0].teamConfirmed)
+        assertNull(list[0].memo)
     }
 
     @Test
-    fun wordsForTheMapAndTheVoice() {
-        val spot = reportSpots(listOf(r(reporter = "a", hoursAgo = 0), r(reporter = "b", hoursAgo = 0)), now.plusMinutes(20))[0]
+    fun wordsForTheMapTheCardAndTheVoice() {
+        val spot = activeSpots(
+            listOf(
+                r(1, "construction", 35.1, 126.9, "2026-11-10").copy(label = "공사", createdAt = LocalDateTime.of(2026, 11, 10, 8, 21)),
+                r(2, "construction", 35.1, 126.9, "2026-11-10").copy(label = "공사", createdAt = LocalDateTime.of(2026, 11, 10, 8, 21)),
+            ),
+            LocalDate.of(2026, 11, 10),
+        ).single()
         assertEquals("공사 2", reportSpotTag(spot))
-        assertEquals("공사 신고 2건 · 마지막 신고 20분 전", reportSpotTitle(spot, now.plusMinutes(20)))
+        assertEquals("공사 신고 2건 · 마지막 신고 20분 전 · 확인됨", reportSpotTitle(spot, LocalDateTime.of(2026, 11, 10, 8, 41)))
+        assertEquals("11월 16일까지 지도에 보여요.", reportSpotUntil(spot))
         assertEquals("앞 60m에 공사 신고가 2건 있어요. 조심해서 가세요.", reportAheadText(spot, 60))
     }
 
     @Test
     fun toldOnlyWhenAheadAndNearTheRoute() {
-        val spot = reportSpots(listOf(r(reporter = "a"), r(reporter = "b")), now)[0]
-        // (along, off) for the spot on a made-up route.
+        val spot = activeSpots(listOf(r(1, "construction", 35.1, 126.9, "2026-11-10")), LocalDate.of(2026, 11, 10)).single()
         fun at(along: Double, off: Double) = reportSpotsAhead(listOf(spot), progressM = 200.0) { along to off }
         assertEquals(60, at(260.0, 10.0).single().second)
         assertTrue(at(150.0, 10.0).isEmpty()) // behind
