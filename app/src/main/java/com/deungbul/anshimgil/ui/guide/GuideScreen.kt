@@ -210,14 +210,17 @@ private const val CROSSWALK_ON_ROUTE_M = 8.0
 /** Position updates come about once a second; moving over slightly less keeps the marker gliding. */
 private const val FOLLOW_MS = 900
 private val FOLLOW = CameraAnimation.from(FOLLOW_MS, false, true)
+
+/** A turn of the map is shown this fast, so it keeps up with the walker turning. */
+private val TURN = CameraAnimation.from(ARROW_TURN_MS, false, true)
 /** The map turns only when the walker turns by at least this much. */
 private const val MAP_TURN_DEGREES = 15f
 
 /** Standing still the map follows a turn of the body from this many degrees. */
-private const val MAP_TURN_STILL_DEGREES = 10f
+private const val MAP_TURN_STILL_DEGREES = 8f
 
 /** The arrow turns quicker than the map, so a turn of the body shows right away. */
-private const val ARROW_TURN_MS = 300
+private const val ARROW_TURN_MS = 250
 
 
 
@@ -455,7 +458,11 @@ fun GuideScreen(
     // Moving and turning in one camera move: two moves sent apart cut each other off, so the map jerked at
     // every fix while it turned (11/9 video). Kakao turns the map the other way round from a compass bearing,
     // hence the minus.
+    // A turn is shown quickly; a move alone glides over the time until the next fix.
+    var shownBearing by remember { mutableFloatStateOf(mapBearing) }
     LaunchedEffect(map, state.snapped, mapBearing) {
+        val turning = angleBetween(shownBearing, mapBearing) > 0.5f
+        shownBearing = mapBearing
         // Glide to each new position over about the time until the next fix, instead of jumping.
         me?.moveTo(state.snapped.toLatLng(), FOLLOW_MS)
         val m = map ?: return@LaunchedEffect
@@ -467,7 +474,7 @@ fun GuideScreen(
                     now?.tiltAngle ?: Math.toRadians(WALK_TILT_DEGREES), Math.toRadians(((360 - mapBearing) % 360).toDouble()), now?.height ?: 0.0,
                 ),
             ),
-            FOLLOW,
+            if (turning) TURN else FOLLOW,
         )
     }
     // Marker rotation is measured on the screen, not the map, so take off the map's own turn; it turns over

@@ -32,23 +32,28 @@ fun rememberCompassHeading(): Float? {
         val orientation = FloatArray(3)
         val remapped = FloatArray(9)
         var smooth: Float? = null
+        var upright = false
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
                 SensorManager.getRotationMatrixFromVector(matrix, event.values)
                 SensorManager.getOrientation(matrix, orientation)
                 // Held upright (looking at the screen while walking) the flat-phone azimuth swings and can
-                // flip by 180°; then measure where the back of the phone points instead (11/8).
-                if (Math.abs(Math.toDegrees(orientation[1].toDouble())) > UPRIGHT_PITCH_DEGREES) {
+                // flip by 180°; then measure where the back of the phone points instead (11/8). Switching
+                // only past 50° and back under 40° keeps a phone held near 45° from flicking between the two.
+                val pitch = Math.abs(Math.toDegrees(orientation[1].toDouble()))
+                upright = if (upright) pitch > UPRIGHT_PITCH_DEGREES - 5 else pitch > UPRIGHT_PITCH_DEGREES + 5
+                if (upright) {
                     SensorManager.remapCoordinateSystem(matrix, SensorManager.AXIS_X, SensorManager.AXIS_Z, remapped)
                     SensorManager.getOrientation(remapped, orientation)
                 }
                 val degrees = ((Math.toDegrees(orientation[0].toDouble()) + 360) % 360).toFloat()
-                // The raw reading shakes with every step, so it is smoothed heavily (a slow average
-                // that follows a real turn within about half a second) and only turns of 8° or more count.
+                // Small shakes (hand, steps) are averaged away slowly; a real turn of the body (the reading
+                // far from the average) is followed fast (11/10: still the arrow wobbled, turning it lagged).
                 val prev = smooth
                 smooth = if (prev == null) degrees else {
                     val diff = ((degrees - prev + 540) % 360) - 180
-                    ((prev + diff * COMPASS_SMOOTHING + 360) % 360)
+                    val share = if (Math.abs(diff) >= COMPASS_TURN_DEGREES) COMPASS_FOLLOW_TURN else COMPASS_SMOOTHING
+                    ((prev + diff * share + 360) % 360)
                 }
                 val now = smooth ?: return
                 val old = heading
@@ -57,7 +62,7 @@ fun rememberCompassHeading(): Float? {
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
         }
-        if (sensor != null) manager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+        if (sensor != null) manager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_GAME)
         onDispose { manager?.unregisterListener(listener) }
     }
     return heading
@@ -66,11 +71,17 @@ fun rememberCompassHeading(): Float? {
 /** Tilted further than this from flat, the phone counts as held upright. */
 private const val UPRIGHT_PITCH_DEGREES = 45.0
 
-/** Share of each new compass reading in the running average (lower is steadier). */
-private const val COMPASS_SMOOTHING = 0.15f
+/** Share of each new compass reading in the running average while it stays close (lower is steadier). */
+private const val COMPASS_SMOOTHING = 0.04f
+
+/** A reading this far from the average is a real turn of the body… */
+private const val COMPASS_TURN_DEGREES = 20f
+
+/** …and is followed this fast (about a tenth of a second at the game sensor rate). */
+private const val COMPASS_FOLLOW_TURN = 0.35f
 
 /** The heading shown changes only when the phone turns at least this much. */
-private const val COMPASS_STEP_DEGREES = 8f
+private const val COMPASS_STEP_DEGREES = 6f
 
 /** Smallest angle between two headings in degrees (0..180). */
 fun angleBetween(a: Float, b: Float): Float {
