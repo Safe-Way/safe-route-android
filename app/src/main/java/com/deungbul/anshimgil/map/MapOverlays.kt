@@ -744,9 +744,8 @@ fun KakaoMap.showReportSpots(context: Context, spots: List<com.deungbul.anshimgi
     } ?: return
     layer.removeAll()
     spots.forEach { spot ->
-        val confirmed = spot.reports.any { it.confirmed }
-        // Darker when confirmed or when many have reported it.
-        val color = if (confirmed || spot.count >= 5) 0xFF9A3412.toInt() else 0xFFC2410C.toInt()
+        // Darker once confirmed (결정 57: 2 reports this period, or the team checked it).
+        val color = if (spot.confirmed) 0xFF9A3412.toInt() else 0xFFD97706.toInt()
         // On a stem: the walker's arrow (about 33 dp across) stands on the spot itself, and the tag sat right under it
         // (11/10 phone check). The stem's foot marks the place; the tag stays readable above the arrow.
         val bitmap = stemmed(pillBitmap("⚠ " + com.deungbul.anshimgil.data.reportSpotTag(spot), color, density), color, density)

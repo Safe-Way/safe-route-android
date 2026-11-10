@@ -109,8 +109,7 @@ import com.deungbul.anshimgil.map.showLayers
 import com.deungbul.anshimgil.map.showReportSpots
 import com.deungbul.anshimgil.data.ReportSpot
 import com.deungbul.anshimgil.data.RoadReportRepository
-import com.deungbul.anshimgil.data.MyReports
-import com.deungbul.anshimgil.data.reportSpots
+import com.deungbul.anshimgil.data.activeSpots
 import com.kakao.vectormap.label.Label
 import com.deungbul.anshimgil.ui.common.MapMessage
 import com.deungbul.anshimgil.ui.mode.style
@@ -392,7 +391,7 @@ fun HomeScreen(
             m.showLayers(context, page.layers)
             shownFacilities = page.layers.facilities
             // 신고 쌓인 곳 on top; the map's facilities still show when the reports cannot be read.
-            runCatching { reportSpots(RoadReportRepository.within(area), mine = MyReports.ids(context)) }
+            runCatching { activeSpots(RoadReportRepository.within(area)) }
                 .onSuccess { m.showReportSpots(context, it) }
             // showLayers clears every label, the position dot included.
             me = here?.let { m.addMyLocation(context, it) }

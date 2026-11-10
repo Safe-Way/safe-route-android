@@ -1,33 +1,34 @@
 package com.deungbul.anshimgil.data
 
-import android.content.Context
 import org.json.JSONObject
 import java.time.Duration
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import kotlin.math.asin
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 /*
- * 신고 쌓인 곳 (11/10): reports from everyone (`GET /api/reports?bbox`) are drawn on the map only where they pile up,
- * so one wrong report does not mark a street.
- *   - Reports of one kind within [REPORT_SPOT_M] of each other make one spot.
- *   - Only the last [REPORT_KEEP_HOURS] hours count; older ones drop off by themselves (works end, things get moved).
- *   - A spot shows from 2 reports by different people; when one person reported again at the same spot, from 3.
- *   - A report the team confirmed shows on its own.
- * The server does not keep who reported (no login); it may send a per-person key as `reporter` later. Until then
- * this phone knows its own reports ([MyReports]) and counts every other report as a different person.
+ * 신고된 곳 (FR-49, team 결정 57 of 2026-11-10): the team's server view `road_report_active`
+ * (safe-route 032_road_report_active.sql) decides which reports count right now, so the route engine, the server
+ * and this map agree. The server does not offer that view to the app yet, so [activeSpots] does the same
+ * calculation on `GET /api/reports?bbox`, rule for rule, and its tests are the team's own cases
+ * (scripts/check_report_active.py). When the server sends the view, read it instead of this.
+ *
+ * 결정 57:
+ *   - Same place = same kind within 30 m; the spot is named by the first report in it (the lowest number).
+ *   - One report is enough to be valid; a spot is `confirmed` with 2 or more reports this period or one the team confirmed.
+ *   - Period, the first report's day being day 1: 막는 물건·사고 1 day, 공사 7, 턱·급경사·보도 파손 30, 기타 7.
+ *   - 공사 only: a report on the last day adds one day (again on the new last day, one more).
+ *   - A report after a period has ended starts a new period that day.
+ *   - Hidden reports do not count (the server's list leaves them out already).
+ * The app's own rules of 11/10 (2 people or 3 reports, 24 hours, one person counted once) were dropped for these.
  */
 
-/** Reports of one kind this close together are one spot. */
+/** Reports of one kind this close together are one place (결정 57). */
 const val REPORT_SPOT_M = 30.0
-
-/** Only reports from the last this many hours count. */
-const val REPORT_KEEP_HOURS = 24L
-
-/** A spot shows from this many reports by different people… */
-const val REPORT_SPOT_PEOPLE = 2
-
-/** …or this many reports in all (one person reporting again). */
-const val REPORT_SPOT_TOTAL = 3
 
 /** During guidance, a spot this far ahead on the route at most is told… */
 const val REPORT_AHEAD_M = 100.0
@@ -35,23 +36,37 @@ const val REPORT_AHEAD_M = 100.0
 /** …when it is this close to the route. */
 const val REPORT_NEAR_ROUTE_M = 30.0
 
-/** One report from the server. [reporter]: the server's key for who sent it, when it sends one. */
+/** One report from the server: [code] is the server's kind (steep, construction, curb, broken, obstacle, accident, other). */
 data class RoadReport(
     val id: Long,
-    val type: ReportType,
+    val code: String,
+    val label: String,
     val point: LatLon,
     val memo: String?,
-    val confirmed: Boolean,
+    val teamConfirmed: Boolean,
     val createdAt: LocalDateTime?,
     val photoCount: Int,
-    val reporter: String? = null,
 )
 
-/** Reports of one kind piled up in one place. */
-data class ReportSpot(val type: ReportType, val point: LatLon, val reports: List<RoadReport>) {
+/** A place with reports valid today, as the team's `road_report_active` gives it. */
+data class ReportSpot(
+    /** The first report in the place; also where the place is drawn. */
+    val spotId: Long,
+    val code: String,
+    val label: String,
+    val point: LatLon,
+    val startsOn: LocalDate,
+    val endsOn: LocalDate,
+    /** The reports of this period, oldest first. */
+    val reports: List<RoadReport>,
+    val confirmed: Boolean,
+) {
     val count: Int get() = reports.size
     val latest: LocalDateTime? get() = reports.mapNotNull { it.createdAt }.maxOrNull()
-    val memos: List<String> get() = reports.mapNotNull { it.memo?.takeIf { m -> m.isNotBlank() } }.distinct()
+    val photoCount: Int get() = reports.sumOf { it.photoCount }
+
+    /** The newest note (the view's last_memo). */
+    val lastMemo: String? get() = reports.lastOrNull { !it.memo.isNullOrBlank() }?.memo
 }
 
 /** The school server's times are Korean time. */
@@ -61,76 +76,102 @@ internal fun parseReports(json: JSONObject): List<RoadReport> {
     val list = json.optJSONArray("reports") ?: return emptyList()
     return (0 until list.length()).mapNotNull { i ->
         val r = list.optJSONObject(i) ?: return@mapNotNull null
-        val type = ReportType.entries.firstOrNull { it.code == r.optString("type") } ?: ReportType.OTHER
         if (!r.has("lat") || !r.has("lon")) return@mapNotNull null
+        val code = r.optString("type").ifBlank { "other" }
         RoadReport(
             id = r.optLong("id"),
-            type = type,
+            code = code,
+            label = r.optString("typeName").takeUnless { r.isNull("typeName") || it.isBlank() }
+                ?: ReportType.entries.firstOrNull { it.code == code }?.label ?: if (code == "accident") "사고" else "기타",
             point = LatLon(r.optDouble("lat"), r.optDouble("lon")),
             memo = r.optString("memo").takeUnless { r.isNull("memo") || it.isBlank() },
-            confirmed = r.optString("status") == "confirmed",
+            teamConfirmed = r.optString("status") == "confirmed",
             createdAt = r.optString("createdAt").takeUnless { r.isNull("createdAt") || it.isBlank() }
                 ?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() },
             photoCount = r.optJSONArray("photoUrls")?.length() ?: 0,
-            reporter = r.optString("reporter").takeUnless { r.isNull("reporter") || it.isBlank() },
         )
     }
 }
 
-/** Who sent [r], for counting people: the server's key, this phone, or (unknown) a person of its own. */
-private fun personOf(r: RoadReport, mine: Set<Long>): String = r.reporter ?: if (r.id in mine) "me" else "report-${r.id}"
-
-/** Whether a spot is drawn: confirmed, or 2 people, or 3 reports. */
-fun spotShown(spot: ReportSpot, mine: Set<Long> = emptySet()): Boolean =
-    spot.reports.any { it.confirmed } ||
-        spot.reports.map { personOf(it, mine) }.distinct().size >= REPORT_SPOT_PEOPLE ||
-        spot.count >= REPORT_SPOT_TOTAL
-
-/**
- * The spots to draw from [reports]: those of the last [REPORT_KEEP_HOURS] hours, grouped by kind within
- * [REPORT_SPOT_M], kept when [spotShown]. A spot sits in the middle of its reports.
- */
-fun reportSpots(reports: List<RoadReport>, now: LocalDateTime = koreaNow(), mine: Set<Long> = emptySet()): List<ReportSpot> {
-    val recent = reports.filter { r ->
-        val at = r.createdAt ?: return@filter false
-        !at.isAfter(now.plusMinutes(5)) && Duration.between(at, now).toHours() < REPORT_KEEP_HOURS
-    }
-    val spots = mutableListOf<ReportSpot>()
-    recent.groupBy { it.type }.forEach { (type, ofType) ->
-        // Oldest first, each joining the first spot whose middle is close enough.
-        val groups = mutableListOf<MutableList<RoadReport>>()
-        ofType.sortedBy { it.createdAt }.forEach { r ->
-            val near = groups.firstOrNull { g -> metersBetween(middle(g), r.point) <= REPORT_SPOT_M }
-            if (near != null) near += r else groups += mutableListOf(r)
-        }
-        groups.forEach { g -> spots += ReportSpot(type, middle(g), g.toList()) }
-    }
-    return spots.filter { spotShown(it, mine) }.sortedByDescending { it.count }
+/** Days a report keeps a place valid, by kind (결정 57). */
+fun reportDays(code: String): Long = when (code) {
+    "obstacle", "accident" -> 1
+    "construction" -> 7
+    "curb", "steep", "broken" -> 30
+    else -> 7
 }
 
-private fun middle(rs: List<RoadReport>) = LatLon(rs.map { it.point.lat }.average(), rs.map { it.point.lon }.average())
+/**
+ * The places valid on [today], worked out as `road_report_active` does: each report belongs to the lowest-numbered
+ * report of its kind within 30 m of it; a place's days are walked in order to find its latest period; the place shows
+ * while that period has not ended, with the reports of that period.
+ */
+fun activeSpots(reports: List<RoadReport>, today: LocalDate = koreaNow().toLocalDate()): List<ReportSpot> {
+    val dated = reports.filter { it.createdAt != null && !it.createdAt.toLocalDate().isAfter(today) }
+    val spotOf = dated.associate { r ->
+        r.id to dated.filter { it.code == r.code && sphereMeters(it.point, r.point) <= REPORT_SPOT_M }.minOf { it.id }
+    }
+    return dated.groupBy { spotOf.getValue(it.id) }.mapNotNull { (spotId, inSpot) ->
+        val first = dated.first { it.id == spotId }
+        val days = reportDays(first.code)
+        var start: LocalDate? = null
+        var end: LocalDate? = null
+        for (d in inSpot.map { it.createdAt!!.toLocalDate() }.distinct().sorted()) {
+            val e = end
+            if (start == null || e == null || d.isAfter(e)) {
+                start = d
+                end = d.plusDays(days - 1)
+            } else if (first.code == "construction" && d == e) {
+                end = e.plusDays(1)
+            }
+        }
+        val s = start ?: return@mapNotNull null
+        val e = end ?: return@mapNotNull null
+        if (e.isBefore(today)) return@mapNotNull null
+        val inPeriod = inSpot.filter { val d = it.createdAt!!.toLocalDate(); !d.isBefore(s) && !d.isAfter(e) }
+            .sortedWith(compareBy<RoadReport> { it.createdAt }.thenBy { it.id })
+        ReportSpot(
+            spotId = spotId, code = first.code, label = first.label, point = first.point,
+            startsOn = s, endsOn = e, reports = inPeriod,
+            confirmed = inPeriod.size >= 2 || inPeriod.any { it.teamConfirmed },
+        )
+    }.sortedBy { it.spotId }
+}
 
-/** "20분 전", "3시간 전". */
+/** Great-circle meters on MySQL's ST_Distance_Sphere sphere, so "within 30 m" means the same as on the server. */
+private fun sphereMeters(a: LatLon, b: LatLon): Double {
+    val r = 6_370_986.0
+    val dLat = Math.toRadians(b.lat - a.lat)
+    val dLon = Math.toRadians(b.lon - a.lon)
+    val h = sin(dLat / 2).let { it * it } + cos(Math.toRadians(a.lat)) * cos(Math.toRadians(b.lat)) * sin(dLon / 2).let { it * it }
+    return 2 * r * asin(sqrt(h))
+}
+
+/** "20분 전", "3시간 전", "2일 전". */
 fun agoText(at: LocalDateTime?, now: LocalDateTime = koreaNow()): String? {
     val min = Duration.between(at ?: return null, now).toMinutes().coerceAtLeast(0)
     return when {
         min < 1 -> "방금 전"
         min < 60 -> "${min}분 전"
-        else -> "${min / 60}시간 전"
+        min < 24 * 60 -> "${min / 60}시간 전"
+        else -> "${min / (24 * 60)}일 전"
     }
 }
 
-/** The tag on the map: "공사 3". */
-fun reportSpotTag(spot: ReportSpot): String = "${spot.type.label} ${spot.count}"
+/** The tag on the map: "공사 2". */
+fun reportSpotTag(spot: ReportSpot): String = "${spot.label} ${spot.count}"
 
-/** The card on tapping it: "공사 신고 3건 · 마지막 신고 20분 전". */
+/** The card on tapping it: "공사 신고 2건 · 마지막 신고 20분 전 · 확인됨". */
 fun reportSpotTitle(spot: ReportSpot, now: LocalDateTime = koreaNow()): String =
-    "${spot.type.label} 신고 ${spot.count}건" + (agoText(spot.latest, now)?.let { " · 마지막 신고 $it" } ?: "") +
-        if (spot.reports.any { it.confirmed }) " · 확인됨" else ""
+    "${spot.label} 신고 ${spot.count}건" + (agoText(spot.latest, now)?.let { " · 마지막 신고 $it" } ?: "") +
+        if (spot.confirmed) " · 확인됨" else ""
 
-/** Said during guidance: "앞 60m에 공사 신고가 3건 있어요. 조심해서 가세요." */
+/** Until when it shows: "11월 16일까지 지도에 보여요." */
+fun reportSpotUntil(spot: ReportSpot): String = "${spot.endsOn.monthValue}월 ${spot.endsOn.dayOfMonth}일까지 지도에 보여요."
+
+/** Said during guidance: "앞 60m에 공사 신고가 2건 있어요. 조심해서 가세요." */
 fun reportAheadText(spot: ReportSpot, aheadM: Int): String =
-    (if (aheadM < 10) "바로 앞에" else "앞 ${aheadM}m에") + " ${spot.type.label} 신고가 ${spot.count}건 있어요. 조심해서 가세요."
+    (if (aheadM < 10) "바로 앞에" else "앞 ${aheadM}m에") + " ${spot.label} 신고가 ${spot.count}건 있어요. 조심해서 가세요."
 
 /** Spots ahead on the route, nearest first, as (spot, meters ahead); [onRoute] gives meters along and off the route. */
 fun reportSpotsAhead(spots: List<ReportSpot>, progressM: Double, onRoute: (LatLon) -> Pair<Double, Double>): List<Pair<ReportSpot, Int>> =
@@ -148,22 +189,4 @@ object RoadReportRepository {
             mapOf("bbox" to "%.6f,%.6f,%.6f,%.6f".format(java.util.Locale.US, area.west, area.south, area.east, area.north)),
         ),
     )
-}
-
-/** The ids of the reports sent from this phone, so they count as one person. Kept on the phone only. */
-object MyReports {
-    private const val PREFS = "my_reports"
-    private const val KEY = "ids"
-
-    fun ids(context: Context): Set<Long> =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getStringSet(KEY, emptySet()).orEmpty()
-            .mapNotNull { it.toLongOrNull() }.toSet()
-
-    fun add(context: Context, id: Long) {
-        if (id <= 0) return
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        // Only the latest ones matter (a day's worth); keep the set small.
-        val ids = (ids(context) + id).sortedDescending().take(50).map { it.toString() }.toSet()
-        prefs.edit().putStringSet(KEY, ids).apply()
-    }
 }
