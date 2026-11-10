@@ -52,6 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
 import com.deungbul.anshimgil.data.ShownHints
 import com.deungbul.anshimgil.data.MapHintSource
 import com.deungbul.anshimgil.data.MapHint
@@ -109,7 +110,6 @@ import com.deungbul.anshimgil.map.showLayers
 import com.deungbul.anshimgil.map.showReportSpots
 import com.deungbul.anshimgil.data.ReportSpot
 import com.deungbul.anshimgil.data.RoadReportRepository
-import com.deungbul.anshimgil.data.activeSpots
 import com.kakao.vectormap.label.Label
 import com.deungbul.anshimgil.ui.common.MapMessage
 import com.deungbul.anshimgil.ui.mode.style
@@ -301,6 +301,18 @@ fun HomeScreen(
     var voiceOff by remember { mutableStateOf(false) }
     val listening = setupByVoice && !voiceOff
     var listenAgain by remember { mutableIntStateOf(0) }
+    // The question on screen now, read from inside the server call (it may have moved on meanwhile).
+    val currentAsk by rememberUpdatedState(setupAsk)
+    fun notUnderstood() {
+        if (listening && voiceMisses == 0) {
+            voiceMisses = 1
+            onLive(false, "잘 못 알아들었어요. 다시 말해 주세요.")
+            listenAgain++
+        } else {
+            if (listening) voiceOff = true
+            onLive(false, "잘 못 알아들었어요. 버튼을 눌러 답해 주세요.")
+        }
+    }
     val setupSpeech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val said = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
         if (said == null) {
@@ -308,17 +320,21 @@ fun HomeScreen(
             return@rememberLauncherForActivityResult
         }
         onLive(true, said)
-        val index = setupFromSpeech(said)
-        if (index != null) {
+        val asked = setupAsk
+        val byWords = setupFromSpeech(said)
+        if (byWords != null) {
             voiceMisses = 0
-            onSetupAnswer(index)
-        } else if (listening && voiceMisses == 0) {
-            voiceMisses = 1
-            onLive(false, "잘 못 알아들었어요. 다시 말해 주세요.")
-            listenAgain++
-        } else {
-            if (listening) voiceOff = true
-            onLive(false, "잘 못 알아들었어요. 버튼을 눌러 답해 주세요.")
+            onSetupAnswer(byWords)
+            return@rememberLauncherForActivityResult
+        }
+        // The phone's words could not tell: the server's AI picks among the buttons (team #152), then as before.
+        scope.launch {
+            val byAi = asked?.let { com.deungbul.anshimgil.data.pickAnswerOnServer(it.first, it.second, said) }
+            if (currentAsk?.first != asked?.first) return@launch
+            if (byAi != null) {
+                voiceMisses = 0
+                onSetupAnswer(byAi)
+            } else notUnderstood()
         }
     }
     fun listenToSetup() {
@@ -436,7 +452,7 @@ fun HomeScreen(
             m.showLayers(context, page.layers)
             shownFacilities = page.layers.facilities
             // 신고 쌓인 곳 on top; the map's facilities still show when the reports cannot be read.
-            runCatching { activeSpots(RoadReportRepository.within(area)) }
+            runCatching { RoadReportRepository.activeWithin(area) }
                 .onSuccess { m.showReportSpots(context, it) }
             // showLayers clears every label, the position dot included.
             me = here?.let { m.addMyLocation(context, it) }

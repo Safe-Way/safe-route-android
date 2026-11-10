@@ -121,4 +121,22 @@ class RoadReportsTest {
         assertTrue(at(350.0, 10.0).isEmpty()) // too far ahead yet
         assertTrue(at(260.0, 45.0).isEmpty()) // not on this road
     }
+
+    @Test
+    fun readsTheServersActiveSpots() {
+        // GET /api/reports/active (server #151), the view's rows.
+        val json = JSONObject(
+            """{"spots":[{"spotId":3,"reportType":"construction","lat":35.14015,"lon":126.93425,"startsOn":"2026-11-10",
+            "endsOn":"2026-11-16","reportCount":2,"photoCount":0,"confirmed":true,"avoidModes":["adult","child","senior","wheelchair"],
+            "costModes":[],"lastAt":"2026-11-10T08:21:00","lastMemo":"[시험] 지도 표시 확인용"}],"truncated":false}""",
+        )
+        val spot = parseActiveSpots(json).single()
+        assertEquals(3L, spot.spotId)
+        assertEquals("공사", spot.label)
+        assertEquals(2, spot.count)
+        assertTrue(spot.confirmed)
+        assertEquals(LocalDate.of(2026, 11, 16), spot.endsOn)
+        assertEquals("[시험] 지도 표시 확인용", spot.lastMemo)
+        assertEquals("공사 신고 2건 · 마지막 신고 20분 전 · 확인됨", reportSpotTitle(spot, LocalDateTime.of(2026, 11, 10, 8, 41)))
+    }
 }

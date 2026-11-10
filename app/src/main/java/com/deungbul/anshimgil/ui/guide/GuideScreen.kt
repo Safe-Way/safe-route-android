@@ -73,7 +73,6 @@ import com.deungbul.anshimgil.data.ReportSpot
 import com.deungbul.anshimgil.data.RoadReportRepository
 import com.deungbul.anshimgil.data.reportAheadText
 import com.deungbul.anshimgil.data.reportSpotTitle
-import com.deungbul.anshimgil.data.activeSpots
 import com.deungbul.anshimgil.data.reportSpotsAhead
 import com.deungbul.anshimgil.map.showReportSpots
 import com.deungbul.anshimgil.map.addTurnArrows
@@ -502,7 +501,7 @@ fun GuideScreen(
     var reportSpotsOnRoute by remember { mutableStateOf<List<ReportSpot>>(emptyList()) }
     LaunchedEffect(route) {
         while (true) {
-            runCatching { activeSpots(RoadReportRepository.within(bboxAround(route.path, marginDeg = 0.001))) }
+            runCatching { RoadReportRepository.activeWithin(bboxAround(route.path, marginDeg = 0.001)) }
                 .onSuccess { all -> reportSpotsOnRoute = all.filter { guidance.alongAndOff(it.point).second <= REPORT_NEAR_ROUTE_M } }
             delay(REPORTS_AGAIN_MS)
         }
@@ -512,8 +511,8 @@ fun GuideScreen(
     val toldReports = remember { mutableSetOf<Long>() }
     LaunchedEffect(state.progressM.toInt() / 10, reportSpotsOnRoute) {
         val (spot, aheadM) = reportSpotsAhead(reportSpotsOnRoute, state.progressM) { guidance.alongAndOff(it) }
-            .firstOrNull { it.first.reports.minOf { r -> r.id } !in toldReports } ?: return@LaunchedEffect
-        toldReports += spot.reports.minOf { it.id }
+            .firstOrNull { it.first.spotId !in toldReports } ?: return@LaunchedEffect
+        toldReports += spot.spotId
         val said = reportAheadText(spot, aheadM)
         aiNotice = said
         onLive(false, said)

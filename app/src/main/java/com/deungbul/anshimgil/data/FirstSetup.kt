@@ -200,3 +200,19 @@ fun setupAnswerFromSpeech(step: SetupStep, said: String): Int? {
         SetupStep.DONE -> when { has("되돌", "처음대로", "취소", "다시") -> SETUP_UNDO_INDEX; has("알겠", "고마", "됐어") || yes -> 0; else -> null }
     }
 }
+
+/**
+ * When the words above cannot tell (null), the team server's AI picks the button meant
+ * (`POST /api/ai/pick-answer`, server #152): the index among [choices], or null when it cannot tell either, the AI
+ * is down (503 AI_UNAVAILABLE) or the server has not got the window yet. Never throws.
+ */
+suspend fun pickAnswerOnServer(question: String, choices: List<String>, said: String): Int? {
+    if (!ServerApi.isConfigured || choices.size !in 2..6) return null
+    return runCatching {
+        val j = ServerApi.post(
+            "/api/ai/pick-answer",
+            org.json.JSONObject().put("question", question).put("choices", org.json.JSONArray(choices)).put("said", said),
+        )
+        if (j.isNull("index")) null else j.optInt("index", -1).takeIf { it in choices.indices }
+    }.getOrNull()
+}
