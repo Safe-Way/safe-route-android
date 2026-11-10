@@ -17,7 +17,7 @@ class GoPhraseTest {
         assertEquals("충장로", placeToGo("충장로 가자"))
         assertEquals("금남로", placeToGo("금남로로 가 줘"))
         assertNull(placeToGo("같이 가자"))
-        assertNull(placeToGo("집에 가자"))
+        assertEquals("집", placeToGo("집에 가자"))
         assertNull(placeToGo("글씨 크게 해 줘"))
     }
 
@@ -53,15 +53,13 @@ class GoPhraseTest {
     }
 
     @Test
-    fun onlyShortPlaceNamesStayOnThePhone() {
-        // 11/9 test: these were searched as place names; the server assistant reads them now.
-        assertNull(placeToGo("비 안 맞고 문화전당 가고 싶어"))
-        assertNull(placeToGo("지하철 타고 시청 가고 싶어"))
-        assertNull(placeToGo("오늘은 그냥 빠른 길로 가자"))
-        assertNull(placeToGo("내일 아침 병원 예약 있는데 미리 길 알려 줘"))
-        assertNull(placeToGo("엘베 있는 데로 가자"))
-        assertEquals("문화전당", placeToGo("문화전당 가자"))
+    fun readsLikeTheServersWordRule() {
+        // RuleReader.destination: the words before the first "가고·가자·…", without mode words, fillers and company.
+        assertEquals("양동시장", placeToGo("할머니랑 양동시장 가고 싶어"))
+        assertEquals("문화전당", placeToGo("엄마랑 문화전당 가자"))
         assertEquals("양림동 펭귄마을", placeToGo("양림동 펭귄마을 가고 싶어"))
         assertEquals("충장로", placeToGo("충장로 쪽으로 가 줘"))
+        // Stops are read by the server's stop rule first.
+        assertNull(placeToGo("다이소 들렀다 문화전당 갈래"))
     }
 }
