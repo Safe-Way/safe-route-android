@@ -1,5 +1,15 @@
 package com.deungbul.anshimgil.ui.assistant
 
+import com.deungbul.anshimgil.TripBookings
+import com.deungbul.anshimgil.data.BOOK_NO
+import com.deungbul.anshimgil.data.BOOK_YES
+import com.deungbul.anshimgil.data.BookingAsk
+import com.deungbul.anshimgil.data.TripBooking
+import com.deungbul.anshimgil.data.bookedText
+import com.deungbul.anshimgil.data.bookingAsk
+import com.deungbul.anshimgil.data.bookingQuestion
+import com.deungbul.anshimgil.data.bookingsText
+import com.deungbul.anshimgil.data.cancelledText
 import com.deungbul.anshimgil.data.StopPlace
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -129,6 +139,8 @@ fun AssistantScreen(
     chat: AssistantChat = remember { AssistantChat() },
     /** Takes back the last change AI 비서 made; false when there is none (사용성 점검표 21번). */
     onUndo: () -> Boolean = { false },
+    /** A saved place (자주 가는 곳, 집) named in what was said, for a booked guidance; null when none. */
+    findSaved: suspend (String) -> Place? = { null },
 ) {
     val android = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -148,6 +160,8 @@ fun AssistantScreen(
     var choices by chat::choices
     // Showing something on the map waits for the walker's yes (11/10): what to open, until [지도에서 볼게요].
     var pendingGo by remember { mutableStateOf<(() -> Unit)?>(null) }
+    // 길 안내 예약 (11/10): the booking asked about, until [예약할게요].
+    var pendingBook by remember { mutableStateOf<TripBooking?>(null) }
     var thinking by remember { mutableStateOf<String?>(null) }
     var urgent by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
@@ -203,6 +217,50 @@ fun AssistantScreen(
         offerGo { onRoute(place) }
     }
 
+    /**
+     * 길 안내 예약: "10분 뒤에 문화전당 가자", "오늘 3시에 시청 길 안내 예약해 줘", "예약 취소". Read on the phone (the
+     * server answers 예약 with 못 해요, meant for 병원 예약); true when [said] was one of these.
+     */
+    fun bookAsk(said: String): Boolean {
+        val now = seoulNow()
+        val ask = bookingAsk(said, now) ?: return false
+        lines += ChatLine(fromUser = true, text = said)
+        input = ""
+        choices = emptyList()
+        when (ask) {
+            is BookingAsk.BadTime -> say(ask.say)
+            BookingAsk.List -> say(bookingsText(TripBookings.upcoming(android), now))
+            BookingAsk.Cancel -> {
+                val gone = TripBookings.cancelAll(android)
+                say(cancelledText(gone, now))
+            }
+            is BookingAsk.Book -> scope.launch {
+                thinking = "찾는 중…"
+                val place = try {
+                    when (val q = ask.query) {
+                        null -> chat.lastPlace
+                        else -> findSaved(q) ?: phoneOrigin(android).point.let { pickLandmark(placeRepository.search(q, it.lat, it.lon)) }
+                    }
+                } catch (e: ApiException) {
+                    thinking = null
+                    say(e.message ?: "지금은 찾을 수 없어요. 잠시 뒤에 다시 해 주세요.")
+                    return@launch
+                }
+                thinking = null
+                if (place == null) {
+                    say(if (ask.query == null) "어디로 가실지 같이 말씀해 주세요. 예를 들면 '10분 뒤에 문화전당 가자'처럼요."
+                    else "'${ask.query}'을(를) 찾지 못했어요. 이름을 조금 다르게 말해 주세요.")
+                    return@launch
+                }
+                chat.lastPlace = place
+                pendingBook = TripBooking(System.currentTimeMillis(), ask.at, place.name, place.lat, place.lon)
+                say(bookingQuestion(ask.at, place.name, seoulNow()))
+                choices = listOf(BOOK_YES, BOOK_NO)
+            }
+        }
+        return true
+    }
+
     fun send(text: String, byVoice: Boolean = false) {
         val said = text.trim()
         if (said.isEmpty() || thinking != null) return
@@ -226,6 +284,24 @@ fun AssistantScreen(
                 null -> pendingGo = null // something else was said: carry on with it
             }
         }
+        pendingBook?.let { booking ->
+            val yes = if (said.replace(" ", "") == BOOK_YES) true else goAnswer(said)
+            if (yes != null) {
+                lines += ChatLine(fromUser = true, text = said)
+                input = ""
+                pendingBook = null
+                choices = emptyList()
+                if (yes) {
+                    TripBookings.add(android, booking)
+                    say(bookedText(booking.at, booking.name, seoulNow()))
+                } else {
+                    say("알겠어요. 예약하지 않았어요.")
+                }
+                return
+            }
+            pendingBook = null
+        }
+        if (bookAsk(said)) return
         if (said == UNDO_CHOICE) {
             lines += ChatLine(fromUser = true, text = said)
             choices = emptyList()
@@ -505,6 +581,9 @@ private fun ListeningStrip(level: Float, heardSoFar: String, onStop: () -> Unit)
         }
     }
 }
+
+/** Now in Korea, for booked guidances. */
+private fun seoulNow(): java.time.LocalDateTime = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"))
 
 /** Asked before the map opens (11/10), and its two answers. */
 const val GO_QUESTION = "지도에서 보여 드릴까요?"

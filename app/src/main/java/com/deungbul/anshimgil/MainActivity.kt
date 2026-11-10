@@ -95,14 +95,20 @@ data class SettingsSnapshot(val mode: UserMode?, val settings: AppSettings, val 
 
 class MainActivity : ComponentActivity() {
     /** A place to open from the 출발 시간 알림 (name, point, by transit), handled once by AppRoot. */
-    private val reminded = androidx.compose.runtime.mutableStateOf<Pair<Place, Boolean>?>(null)
+    private val reminded = androidx.compose.runtime.mutableStateOf<Triple<Place, Boolean, Boolean>?>(null)
 
     private fun readReminder(intent: android.content.Intent?) {
         val name = intent?.getStringExtra(EXTRA_GO_NAME) ?: return
         val lat = intent.getDoubleExtra(EXTRA_GO_LAT, Double.NaN)
         val lon = intent.getDoubleExtra(EXTRA_GO_LON, Double.NaN)
         if (lat.isNaN() || lon.isNaN()) return
-        reminded.value = Place(null, name, "", lat, lon, null) to intent.getBooleanExtra(EXTRA_GO_TRANSIT, false)
+        reminded.value = Triple(
+            Place(null, name, "", lat, lon, null),
+            intent.getBooleanExtra(EXTRA_GO_TRANSIT, false),
+            // 길 안내 예약: at the booked time the guidance starts by itself.
+            intent.getBooleanExtra(EXTRA_GO_START, false),
+        )
+        intent.removeExtra(EXTRA_GO_START)
         intent.removeExtra(EXTRA_GO_NAME)
     }
 
@@ -183,8 +189,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        appOnScreen = true
+    }
+
     override fun onStop() {
         super.onStop()
+        appOnScreen = false
         ModeStatus.hide(this)
     }
 }
@@ -249,8 +261,8 @@ fun AppRoot(
     tripLog: TripLogRepository? = null,
     myInfoRepository: com.deungbul.anshimgil.data.MyInfoRepository = com.deungbul.anshimgil.data.MyInfoRepository(guestId = { walkSpeedRepository.guestId() }),
     usageRepository: UsageRepository? = null,
-    /** From the 출발 시간 알림: open the route there. */
-    reminded: Pair<Place, Boolean>? = null,
+    /** From the 출발 시간 알림 or a booked guidance: open the route there (place, by transit, start at once). */
+    reminded: Triple<Place, Boolean, Boolean>? = null,
     onRemindedHandled: () -> Unit = {},
 ) {
     val savedFlow = remember(modeRepository) { modeRepository.mode.map { SavedMode.Ready(it) } }
@@ -335,8 +347,8 @@ fun AppRoot(
     var tripId by remember { mutableStateOf<Long?>(null) }
     var tripDestination by remember { mutableStateOf<Place?>(null) }
     LaunchedEffect(reminded) {
-        val (place, transit) = reminded ?: return@LaunchedEffect
-        screen = Screen.Route(place, fromHome = true, transit = transit)
+        val (place, transit, start) = reminded ?: return@LaunchedEffect
+        screen = Screen.Route(place, fromHome = true, transit = transit, autoStart = start)
         onRemindedHandled()
     }
     // 쓰는 대로 맞추기: what has been learned, and a change to offer (after the trip question, one at a time).
@@ -433,6 +445,7 @@ fun AppRoot(
                         assistant = appAssistant,
                         context = AssistantContext(mode, settings, usage = usage, where = { currentLocation(appContext, 4_000) }, usualMode = com.deungbul.anshimgil.data.TempModeStore.get(appContext)?.usual ?: mode),
                         placeRepository = placeRepository,
+                        findSaved = { q -> com.deungbul.anshimgil.data.favoriteIn(q, savedPlaces.favorites.first())?.let { f -> f.place?.copy(name = f.name) } },
                         onChangeSettings = { change ->
                             val before = SettingsSnapshot(mode, settings, usage)
                             val tempBefore = com.deungbul.anshimgil.data.TempModeStore.get(appContext)
