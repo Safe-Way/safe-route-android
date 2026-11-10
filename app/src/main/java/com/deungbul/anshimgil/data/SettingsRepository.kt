@@ -26,6 +26,8 @@ data class AppSettings(
     val turnSigns: Boolean = false,
     /** The SOS button on the map screens; off unless the user turns it on. */
     val sosButton: Boolean = false,
+    /** AI 비서 by voice back and forth: opening it listens, and after each answer it listens again (team, 11/10). */
+    val voiceChat: Boolean = false,
 )
 
 /** Situations routing can react to; all are switched off when auto-detection is off. */
@@ -41,6 +43,7 @@ class SettingsRepository(private val context: Context) {
     private val guardiansKey = stringPreferencesKey("guardians")
     private val turnSignsKey = booleanPreferencesKey("turn_signs")
     private val sosButtonKey = booleanPreferencesKey("sos_button")
+    private val voiceChatKey = booleanPreferencesKey("voice_chat")
 
     val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
         AppSettings(
@@ -53,7 +56,12 @@ class SettingsRepository(private val context: Context) {
             guardians = prefs[guardiansKey].orEmpty().lines().mapNotNull { Guardian.decode(it) },
             turnSigns = prefs[turnSignsKey] ?: false,
             sosButton = prefs[sosButtonKey] ?: false,
+            voiceChat = prefs[voiceChatKey] ?: false,
         )
+    }
+
+    suspend fun setVoiceChat(on: Boolean) {
+        context.settingsDataStore.edit { it[voiceChatKey] = on }
     }
 
     suspend fun setVoiceGuide(on: Boolean) {

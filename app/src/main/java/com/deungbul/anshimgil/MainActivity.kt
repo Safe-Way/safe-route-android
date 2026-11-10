@@ -584,6 +584,7 @@ fun AppRoot(
                         onManagePlaces = { screen = Screen.Search() },
                         onOpenMyInfo = { screen = Screen.MyInfo },
                         onVoiceChange = { scope.launch { settingsRepository.setVoiceGuide(it) } },
+                        onVoiceChatChange = { scope.launch { settingsRepository.setVoiceChat(it) } },
                         onAutoConditionsChange = { scope.launch { settingsRepository.setAutoConditions(it) } },
                         onTextSizeChange = { scope.launch { settingsRepository.setTextSize(it) } },
                         onExtraMapItemChange = { key, on -> scope.launch { settingsRepository.setExtraMapItem(key, on) } },
