@@ -149,36 +149,54 @@ fun setupQuestion(step: SetupStep, so: SetupAnswers): String = when (step) {
  * index into [SetupStep.answers]; null when it is not clear, and the question is asked again.
  */
 fun setupAnswerFromSpeech(step: SetupStep, said: String): Int? {
-    val s = said.replace(" ", "")
+    val s = said.replace(" ", "").trimEnd('.', '!', '?', '~')
     fun has(vararg w: String) = w.any { s.contains(it.replace(" ", "")) }
-    val no = has("아니", "싫어", "괜찮아", "필요없", "필요 없", "안 해", "안해", "다음에", "나중에", "그대로", "됐어")
-    val yes = has("좋아", "응", "네", "예", "그래", "해 줘", "해줘", "해주세요", "부탁", "맞춰")
+    // "잘 모르겠어": asked again rather than guessed.
+    if (has("모르겠", "글쎄")) return null
+    // A no said around a yes word comes first ("안 좋아", "남기지 마", "하지 마").
+    val no = has(
+        "아니", "아뇨", "싫", "별로", "안좋", "필요없", "필요 없", "안해", "안 할", "하지마", "하지 마", "말아", "말고",
+        "됐어", "됐습니다", "다음에", "나중에", "그대로", "안남", "남기지", "안둘", "두지마", "빼",
+    )
+    val yes = !no && has(
+        "좋아", "좋습", "응", "네", "예", "그래", "그렇게", "맞아", "맞습", "오케이", "해줘", "해 줘", "해주세요", "할게", "부탁",
+        "맞춰", "남겨", "남길", "어어",
+    )
     return when (step) {
-        SetupStep.WAY -> when { has("버튼", "누를", "눌러") -> 1; has("말로", "말할", "목소리", "음성") || yes -> 0; no -> 1; else -> null }
-        // The server's readings (RuleBrain.aid, setupStairs).
+        SetupStep.WAY -> when { has("버튼", "누를", "눌러", "손으로") -> 1; has("말로", "말할", "목소리", "음성") || yes -> 0; no -> 1; else -> null }
+        // The server's readings (RuleBrain.aid, setupStairs), with more ways of saying the same.
         SetupStep.AID -> when {
-            has("휠체어") -> 2
-            has("지팡이", "보행기") -> 1
-            has("유모차") -> 3
-            has("걸어", "그냥") -> 0
+            has("휠체어", "전동") -> 2
+            has("유모차", "아기", "애기", "아이데리고") -> 3
+            has("지팡이", "보행기", "워커", "짚고", "지팡") -> 1
+            has("걸어", "그냥", "혼자", "두발", "도움없이", "걷") -> 0
             else -> null
         }
         SetupStep.STAIRS -> when {
-            has("못", "안돼", "안 돼", "힘들") -> 0
-            has("몇", "조금", "한두") -> 1
-            has("괜찮", "다", "돼") -> 2
+            has("못", "안돼", "안 돼", "힘들", "버거", "벅차", "무서", "자신없", "어려", "무리", "싫") -> 0
+            has("몇", "조금", "좀", "한두", "짧으면", "적으면", "천천히") -> 1
+            has("괜찮", "다돼", "잘다녀", "문제없", "상관없", "많아도", "돼", "가능") -> 2
             else -> null
         }
-        SetupStep.CONFIRM, SetupStep.CONSENT -> when { no -> 1; yes || has("남길") -> 0; else -> null }
-        SetupStep.START, SetupStep.CHANGED -> when { no -> 1; yes -> 0; else -> null }
+        SetupStep.CONFIRM, SetupStep.CONSENT -> when { no -> 1; yes -> 0; else -> null }
+        // "괜찮아요" to an offer is a polite no.
+        SetupStep.START, SetupStep.CHANGED -> when { no || has("괜찮") -> 1; yes -> 0; else -> null }
         SetupStep.TEXT -> when {
-            has("많이", "너무", "안 보여", "안보여", "하나도") -> 2
-            has("조금", "좀", "약간", "작아", "작은") -> 1
-            has("잘 보여", "잘보여", "보여", "괜찮", "충분") -> 0
+            has("많이", "너무", "안보여", "안 보여", "하나도", "흐려", "흐릿", "가물") -> 2
+            has("조금", "좀", "약간", "작아", "작은", "작네") -> 1
+            has("잘보여", "보여", "괜찮", "충분", "문제없", "커", "잘 읽") -> 0
             else -> null
         }
-        SetupStep.VOICE -> when { has("화면", "소리 없이", "조용", "끄") || no -> 1; has("소리", "말로", "들려") || yes -> 0; else -> null }
-        SetupStep.SOS -> when { no -> 1; has("둘래", "둬", "놔", "있으면") || yes -> 0; else -> null }
-        SetupStep.DONE -> when { has("되돌", "처음대로", "취소") -> SETUP_UNDO_INDEX; has("알겠", "좋아", "응", "네", "고마") -> 0; else -> null }
+        SetupStep.VOICE -> when {
+            has("화면만", "화면으로", "소리없이", "조용", "끄", "꺼", "시끄") || no -> 1
+            has("소리", "말로", "들려", "알려", "읽어") || yes -> 0
+            else -> null
+        }
+        SetupStep.SOS -> when {
+            no || has("괜찮") -> 1
+            has("둘래", "둬", "놔", "있으면", "좋겠", "필요해", "필요하") || yes -> 0
+            else -> null
+        }
+        SetupStep.DONE -> when { has("되돌", "처음대로", "취소", "다시") -> SETUP_UNDO_INDEX; has("알겠", "고마", "됐어") || yes -> 0; else -> null }
     }
 }
