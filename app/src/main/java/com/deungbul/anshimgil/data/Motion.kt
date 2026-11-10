@@ -84,9 +84,8 @@ fun guideHeading(onRoute: Boolean, moving: Boolean, routeAhead: Float, course: F
 }
 
 /**
- * Which way the walker's arrow points. The map keeps facing the route ahead (above), but standing still the
- * arrow follows the compass, so turning round shows on screen at once instead of the arrow staying fixed (11/10).
- * Walking: the same way as the map.
+ * Which way the walker's arrow and the map face. Walking: [heading] (above). Standing still: the compass, so
+ * turning round turns the arrow and the map instead of the screen staying fixed (11/10).
  */
 fun arrowHeading(moving: Boolean, heading: Float, compass: Float?): Float = if (!moving && compass != null) compass else heading
 
