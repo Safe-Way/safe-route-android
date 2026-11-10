@@ -444,14 +444,13 @@ fun GuideScreen(
 
     // Heading-up, like Naver's walking guidance: the map turns so the way ahead points up. It turns only
     // for a real change of direction and slowly, so it does not swing about (11/8).
-    // Standing still, the map turns with the walker too (compass), in smaller steps, so turning round moves
-    // the screen (11/10). Walking, it keeps to the route ahead.
     val arrow = if (demo) heading else arrowHeading(moving, heading, compass)
     var mapBearing by remember { mutableFloatStateOf(heading) }
-    LaunchedEffect(arrow, heading, moving) {
-        val target = if (moving || demo) heading else arrow
-        val step = if (moving || demo) MAP_TURN_DEGREES else MAP_TURN_STILL_DEGREES
-        if (angleBetween(mapBearing, target) >= step) mapBearing = target
+    // The map turns with the phone (compass), walking or not, so the arrow stays pointing up and the street
+    // in front of the walker is the street at the top of the screen (11/10, heading-up like Naver).
+    LaunchedEffect(arrow) {
+        val step = if (demo) MAP_TURN_DEGREES else MAP_TURN_STILL_DEGREES
+        if (angleBetween(mapBearing, arrow) >= step) mapBearing = arrow
     }
     // Moving and turning in one camera move: two moves sent apart cut each other off, so the map jerked at
     // every fix while it turned (11/9 video). Kakao turns the map the other way round from a compass bearing,
