@@ -137,19 +137,30 @@ class MainActivity : ComponentActivity() {
             }
         }
         setContent {
-            // Asked once (Android 13+), after a mode is chosen, for the mode icon next to the clock.
-            val notifyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-                if (granted) lifecycleScope.launch { modeRepository.mode.first()?.let { ModeStatus.show(this@MainActivity, it) } }
+            // Asked once each, after a mode is chosen: notifications (Android 13+) for the mode icon next to the clock,
+            // and the position, so a new walker's map, nearby places and routes start from where they are rather than
+            // from Chosun University until they find the location button (11/10 phone check). One request, so the two
+            // dialogs come one after the other instead of the second being dropped.
+            val firstPermissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+                if (granted[android.Manifest.permission.POST_NOTIFICATIONS] == true) {
+                    lifecycleScope.launch { modeRepository.mode.first()?.let { ModeStatus.show(this@MainActivity, it) } }
+                }
             }
             val hasMode by modeRepository.mode.map { it != null }.collectAsStateWithLifecycle(initialValue = false)
             LaunchedEffect(hasMode) {
+                if (!hasMode) return@LaunchedEffect
                 val prefs = getSharedPreferences("app", MODE_PRIVATE)
-                if (hasMode && android.os.Build.VERSION.SDK_INT >= 33 && !ModeStatus.canShow(this@MainActivity) &&
-                    !prefs.getBoolean("askedNotify", false)
-                ) {
-                    prefs.edit().putBoolean("askedNotify", true).apply()
-                    notifyPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                val ask = buildList {
+                    if (android.os.Build.VERSION.SDK_INT >= 33 && !ModeStatus.canShow(this@MainActivity) && !prefs.getBoolean("askedNotify", false)) {
+                        add(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                    if (!com.deungbul.anshimgil.location.hasLocationPermission(this@MainActivity) && !prefs.getBoolean("askedLocation", false)) {
+                        addAll(com.deungbul.anshimgil.location.LOCATION_PERMISSIONS)
+                    }
                 }
+                if (ask.isEmpty()) return@LaunchedEffect
+                prefs.edit().putBoolean("askedNotify", true).putBoolean("askedLocation", true).apply()
+                firstPermissions.launch(ask.toTypedArray())
             }
             val settings by settingsRepository.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
             // AI 비서's text enlargement, on top of the text size in settings (쓰는 대로 맞추기).
