@@ -747,7 +747,9 @@ fun KakaoMap.showReportSpots(context: Context, spots: List<com.deungbul.anshimgi
         val confirmed = spot.reports.any { it.confirmed }
         // Darker when confirmed or when many have reported it.
         val color = if (confirmed || spot.count >= 5) 0xFF9A3412.toInt() else 0xFFC2410C.toInt()
-        val bitmap = pillBitmap("⚠ " + com.deungbul.anshimgil.data.reportSpotTag(spot), color, density)
+        // On a stem: the walker's arrow (about 33 dp across) stands on the spot itself, and the tag sat right under it
+        // (11/10 phone check). The stem's foot marks the place; the tag stays readable above the arrow.
+        val bitmap = stemmed(pillBitmap("⚠ " + com.deungbul.anshimgil.data.reportSpotTag(spot), color, density), color, density)
         layer.addLabel(
             LabelOptions.from(LatLng.from(spot.point.lat, spot.point.lon))
                 .setStyles(LabelStyles.from(LabelStyle.from(bitmap).setAnchorPoint(0.5f, 1f).setApplyDpScale(false)))
@@ -755,4 +757,20 @@ fun KakaoMap.showReportSpots(context: Context, spots: List<com.deungbul.anshimgi
                 .setTag(spot),
         )
     }
+}
+
+/** Clear room between a tag and the place it stands for, so the walker's arrow there does not cover the tag. */
+private const val TAG_STEM_DP = 24f
+
+/** [tag] raised on a thin stem whose foot (a small dot, the bitmap's bottom middle) marks the place. */
+private fun stemmed(tag: Bitmap, color: Int, density: Float): Bitmap {
+    val stem = TAG_STEM_DP * density
+    val bitmap = Bitmap.createBitmap(tag.width, tag.height + stem.toInt(), Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val x = tag.width / 2f
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color; strokeWidth = 2f * density }
+    canvas.drawLine(x, tag.height.toFloat(), x, bitmap.height - 3f * density, paint)
+    canvas.drawCircle(x, bitmap.height - 3f * density, 3f * density, paint)
+    canvas.drawBitmap(tag, 0f, 0f, null)
+    return bitmap
 }
