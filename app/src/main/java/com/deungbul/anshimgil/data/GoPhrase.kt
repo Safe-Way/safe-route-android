@@ -1,51 +1,57 @@
 package com.deungbul.anshimgil.data
 
 /*
- * "문화전당 가자" (사용성 점검표 5번, 11/9): a place named with "가자 / 가 줘 / 가고 싶어" goes straight to the
- * route, one word said and nothing more to tap. The server assistant asked which of three places was meant; the
- * phone picks the landmark among the search results itself (the walker can still change the destination).
+ * "문화전당 가자": the team server's rule. The server reads such a request with Gemini first and only when that fails
+ * with its words (safe-route AssistantService.think ⑥, RuleBrain.destination, RuleReader.destination). So the phone
+ * sends it to the server, and [placeToGo] is that same word rule, for when the server cannot be reached.
+ * The app's own rule of 11/9 (its "가자" endings, the words that are not a name, handled on the phone first) was
+ * dropped for it.
  */
 
-private val GO_ENDINGS = listOf(
-    "가자", "가 자", "가줘", "가 줘", "가주세요", "가 주세요", "가고 싶어", "가고싶어", "가고 싶어요", "가고싶어요",
-    "갈래", "갈래요", "가려고", "데려다 줘", "데려다줘", "안내해 줘", "안내해줘", "안내해 주세요", "길 알려 줘", "길 알려줘",
-)
+/** The server's words for wanting to go (RuleReader.GO_WORDS); the words before the first of them name the place. */
+private val GO_WORDS = listOf("가고", "가는", "갈래", "갈게", "가려", "가자", "가야", "데려다", "데려가", "가요", "갈까", "가", "갈")
 
-/** Words that make what is left a wish or a condition, not a place's name. */
-private val NOT_A_NAME = listOf(
-    "비안", "비맞", "안맞", "빠른", "느린", "그냥", "지하철", "버스", "택시", "타고", "걸어서", "내일", "오늘", "모레", "아침",
-    "저녁", "예약", "미리", "계단", "없는", "있는", "말고", "피해", "조용한", "가까운", "먼저", "들렀", "들러",
-)
+/** Way-of-walking words are not part of a place (RuleReader.MODE_WORDS). */
+private val MODE_WORD_LIST = SERVER_MODE_WORDS.flatMap { it.second }
 
-/** Particles and words left after the place's name ("문화전당으로", "문화전당까지"). */
-private val TRAILING = listOf("으로", "로", "까지", "에", "에게", "쪽으로", "쪽")
+/** Words dropped from a place's name (RuleReader.isFiller). */
+private val FILLERS = setOf("나", "저", "우리", "지금", "오늘", "같이", "좀", "빨리", "길", "알려줘", "알려", "주세요", "싶어", "싶어요", "쪽", "쪽으로", "쪽에", "방향", "방면")
 
-/** The place named in [said] when it asks to go there, e.g. "문화전당" in "문화전당 가자"; null otherwise. */
+/** A first word naming who goes along ("엄마랑", "친구하고"), RuleReader.WITH + isPersonish. */
+private val WITH = Regex("^.*(랑|이랑|하고|와|과|께서|가|이|는|은)$")
+
+/** The place named in [said] when it asks to go there, e.g. "문화전당" in "문화전당 가자" (RuleBrain.destination); null otherwise. */
 fun placeToGo(said: String): String? {
-    // Stopping somewhere on the way ("다이소 들렀다가 집에 갈래") is for AI 비서 on the server, which plans the stops.
+    // Stopping somewhere on the way is read by the server's stop rule first (AssistantService ⑤).
     if (mentionsStops(said)) return null
-    var s = said.trim().trimEnd('.', '!', '?', '~').trim()
-    val ending = GO_ENDINGS.sortedByDescending { it.length }.firstOrNull { s.endsWith(it) } ?: return null
-    s = s.removeSuffix(ending).trim()
-    for (w in listOf("길", "빨리", "지금", "얼른", "어서")) s = s.removeSuffix(w).trim()
-    TRAILING.sortedByDescending { it.length }.firstOrNull { s.endsWith(it) && s.length > it.length && isParticle(s, it) }
-        ?.let { s = s.removeSuffix(it).trim() }
-    s = s.removePrefix("나 ").removePrefix("우리 ").trim()
-    // Not a place: "집에 가자" is a saved place (asked before this), "같이 가자" and the like are not names.
-    if (s.length < 2 || s in setOf("같이", "어디", "어디로", "거기", "저기", "여기", "집", "다른 데", "다른데")) return null
-    // Only a short place name stays on the phone. With a condition, a time, a way of going or a description
-    // ("비 안 맞고 문화전당", "지하철 타고 시청", "오늘은 그냥 빠른 길", "엘베 있는 데") the server assistant reads it
-    // (11/9 test: the phone searched those words as a place name).
-    if (s.split(Regex("\\s+")).size > 3 || NOT_A_NAME.any { s.replace(" ", "").contains(it) } || s.endsWith(" 데") || s.endsWith("데로")) return null
-    return s
+    val f = said.replace(" ", "")
+    if (f.startsWith("집에") || f.startsWith("집으로") || f.contains("집에갈") || f.contains("집에가")) return "집"
+    val words = said.trim().split(Regex("\\s+"))
+    var raw: String? = null
+    for (i in 1 until words.size) {
+        val w = words[i]
+        if (GO_WORDS.any { g -> w.startsWith(g) && (g.length > 1 || w.length <= 2) }) {
+            raw = words.subList(0, i).joinToString(" ")
+            break
+        }
+    }
+    val kept = mutableListOf<String>()
+    for (word in (raw ?: return null).trim().split(Regex("\\s+"))) {
+        if (word.isEmpty() || MODE_WORD_LIST.any { word.startsWith(it) } || word in FILLERS || stripParticle(word) in FILLERS) continue
+        if (kept.isEmpty() && WITH.matches(word) && word.length > 1 && (word.endsWith("랑") || word.endsWith("하고"))) continue
+        kept += stripParticle(word)
+    }
+    return kept.joinToString(" ").trim().ifEmpty { null }
 }
 
-/** "로" is a particle only after a vowel or ㄹ ("학교로", "서울로"); "충장로", "금남로" are names. */
-private fun isParticle(s: String, ending: String): Boolean {
-    if (ending != "로") return true
-    val before = s.dropLast(1).lastOrNull() ?: return false
-    val code = before.code - 0xAC00
-    return code in 0..11171 && (code % 28 == 0 || code % 28 == 8)
+/** "까지", "으로", "에" and the particle "로" taken off the end (RuleReader.stripParticle; "충장로" stays). */
+internal fun stripParticle(w: String): String {
+    for (p in listOf("까지", "으로", "에")) if (w.endsWith(p) && w.length > p.length + 1) return w.dropLast(p.length)
+    if (w.endsWith("로") && w.length > 2) {
+        val code = w[w.length - 2].code - 0xAC00
+        if (code in 0..11171 && (code % 28 == 0 || code % 28 == 8)) return w.dropLast(1)
+    }
+    return w
 }
 
 /**

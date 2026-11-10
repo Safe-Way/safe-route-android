@@ -371,8 +371,8 @@ class FavoriteAppAssistant(
 private fun AssistantAction.staysOnPhone(): Boolean = this is AssistantAction.Emergency ||
     this is AssistantAction.ChangeSettings || this is AssistantAction.ShowBuses ||
     this is AssistantAction.OpenReport || this is AssistantAction.GoNearby ||
-    (this is AssistantAction.Ask && onPhone) || (this is AssistantAction.Answer && onPhone) ||
-    (this is AssistantAction.GoTo && onPhone)
+    (this is AssistantAction.Ask && onPhone) || (this is AssistantAction.Answer && onPhone)
+// "○○ 가자" (GoTo) goes to the server, which reads it with Gemini first (the team's order); the phone's reading is the fallback.
 
 /** Server tools that save settings on the server, which the app does not read; the phone does these. */
 private val SERVER_SETTING_TOOLS = setOf("update_my_info", "set_map_layers")
