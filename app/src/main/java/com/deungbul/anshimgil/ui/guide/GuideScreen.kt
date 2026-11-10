@@ -597,7 +597,8 @@ fun GuideScreen(
         if (!asksToRest(mode) || resting != null || restOffer != null || !due || state.remainingM <= REST_NOT_NEAR_END_M) return@LaunchedEffect
         if (!watch.slow) return@LaunchedEffect
         // Where the walker is drawn: in the demo walk that is on the route, not the phone's far-away position.
-        val place = restPlaceOnTheWay(active.facilities, if (demo) state.snapped else fix ?: state.snapped, state.progressM) {
+        val night = active.conditions.any { it.key == "night" && it.on }
+        val place = restPlaceOnTheWay(active.facilities, if (demo) state.snapped else fix ?: state.snapped, state.progressM, night) {
             guidance.alongAndOff(LatLon(it.lat, it.lon))
         } ?: return@LaunchedEffect
         lastRestAsk = now
