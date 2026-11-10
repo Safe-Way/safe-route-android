@@ -314,17 +314,21 @@ class AssistantTest {
 
     /** From the 11/9 test of 63 sentences (reports/assistant-eval-1109.html). */
     @Test
-    fun emergencyWordsAreNarrowerAndComplete() {
-        assertTrue(rule("119 불러 줘") is AssistantAction.Emergency)
-        assertTrue(rule("누가 자꾸 쫓아오는 것 같아") is AssistantAction.Emergency)
-        assertTrue(rule("넘어졌어 일어나기가 힘들어") is AssistantAction.Emergency)
+    fun emergencyFollowsTheTeamServerRule() {
+        // The server's urgent words (RuleBrain.URGENT) and answer.
+        val urgent = rule("넘어졌어 일어나기가 힘들어")
+        assertTrue(urgent is AssistantAction.Emergency)
+        assertEquals(EMERGENCY_SAY, (urgent as AssistantAction.Emergency).say)
         assertTrue(rule("어지러워 쓰러질 것 같아") is AssistantAction.Emergency)
         assertTrue(rule("너무 아파") is AssistantAction.Emergency)
-        // A pain or a fear with a wish is not an emergency: the server assistant asks or routes.
+        assertTrue(rule("숨이 차서 못 걷겠어") is AssistantAction.Emergency)
+        assertTrue(rule("도와줘") is AssistantAction.Emergency)
+        // "다쳐서" with a way of walking is about walking, not a fall (as on the server).
+        assertTrue(rule("다리를 다쳐서 휠체어 타고 다녀") !is AssistantAction.Emergency)
+        // Not on the server's list, so not urgent on the phone either (asked of the server team, 11/10).
+        assertTrue(rule("119 불러 줘") !is AssistantAction.Emergency)
         assertTrue(rule("오늘 무릎이 아파") !is AssistantAction.Emergency)
-        assertTrue(rule("다리가 아파서 좀 앉았다 가고 싶어") !is AssistantAction.Emergency)
         assertTrue(rule("집에 갈 건데 밤이라 무서워") !is AssistantAction.Emergency)
-        assertTrue(rule("보도블록이 다 깨져서 넘어질 뻔했어") is AssistantAction.OpenReport)
     }
 
     @Test

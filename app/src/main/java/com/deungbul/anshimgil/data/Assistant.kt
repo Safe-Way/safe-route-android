@@ -110,7 +110,7 @@ object RuleAppAssistant : AppAssistant {
         // Who walks and how ("다리를 다쳐서 휠체어 타", "오늘은 휠체어 안 타"): before the emergency words, which
         // would take "다쳐서" for a fall; walkerChange leaves anything urgent to them.
         walkerChange(said, history, context.mode)?.let { return it }
-        if (isEmergency(said)) return AssistantAction.Emergency("괜찮으세요? 112에 전화하거나 보호자에게 알릴까요?")
+        if (isEmergency(said)) return AssistantAction.Emergency(EMERGENCY_SAY)
         // "집에 하트 그려진 아이콘 뭐야?": before the places, so "화장실 아이콘 뭐야" is told, not routed to.
         iconAnswer(said)?.let { return AssistantAction.Answer(it) }
         val wantsGo = has("안내", "가고싶", "가자", "가줘", "어디", "가까운", "근처", "찾아", "길")
@@ -163,24 +163,36 @@ fun reportTypeIn(said: String): ReportType? {
     return REPORT_WORDS.firstOrNull { (_, words) -> words.any { s.contains(it.replace(" ", "")) } }?.first
 }
 
-/*
- * Emergency words (11/9 test of 63 sentences): some are urgent on their own; "아파·무서워·어지러" are urgent only
- * when that is all that is said ("아파", "너무 무서워"). "오늘 무릎이 아파", "다리가 아파서 좀 앉았다 가고 싶어",
- * "집에 갈 건데 밤이라 무서워" and "넘어질 뻔했어" asked 112 before; "119 불러 줘" and "누가 자꾸 쫓아오는 것 같아" did not.
+/**
+ * 급한 말: the team server's rule word for word (safe-route RuleBrain.URGENT and urgent()), so the phone and the server
+ * agree on what is urgent. The app's own words of 11/9 (119, 112, 쫓아오, a short 아파·무서워·어지러) were dropped for it;
+ * "119" and "쫓아오" were missed in the 11/9 test, so they were asked of the server team instead.
  */
-private val URGENT_WORDS = listOf(
-    "넘어졌", "넘어져", "다쳤", "다쳐", "쓰러", "살려", "따라와", "따라오", "쫓아와", "쫓아오", "쫓아온", "위험해",
-    "도와주세요", "119", "112", "피가", "피나",
+internal val URGENT_WORDS = listOf(
+    "넘어졌", "넘어짐", "넘어져서", "쓰러", "피가", "피나", "살려",
+    "도와줘", "도와주세요", "위험해", "따라와", "따라오", "숨이", "너무아파", "많이아파", "못일어나", "다쳤어", "다쳤어요",
 )
-private val MAYBE_URGENT_WORDS = listOf("아파", "아퍼", "무서워", "무서워요", "어지러")
 
-/** Whether [said] is an emergency, see above. */
+/** The team server's answer to an urgent remark (RuleBrain.emergency()); the buttons are 112 / 보호자 / 괜찮아요. */
+const val EMERGENCY_SAY = "괜찮으세요? 위험하면 바로 112에 전화하세요. 112에 전화할까요, 보호자에게 알릴까요?"
+
+/** Whether [said] is urgent, as the server decides: an urgent word, except "다쳐서" with a way of walking ("다쳐서 휠체어 타"). */
 internal fun isEmergency(said: String): Boolean {
     val s = said.replace(" ", "")
-    if (URGENT_WORDS.any { s.contains(it) }) return true
-    val words = said.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-    return words.size <= 2 && MAYBE_URGENT_WORDS.any { s.contains(it) }
+    if (URGENT_WORDS.none { s.contains(it) }) return false
+    return !(s.contains("다쳐서") && serverModeWord(said) != null)
 }
+
+/** The server's words for a way of walking (safe-route RuleReader.MODE_WORDS), wheelchair first. */
+internal val SERVER_MODE_WORDS: List<Pair<UserMode, List<String>>> = listOf(
+    UserMode.DISABLED to listOf("휠체어"),
+    UserMode.SENIOR to listOf("할머니", "할아버지", "어르신", "노인", "할매", "할배"),
+    UserMode.CHILD to listOf("어린이", "아이", "애기", "아기", "아들", "딸", "초등", "유치원", "꼬마", "애랑", "애들"),
+    UserMode.GENERAL to listOf("어른", "혼자", "성인"),
+)
+
+/** The way of walking named in [said], as the server reads it (RuleReader.mode). */
+internal fun serverModeWord(said: String): UserMode? = SERVER_MODE_WORDS.firstOrNull { (_, words) -> words.any { said.contains(it) } }?.first
 
 /** "…보여 줘", "지도에서 빼 줘": the map's pictures, which the server sets (not a report). */
 private fun asksToShowOnMap(s: String): Boolean =

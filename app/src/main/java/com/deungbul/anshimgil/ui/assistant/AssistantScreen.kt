@@ -280,7 +280,6 @@ fun AssistantScreen(
                         android.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:112")))
                     },
                     onGuardian = onAlertGuardian,
-                    onPolice = { urgent = false; send("가까운 파출소로 안내해 줘") },
                     onFine = { urgent = false; say("다행이에요. 필요하면 언제든 말해 주세요.") },
                 )
             }
@@ -346,9 +345,9 @@ private const val SLOW_MS = 3_000L
 /** How far back a live bubble's line counts as already said. */
 private const val RECENT_LINES = 8
 
-/** 급한 말에: 112 / 보호자 / 파출소 / 괜찮아요, big enough to hit in a hurry. */
+/** 급한 말에: the team server's three answers, 112 / 보호자 / 괜찮아요 (RuleBrain.emergency), big enough to hit in a hurry. */
 @Composable
-private fun EmergencyCard(onCall: () -> Unit, onGuardian: () -> Unit, onPolice: () -> Unit, onFine: () -> Unit) {
+private fun EmergencyCard(onCall: () -> Unit, onGuardian: () -> Unit, onFine: () -> Unit) {
     val red = Color(0xFFB42318)
     Surface(shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -356,9 +355,8 @@ private fun EmergencyCard(onCall: () -> Unit, onGuardian: () -> Unit, onPolice: 
                 Text("112에 전화", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
             Button(onClick = onGuardian, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB45309)), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-                Text("보호자에게 알리기 (SOS)", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("보호자에게 알리기", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
-            OutlinedButton(onClick = onPolice, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("가까운 파출소로 가기", fontSize = 16.sp) }
             OutlinedButton(onClick = onFine, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("괜찮아요", fontSize = 16.sp) }
         }
     }
