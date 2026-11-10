@@ -11,13 +11,14 @@ import java.io.ByteArrayOutputStream
  * pavement, something in the way) with up to 3 photos and their position. Server `POST /api/reports`.
  */
 
-/** Report kinds, in the server's codes and words. */
+/** Report kinds, in the server's codes and words (AssistantTools.REPORT_TYPES, ReportType.java). */
 enum class ReportType(val code: String, val label: String) {
     STEEP("steep", "급경사"),
     CONSTRUCTION("construction", "공사"),
     CURB("curb", "턱"),
     BROKEN("broken", "보도 파손"),
     OBSTACLE("obstacle", "막는 물건"),
+    ACCIDENT("accident", "사고"),
     OTHER("other", "기타"),
 }
 

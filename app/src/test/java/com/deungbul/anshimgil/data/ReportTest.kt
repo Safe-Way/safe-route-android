@@ -17,6 +17,6 @@ class ReportTest {
 
     @Test
     fun reportTypesMatchTheServer() {
-        assertEquals(listOf("steep", "construction", "curb", "broken", "obstacle", "other"), ReportType.entries.map { it.code })
+        assertEquals(listOf("steep", "construction", "curb", "broken", "obstacle", "accident", "other"), ReportType.entries.map { it.code })
     }
 }

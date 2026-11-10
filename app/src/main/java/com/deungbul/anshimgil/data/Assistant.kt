@@ -17,7 +17,22 @@ import java.io.IOException
  */
 
 /** Nearby place kinds the server knows (`/api/places/nearby`), with their names. */
-val NEARBY_KINDS = mapOf("toilet" to "화장실", "store" to "편의점", "police" to "파출소", "shelter" to "쉼터", "subway" to "지하철역")
+/** Kinds of place AI 비서 finds nearby and their names: the team server's find_nearby kinds (AssistantTools.NEARBY, nearby.txt). */
+val NEARBY_KINDS = linkedMapOf(
+    "toilet" to "화장실", "shelter" to "쉼터", "police" to "경찰서·파출소", "store" to "편의점",
+    "bell" to "비상벨", "subway" to "지하철역", "guard_house" to "아동안전지킴이집",
+)
+
+/** The words that name each kind in what is said. */
+private val NEARBY_WORDS = mapOf(
+    "toilet" to listOf("화장실"), "shelter" to listOf("쉼터"), "police" to listOf("경찰서", "파출소", "지구대"),
+    "store" to listOf("편의점"), "bell" to listOf("비상벨"), "subway" to listOf("지하철역", "지하철"),
+    "guard_house" to listOf("지킴이집", "아동안전지킴이"),
+)
+
+/** The kind of place named in [s] (no spaces) and the word that named it. */
+private fun nearbyKindIn(s: String): Pair<String, String>? =
+    NEARBY_WORDS.entries.firstNotNullOfOrNull { (kind, words) -> words.firstOrNull { s.contains(it) }?.let { kind to it } }
 
 /** What the assistant asks the app to do; [say] is what it tells the walker. */
 sealed interface AssistantAction {
@@ -114,8 +129,9 @@ object RuleAppAssistant : AppAssistant {
         // "집에 하트 그려진 아이콘 뭐야?": before the places, so "화장실 아이콘 뭐야" is told, not routed to.
         iconAnswer(said)?.let { return AssistantAction.Answer(it) }
         val wantsGo = has("안내", "가고싶", "가자", "가줘", "어디", "가까운", "근처", "찾아", "길")
-        NEARBY_KINDS.entries.firstOrNull { (_, name) -> s.contains(name) }?.let { (kind, name) ->
-            if (wantsGo || s.length <= name.length + 3) return AssistantAction.GoNearby("가까운 ${withDirection(name)} 길을 찾을게요.", kind)
+        nearbyKindIn(s)?.let { (kind, word) ->
+            val name = NEARBY_KINDS.getValue(kind)
+            if (wantsGo || s.length <= word.length + 3) return AssistantAction.GoNearby("가까운 ${withDirection(name)} 길을 찾을게요.", kind)
         }
         undoAdaptation(s, context.usage)?.let { return it }
         // "문화전당 가자": straight to the route (사용성 점검표 5번).
@@ -139,7 +155,7 @@ object RuleAppAssistant : AppAssistant {
                 "무엇을 도와드릴까요?",
                 listOf("근처 화장실로 안내해 줘", "글씨 크게 해 줘", "가까운 버스 보여 줘", "가까운 편의점"),
             )
-            reportTypeIn(said) != null || has("신고", "불편") -> reportAction(said)
+            reportTypeIn(said) != null || has("신고") -> reportAction(said)
             else -> AssistantAction.Ask(
                 "무엇을 도와드릴까요?",
                 listOf("근처 화장실로 안내해 줘", "글씨 크게 해 줘", "가까운 버스 보여 줘", "가까운 편의점"),
@@ -149,17 +165,24 @@ object RuleAppAssistant : AppAssistant {
 }
 
 /** Words for each kind of problem on the way, for 불편 신고 by voice. */
+/**
+ * 말로 신고: the team server's rule (RuleBrain.reportType). A report needs a word saying it is here and now
+ * (여기·났어·중이·못 지나·못 가·신고), then the kind by these words, 사고 first.
+ */
+private val REPORT_HERE_WORDS = listOf("여기", "났어", "중이", "못지나", "못가", "신고")
 private val REPORT_WORDS = listOf(
+    ReportType.ACCIDENT to listOf("사고"),
     ReportType.CONSTRUCTION to listOf("공사"),
-    ReportType.STEEP to listOf("경사", "비탈", "가팔"),
     ReportType.CURB to listOf("턱"),
-    ReportType.BROKEN to listOf("깨졌", "깨진", "파손", "부서", "망가", "패인", "파였", "움푹", "들떴", "보도블록"),
-    ReportType.OBSTACLE to listOf("막혀", "막고", "막혔", "못 지나", "못지나", "쓰레기", "킥보드"),
+    ReportType.STEEP to listOf("경사", "가팔"),
+    ReportType.BROKEN to listOf("깨져", "부서", "파손", "움푹"),
+    ReportType.OBSTACLE to listOf("막혀", "막아", "세워져", "쌓여"),
 )
 
 /** The kind of problem [said] describes, e.g. 공사 in "여기 공사 중이라 못 지나가"; null when it is not clear. */
 fun reportTypeIn(said: String): ReportType? {
     val s = said.replace(" ", "")
+    if (REPORT_HERE_WORDS.none { s.contains(it) }) return null
     return REPORT_WORDS.firstOrNull { (_, words) -> words.any { s.contains(it.replace(" ", "")) } }?.first
 }
 
