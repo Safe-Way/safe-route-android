@@ -85,6 +85,8 @@ fun ReportScreen(
     /** Filled in by AI 비서 from what the walker said; they still check it and press 보내기. */
     initialType: ReportType? = null,
     initialMemo: String = "",
+    /** After the report went out (by default the same as [onBack]); during guidance it asks to find the way again. */
+    onSent: () -> Unit = onBack,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -199,7 +201,7 @@ fun ReportScreen(
                         // The words of the team's consent text (consent.md 3번): one report already shows on the map.
                         Toast.makeText(context, "신고를 보냈어요. 고마워요! 신고한 곳은 지도에 '신고된 곳'으로 보여요.", Toast.LENGTH_LONG).show()
                         File(context.cacheDir, "report_photos").deleteRecursively()
-                        onBack()
+                        onSent()
                     } catch (e: ApiException) {
                         error = e.message
                     }
