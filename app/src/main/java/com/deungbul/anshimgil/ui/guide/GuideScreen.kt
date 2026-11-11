@@ -148,6 +148,10 @@ import com.deungbul.anshimgil.data.GuidanceState
 import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.arrowHeading
 import com.deungbul.anshimgil.data.drawnPoint
+import com.deungbul.anshimgil.data.BothSide
+import com.deungbul.anshimgil.data.SidewalkSide
+import com.deungbul.anshimgil.data.walkerSide
+import com.deungbul.anshimgil.map.redrawWalkingLine
 import com.deungbul.anshimgil.data.OffRouteCounter
 import com.deungbul.anshimgil.data.atCrossing
 import com.deungbul.anshimgil.data.offRouteLimitM
@@ -419,8 +423,29 @@ fun GuideScreen(
 
     // A tapped 신고 쌓인 곳 says what it is in the notice line.
     var tappedReport by remember { mutableStateOf<ReportSpot?>(null) }
+    // A road with pavements on both sides (w15): the line is drawn on the side the walker is on, for the stretch
+    // they are on (the right-hand side for the others, and in the demo walk). Kept until the GPS clearly says the
+    // other side, so noise on the line does not flip it.
+    var walkerOn by remember(route) { mutableStateOf<Pair<Int, SidewalkSide>?>(null) }
+    LaunchedEffect(fix, route) {
+        val f = fix ?: return@LaunchedEffect
+        if (demo) return@LaunchedEffect
+        val i = guidance.pointIndexAt(state.progressM)
+        val stretch = route.sidewalks.firstOrNull { i >= it.from && i <= it.to && it.side == SidewalkSide.BOTH } ?: return@LaunchedEffect
+        val side = walkerSide(route.path, f, i) ?: return@LaunchedEffect
+        if (walkerOn != (stretch.from to side)) walkerOn = stretch.from to side
+    }
+    val both = BothSide { st -> walkerOn?.takeIf { it.first == st.from }?.second ?: SidewalkSide.RIGHT }
     // Where the walker's marker and the camera sit: on the line as drawn, moved onto the pavement side (11/11).
-    val shownAt = drawnPoint(route, state.snapped, guidance.pointIndexAt(state.progressM))
+    val shownAt = drawnPoint(route, state.snapped, guidance.pointIndexAt(state.progressM), both)
+    // Crossed to the other pavement: draw the line on that side.
+    var drawnFor by remember(route) { mutableStateOf(walkerOn) }
+    LaunchedEffect(map, walkerOn) {
+        val m = map ?: return@LaunchedEffect
+        if (walkerOn == drawnFor) return@LaunchedEffect
+        drawnFor = walkerOn
+        m.redrawWalkingLine(context, route, both)
+    }
 
     // Drawn again whenever the route changes (after finding a new one).
     LaunchedEffect(map, route) {
@@ -432,7 +457,7 @@ fun GuideScreen(
             true
         }
         // Stop pins are drawn here with their first numbers, not the new route's.
-        m.showRoutes(context, active.copy(routes = listOf(route.copy(stops = emptyList()))), route.type, destinationName, walking = true)
+        m.showRoutes(context, active.copy(routes = listOf(route.copy(stops = emptyList()))), route.type, destinationName, walking = true, both = both)
         m.addStopPins(context, plannedStops.withIndex().filter { it.index !in stopsDone }.map { it.index + 1 to it.value.point })
         if (showTurnSigns) m.addTurnArrows(context, guidance.turnMarks)
         me = m.addMyLocation(context, shownAt, sizeDp = 24f)

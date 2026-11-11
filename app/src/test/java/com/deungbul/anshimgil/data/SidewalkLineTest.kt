@@ -62,4 +62,22 @@ class SidewalkLineTest {
         assertEquals(null, w[1].offsetM)
         assertEquals(null, w[1].oneway)
     }
+
+    @Test
+    fun bothSidesGoesToTheWalkersSideOrRight() {
+        val both = listOf(Sidewalk(0, 2, SidewalkSide.BOTH, offsetM = 8.0))
+        val r = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = both)
+        // No position yet: right (east when walking north).
+        assertEquals(8.0, eastM(path[1], drawnPath(r)[1]), 0.1)
+        // The walker is west of the line: left.
+        val westOfLine = LatLon(north(50.0).lat, north(50.0).lon - 6 / (111_320.0 * Math.cos(Math.toRadians(35.146))))
+        assertEquals(SidewalkSide.LEFT, walkerSide(path, westOfLine, 0))
+        val onWalkersSide = BothSide { walkerSide(path, westOfLine, 0) ?: SidewalkSide.RIGHT }
+        assertEquals(-8.0, eastM(path[1], drawnPath(r, onWalkersSide)[1]), 0.1)
+        // On the line: cannot tell.
+        assertEquals(null, walkerSide(path, north(50.0), 0))
+        // "both" from an older server without offsetM: not moved.
+        val old = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.BOTH)))
+        assertEquals(path, drawnPath(old))
+    }
 }
