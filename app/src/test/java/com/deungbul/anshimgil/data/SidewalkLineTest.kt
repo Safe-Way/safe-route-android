@@ -33,4 +33,33 @@ class SidewalkLineTest {
         val r = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT)))
         assertEquals(6.0, eastM(north(70.0), drawnPoint(r, north(70.0), 1)), 0.1)
     }
+
+    @Test
+    fun theServersOffsetIsUsedWhenItComes() {
+        val r = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT, offsetM = 12.4)))
+        assertEquals(12.4, eastM(path[1], drawnPath(r)[1]), 0.1)
+        // An offset with no side known: not moved.
+        val u = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.UNKNOWN, offsetM = 12.4)))
+        assertEquals(path, drawnPath(u))
+        // A silly value: the old 6 m instead.
+        val big = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT, offsetM = 80.0)))
+        assertEquals(6.0, eastM(path[1], drawnPath(big)[1]), 0.1)
+    }
+
+    @Test
+    fun readsTheProposedSidewalkFields() {
+        val json = org.json.JSONObject(
+            """{"routes":[{"kind":"safe","distanceM":100,"durationMin":2,"geometry":[[126.92,35.146],[126.92,35.147]],
+            "sidewalks":[{"from":0,"to":1,"side":"right","highway":"primary","lanes":3,"oneway":true,"widthM":null,"offsetM":6.4},
+            {"from":1,"to":1,"side":"unknown"}]}]}""",
+        )
+        val w = parseRouteResult(json, UserMode.GENERAL).routes.single().sidewalks
+        assertEquals(6.4, w[0].offsetM!!, 0.001)
+        assertEquals("primary", w[0].highway)
+        assertEquals(3, w[0].lanes)
+        assertEquals(true, w[0].oneway)
+        assertEquals(null, w[0].widthM)
+        assertEquals(null, w[1].offsetM)
+        assertEquals(null, w[1].oneway)
+    }
 }
