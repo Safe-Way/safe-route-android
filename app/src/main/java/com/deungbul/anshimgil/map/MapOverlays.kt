@@ -8,6 +8,8 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import com.deungbul.anshimgil.data.Facility
 import com.deungbul.anshimgil.data.drawnPath
+import com.deungbul.anshimgil.data.RouteOption
+import com.deungbul.anshimgil.data.BothSide
 import com.deungbul.anshimgil.data.FacilityKind
 import com.deungbul.anshimgil.data.FacilityLook
 import com.deungbul.anshimgil.data.HELP_KINDS
@@ -123,6 +125,16 @@ fun LatLon.toLatLng(): LatLng = LatLng.from(lat, lon)
  * Draws both routes (the [selected] one on top and stronger), facility tags along them,
  * and start/end markers, then fits the camera to the routes.
  */
+/** Draws the walking route line again (only the line), e.g. when the walker crosses to the other pavement. */
+fun KakaoMap.redrawWalkingLine(context: Context, route: RouteOption, both: BothSide) {
+    val density = context.resources.displayMetrics.density
+    val lineLayer = routeLineManager?.layer ?: return
+    lineLayer.removeAll()
+    val color = (if (route.type == RouteType.SAFE) 0xFF0B3D23 else 0xFF17211B).toInt()
+    val style = RouteLineStyle.from(11f * density, color, 2.5f * density, 0xFFFFFFFF.toInt())
+    lineLayer.addRouteLine(RouteLineOptions.from(RouteLineSegment.from(drawnPath(route, both).map { it.toLatLng() }, style)))
+}
+
 fun KakaoMap.showRoutes(
     context: Context,
     result: RouteResult,
@@ -130,6 +142,8 @@ fun KakaoMap.showRoutes(
     destinationName: String,
     /** Walking guidance: a darker, wider line with a wider white edge, still clear in sunlight (사용성 16번). */
     walking: Boolean = false,
+    /** Which side a "both" road stretch is drawn on (the walker's side while guiding; right otherwise). */
+    both: BothSide = BothSide.RIGHT,
 ) {
     val density = context.resources.displayMetrics.density
     val lineLayer = routeLineManager?.layer ?: return
@@ -145,7 +159,7 @@ fun KakaoMap.showRoutes(
         val width = (if (walking) 11f else if (isSelected) 8f else 5f) * density
         val style = RouteLineStyle.from(width, color, (if (walking) 2.5f else 1.5f) * density, 0xFFFFFFFF.toInt())
         lineLayer.addRouteLine(
-            RouteLineOptions.from(RouteLineSegment.from(drawnPath(route).map { it.toLatLng() }, style)),
+            RouteLineOptions.from(RouteLineSegment.from(drawnPath(route, both).map { it.toLatLng() }, style)),
         )
     }
 
