@@ -1,6 +1,12 @@
 package com.deungbul.anshimgil.ui.route
 
 import com.deungbul.anshimgil.data.withEulReul
+import com.deungbul.anshimgil.data.ElevatorExit
+import com.deungbul.anshimgil.data.ELEVATOR_EXIT_MODES
+import com.deungbul.anshimgil.data.FacilityRepository
+import com.deungbul.anshimgil.data.bboxAround
+import com.deungbul.anshimgil.data.elevatorExitFor
+import com.deungbul.anshimgil.data.stationName
 import com.deungbul.anshimgil.data.MAX_TRANSIT_STOPS
 import com.deungbul.anshimgil.data.StopPlace
 import com.deungbul.anshimgil.data.firstWait
@@ -156,8 +162,11 @@ fun RouteScreen(
     onChangeDestination: (Place) -> Unit,
     /** The walker's own pace (see personalSpeed); route times are worked out from it. */
     walkSpeedMPerMin: Double,
-    onStart: (RouteResult, RouteType) -> Unit,
+    /** The chosen route; the last is what the walker arrives at when it is not the destination itself (an elevator exit). */
+    onStart: (RouteResult, RouteType, String?) -> Unit,
     modifier: Modifier = Modifier,
+    /** For 휠체어·어르신 going to a station: its exits, to arrive at one with an elevator. */
+    facilityRepository: FacilityRepository? = null,
     /** 대중교통 tab: guide the chosen transit route step by step. */
     onStartTransit: (TransitRoute) -> Unit = {},
     /** Open on the 대중교통 tab. */
@@ -185,15 +194,27 @@ fun RouteScreen(
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { asked = true }
     LaunchedEffect(Unit) { if (!asked) permissionLauncher.launch(LOCATION_PERMISSIONS) }
 
+    // 휠체어·어르신 to a station: arrive at its exit with an elevator, like Naver's "4번 출구 엘리베이터 이용" (11/11).
+    var exitTo by remember { mutableStateOf<ElevatorExit?>(null) }
     LaunchedEffect(asked, conditionsOff, conditionsOn, retry) {
         if (!asked) return@LaunchedEffect
         state = RouteState.Loading
         val from = (startPlace?.let { Origin(LatLon(it.lat, it.lon), it.name) }
             ?: phoneOrigin(context)).also { origin = it }
+        val dest = LatLon(destination.lat, destination.lon)
+        exitTo = if (mode in ELEVATOR_EXIT_MODES && facilityRepository != null && stationName(destination.name) != null) {
+            try {
+                elevatorExitFor(destination, from.point, facilityRepository.load(mode, emptySet(), bboxAround(listOf(dest), marginDeg = 0.005)).layers.facilities)
+            } catch (e: ApiException) {
+                null
+            }
+        } else {
+            null
+        }
         state = try {
             RouteState.Ready(
                 routeRepository.findRoutes(
-                    RouteRequest(from.point, LatLon(destination.lat, destination.lon), mode, conditionsOff, conditionsOn, stops = stops),
+                    RouteRequest(from.point, exitTo?.point ?: dest, mode, conditionsOff, conditionsOn, stops = stops),
                 ),
             )
         } catch (e: ApiException) {
@@ -303,7 +324,7 @@ fun RouteScreen(
             (state as? RouteState.Ready)?.let { s ->
                 val type = if (s.result.route(selected) != null) selected else s.result.routes.first().type
                 autoStarted = true
-                onStart(s.result, type)
+                onStart(s.result, type, exitTo?.label)
             }
         }
     }
@@ -335,7 +356,7 @@ fun RouteScreen(
         if (transitTab && t != null) {
             t.routes.getOrNull(transitSelected)?.let { m.showTransit(context, it, destination.name) }
         } else if (!transitTab) {
-            result?.let { m.showRoutes(context, it, selected, destination.name) }
+            result?.let { m.showRoutes(context, it, selected, exitTo?.label ?: destination.name) }
         }
     }
 
@@ -466,13 +487,21 @@ fun RouteScreen(
                                 else -> TextButton(onClick = onPickStart) { Text("출발지 바꾸기") }
                             }
                         }
-                        is RouteState.Ready -> RouteDetails(s.result.atPace(walkSpeedMPerMin), mode, selected, onSelect = { selected = it })
+                        is RouteState.Ready -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            exitTo?.let { e ->
+                                Text(
+                                    "${e.label}로 도착하게 안내해요.",
+                                    fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D4ED8),
+                                )
+                            }
+                            RouteDetails(s.result.atPace(walkSpeedMPerMin), mode, selected, onSelect = { selected = it })
+                        }
                     }
                 }
                 if (!transitTab) (state as? RouteState.Ready)?.let { s ->
                     StartButton(s.result.atPace(walkSpeedMPerMin), selected, onStart = {
                         if (s.result.routes.size > 1) chosen(if (selected == RouteType.SHORTEST) RouteChoice.SHORTEST else RouteChoice.SAFE)
-                        onStart(s.result, selected)
+                        onStart(s.result, selected, exitTo?.label)
                     })
                 }
                 if (transitTab) (transit as? TransitState.Ready)?.result?.routes?.getOrNull(transitSelected)?.let { t ->
