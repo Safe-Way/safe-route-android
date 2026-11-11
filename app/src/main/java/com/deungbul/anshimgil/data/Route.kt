@@ -35,8 +35,23 @@ data class RouteOption(
 
 enum class SidewalkSide { LEFT, RIGHT, BOTH, NONE, UNKNOWN }
 
-/** Path points [from]..[to] (indices into the route's path) run beside a road with the pavement on [side]. */
-data class Sidewalk(val from: Int, val to: Int, val side: SidewalkSide)
+/**
+ * Path points [from]..[to] (indices into the route's path) run beside a road with the pavement on [side].
+ * [offsetM] is the server's distance from the line to the middle of the pavement (11/11 proposal: half the width,
+ * or lanes × 3.25 m ÷ 2, or a default by road kind, plus 1.5 m; for a one-way road the side is its outer side);
+ * null when the server does not send it. [highway], [lanes], [oneway] and [widthM] are the road's own values, kept
+ * for later; null when unknown.
+ */
+data class Sidewalk(
+    val from: Int,
+    val to: Int,
+    val side: SidewalkSide,
+    val offsetM: Double? = null,
+    val highway: String? = null,
+    val lanes: Int? = null,
+    val oneway: Boolean? = null,
+    val widthM: Double? = null,
+)
 
 /**
  * What to tell the walker about the pavement where they are, given the path point they are past;

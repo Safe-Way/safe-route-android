@@ -177,6 +177,11 @@ internal fun parseRouteResult(json: JSONObject, mode: UserMode? = null): RouteRe
                         "no" -> SidewalkSide.NONE
                         else -> SidewalkSide.UNKNOWN
                     },
+                    offsetM = w.optDouble("offsetM").takeIf { !w.isNull("offsetM") && it.isFinite() && it > 0 },
+                    highway = w.optString("highway").takeIf { !w.isNull("highway") && it.isNotBlank() },
+                    lanes = w.optInt("lanes").takeIf { !w.isNull("lanes") && w.has("lanes") && it > 0 },
+                    oneway = if (w.isNull("oneway") || !w.has("oneway")) null else w.optBoolean("oneway"),
+                    widthM = w.optDouble("widthM").takeIf { !w.isNull("widthM") && it.isFinite() && it > 0 },
                 )
             },
             // Meters along the line as sent, so placed before the ends are tidied.
