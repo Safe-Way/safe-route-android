@@ -10,8 +10,11 @@ import kotlin.math.hypot
  * the route as it came.
  */
 
-/** How far (meters) the line is drawn towards the pavement. */
-const val SIDEWALK_DRAW_OFFSET_M = 6.0
+/**
+ * How far (meters) the line is drawn towards the pavement. 6 → 9 (11/11 phone check): on 제봉로 at 6 m the line still
+ * sat on the edge of the carriageway. OSM gives a pavement side mostly on wide roads, so a narrow street seldom gets it.
+ */
+const val SIDEWALK_DRAW_OFFSET_M = 9.0
 
 private const val M_PER_DEG_LAT = 111_320.0
 
@@ -53,3 +56,12 @@ fun drawnPath(route: RouteOption): List<LatLon> =
 /** [here] on the route near path point [i], moved the same way as the line there, so the marker sits on it. */
 fun drawnPoint(route: RouteOption, here: LatLon, i: Int): LatLon =
     sidewalkOffsetAt(route.path, route.sidewalks, i).let { LatLon(here.lat + it.lat, here.lon + it.lon) }
+
+/** Turn signs moved the same way as the line at the path point nearest each, so they stay on it. */
+fun drawnTurnMarks(route: RouteOption, marks: List<TurnMark>): List<TurnMark> {
+    if (route.sidewalks.isEmpty() || route.path.isEmpty()) return marks
+    return marks.map { m ->
+        val i = route.path.indices.minByOrNull { metersBetween(route.path[it], m.point) } ?: return@map m
+        m.copy(point = drawnPoint(route, m.point, i))
+    }
+}

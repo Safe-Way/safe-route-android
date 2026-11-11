@@ -148,6 +148,7 @@ import com.deungbul.anshimgil.data.GuidanceState
 import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.arrowHeading
 import com.deungbul.anshimgil.data.drawnPoint
+import com.deungbul.anshimgil.data.drawnTurnMarks
 import com.deungbul.anshimgil.data.OffRouteCounter
 import com.deungbul.anshimgil.data.atCrossing
 import com.deungbul.anshimgil.data.offRouteLimitM
@@ -434,7 +435,7 @@ fun GuideScreen(
         // Stop pins are drawn here with their first numbers, not the new route's.
         m.showRoutes(context, active.copy(routes = listOf(route.copy(stops = emptyList()))), route.type, destinationName, walking = true)
         m.addStopPins(context, plannedStops.withIndex().filter { it.index !in stopsDone }.map { it.index + 1 to it.value.point })
-        if (showTurnSigns) m.addTurnArrows(context, guidance.turnMarks)
+        if (showTurnSigns) m.addTurnArrows(context, drawnTurnMarks(route, guidance.turnMarks))
         me = m.addMyLocation(context, shownAt, sizeDp = 24f)
         m.moveCamera(CameraUpdateFactory.newCenterPosition(shownAt.toLatLng(), GUIDE_ZOOM))
         m.tiltForWalking()

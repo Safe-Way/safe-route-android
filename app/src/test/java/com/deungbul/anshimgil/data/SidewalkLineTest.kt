@@ -14,14 +14,14 @@ class SidewalkLineTest {
     fun walkingNorthTheRightPavementIsEast() {
         val r = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT)))
         val drawn = drawnPath(r)
-        assertEquals(6.0, eastM(path[1], drawn[1]), 0.1)
+        assertEquals(9.0, eastM(path[1], drawn[1]), 0.1)
         assertEquals(path[1].lat, drawn[1].lat, 1e-9)
     }
 
     @Test
     fun leftIsWestAndBothOrUnknownStay() {
         val left = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.LEFT)))
-        assertEquals(-6.0, eastM(path[1], drawnPath(left)[1]), 0.1)
+        assertEquals(-9.0, eastM(path[1], drawnPath(left)[1]), 0.1)
         val both = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.BOTH)))
         assertEquals(path, drawnPath(both))
         val none = RouteOption(RouteType.SAFE, 100, 2, path)
@@ -31,6 +31,13 @@ class SidewalkLineTest {
     @Test
     fun theMarkerMovesWithTheLine() {
         val r = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT)))
-        assertEquals(6.0, eastM(north(70.0), drawnPoint(r, north(70.0), 1)), 0.1)
+        assertEquals(9.0, eastM(north(70.0), drawnPoint(r, north(70.0), 1)), 0.1)
+    }
+
+    @Test
+    fun turnSignsMoveWithTheLine() {
+        val r = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT)))
+        val moved = drawnTurnMarks(r, listOf(TurnMark(north(50.0), left = true))).single()
+        assertEquals(9.0, eastM(north(50.0), moved.point), 0.1)
     }
 }
