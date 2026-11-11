@@ -242,7 +242,7 @@ private sealed interface Screen {
         /** 들를 곳 on the way, in order (AI 비서 planned them). */
         val stops: List<com.deungbul.anshimgil.data.StopPlace> = emptyList(),
     ) : Screen
-    data class Guide(val route: Route, val result: RouteResult, val type: RouteType) : Screen
+    data class Guide(val route: Route, val result: RouteResult, val type: RouteType, val arriveAt: String? = null) : Screen
     data class TransitGuide(val route: Route, val transit: TransitRoute) : Screen
 }
 
@@ -692,7 +692,8 @@ fun AppRoot(
                             },
                             onChangeDestination = { place -> screen = route.copy(destination = place) },
                             walkSpeedMPerMin = personalSpeed(mode, samples),
-                            onStart = { result, type -> screen = Screen.Guide(route, result, type) },
+                            onStart = { result, type, arriveAt -> screen = Screen.Guide(route, result, type, arriveAt) },
+                            facilityRepository = facilityRepository,
                             onStartTransit = { t -> screen = Screen.TransitGuide(route, t) },
                             modifier = modifier,
                         )
@@ -741,7 +742,7 @@ fun AppRoot(
                         mode = mode,
                         result = guide.result,
                         type = guide.type,
-                        destinationName = guide.route.destination.name,
+                        destinationName = guide.arriveAt ?: guide.route.destination.name,
                         voiceByDefault = settings.voiceGuide,
                         facilityRepository = facilityRepository,
                         guardians = settings.guardians,
