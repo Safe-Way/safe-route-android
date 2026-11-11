@@ -98,13 +98,19 @@ fun lastKnownLocation(context: Context, maxAgeMs: Long = USABLE_MS): LatLon? {
  */
 @SuppressLint("MissingPermission")
 @Composable
-fun LocationUpdates(context: Context, onFix: (LatLon) -> Unit) {
+fun LocationUpdates(context: Context, onFix: (LatLon) -> Unit) = LocationUpdatesWithAccuracy(context) { fix, _ -> onFix(fix) }
+
+/** As [LocationUpdates], also giving the phone's error (meters, 0 = unknown) of the fix behind each position. */
+@SuppressLint("MissingPermission")
+@Composable
+fun LocationUpdatesWithAccuracy(context: Context, onFix: (LatLon, Float) -> Unit) {
     DisposableEffect(Unit) {
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val filter = PositionFilter()
         val listener = listener { location ->
-            filter.accept(location.toLatLon(), if (location.hasAccuracy()) location.accuracy else 0f, android.os.SystemClock.elapsedRealtime())
-                ?.let(onFix)
+            val accuracy = if (location.hasAccuracy()) location.accuracy else 0f
+            filter.accept(location.toLatLon(), accuracy, android.os.SystemClock.elapsedRealtime())
+                ?.let { onFix(it, accuracy) }
         }
         enabledProviders(manager).forEach { manager.requestLocationUpdates(it, 1000L, 0f, listener) }
         onDispose { manager.removeUpdates(listener) }

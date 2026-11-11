@@ -84,4 +84,25 @@ class MotionTest {
         assertEquals(90f, guideHeading(onRoute = true, moving = true, routeAhead = 0f, course = 90f, compass = null))
         assertEquals(0f, guideHeading(onRoute = true, moving = true, routeAhead = 0f, course = 30f, compass = null))
     }
+
+    @Test
+    fun roughOrJumpingFixesAreNotARide() {
+        // m26 (영상 9:40): walking, with rough fixes far off now and then.
+        val rough = MotionTracker()
+        var t = 0L
+        var at = 0.0
+        repeat(40) { s ->
+            at += 1.3; t += 1000
+            if (s % 3 == 0) rough.add(north(at + 80), t, accuracyM = 45f) else rough.add(north(at), t, accuracyM = 6f)
+        }
+        assertFalse(rough.inVehicle)
+        // Walking with a single 70 m jump that looks precise: one fast step, not a ride.
+        val jump = MotionTracker()
+        t = 0L; at = 0.0
+        repeat(40) { s ->
+            at += 1.3; t += 1000
+            jump.add(north(if (s in 10..25) at + 70 else at), t, accuracyM = 8f)
+        }
+        assertFalse(jump.inVehicle)
+    }
 }

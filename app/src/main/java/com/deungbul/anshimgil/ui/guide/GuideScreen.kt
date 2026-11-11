@@ -139,6 +139,7 @@ import androidx.compose.ui.unit.sp
 import android.content.Context
 import com.deungbul.anshimgil.location.LOCATION_PERMISSIONS
 import com.deungbul.anshimgil.location.LocationUpdates
+import com.deungbul.anshimgil.location.LocationUpdatesWithAccuracy
 import com.deungbul.anshimgil.ui.route.arrivalTime
 import com.deungbul.anshimgil.location.hasLocationPermission
 import com.deungbul.anshimgil.data.Facility
@@ -321,9 +322,9 @@ fun GuideScreen(
         if (accel != null) sensors.registerListener(listener, accel, SensorManager.SENSOR_DELAY_GAME)
         onDispose { sensors?.unregisterListener(listener) }
     }
-    if (hasPermission) LocationUpdates(context) {
+    if (hasPermission) LocationUpdatesWithAccuracy(context) { it, accuracyM ->
         val now = android.os.SystemClock.elapsedRealtime()
-        motion.add(it, now)
+        motion.add(it, now, accuracyM)
         runDetector.addSpeed(motion.speedMps)
         running = runDetector.running
         inVehicle = motion.inVehicle
