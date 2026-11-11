@@ -146,6 +146,9 @@ import com.deungbul.anshimgil.data.Guidance
 import com.deungbul.anshimgil.data.GuidanceState
 import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.arrowHeading
+import com.deungbul.anshimgil.data.OffRouteCounter
+import com.deungbul.anshimgil.data.atCrossing
+import com.deungbul.anshimgil.data.offRouteLimitM
 import com.deungbul.anshimgil.data.guideHeading
 import com.deungbul.anshimgil.data.MotionTracker
 import com.deungbul.anshimgil.ui.mode.ModeBadge
@@ -184,6 +187,8 @@ private const val REROUTE_AFTER_MS = 8_000L
 
 /** How long AI 비서's short notice stays under the status line. */
 private const val AI_NOTICE_MS = 10_000L
+/** On the route this long after a new route, and its card closes by itself (m25). */
+private const val CARD_CLOSE_ON_ROUTE_MS = 15_000L
 /** Off the route this long before offering to tell the guardians. */
 private const val OFF_ROUTE_ALERT_MS = 20_000L
 private const val DEMO_STEP_M = 8.0
@@ -484,7 +489,13 @@ fun GuideScreen(
     // 귀가 지킴이: off the planned route for a while, offer to tell the guardians (once per stretch off route).
     // In a car or bus the route is left on purpose: no off-route warning, no new route.
     // Stepping into the rest place (a little off the route) is not leaving the route.
-    val off = !demo && !inVehicle && !atRest && state.offRouteM > OFF_ROUTE_WARN_M
+    // At a turn or crossing the route line (middle of the road) is far from the pavement: allow more there, and
+    // only two fixes in a row past it count, so one jumpy fix finds no new route (m25, 11/11).
+    val offLimit = offRouteLimitM(atCrossing(state.snapped, guidance.turnMarks))
+    val offCounter = remember(guidance) { OffRouteCounter() }
+    var offInRow by remember(guidance) { mutableStateOf(false) }
+    LaunchedEffect(fix, guidance) { if (fix != null) offInRow = offCounter.update(state.offRouteM, offLimit) }
+    val off = !demo && !inVehicle && !atRest && offInRow
     var offRouteLong by remember { mutableStateOf(false) }
     var offRouteTold by remember { mutableStateOf(false) }
     LaunchedEffect(off) {
@@ -517,6 +528,15 @@ fun GuideScreen(
         }
         rerouting = false
         return found
+    }
+    // The "새 길로 안내해요" card goes away once the walker is on the route again for a while (m25: it stayed
+    // until a button was pressed, over 10 minutes).
+    val backOnRoute = !demo && state.offRouteM <= offLimit
+    LaunchedEffect(rerouted, backOnRoute) {
+        if (rerouted && backOnRoute) {
+            delay(CARD_CLOSE_ON_ROUTE_MS)
+            rerouted = false
+        }
     }
     // AI 비서's short word about what just happened (a new route found), shown under the status line for a while.
     var aiNotice by remember { mutableStateOf<String?>(null) }
@@ -696,7 +716,7 @@ fun GuideScreen(
                     StatusPill(if (type == RouteType.SAFE) "안전한 길로 가는 중" else "빠른 길로 가는 중", Green)
                     if (demo) StatusPill("시연: 가상 이동", Color(0xFF6D28D9))
                 }
-                if (!demo && !atRest && state.offRouteM > OFF_ROUTE_WARN_M) {
+                if (!demo && !atRest && state.offRouteM > offLimit) {
                     StatusPill("경로에서 ${state.offRouteM}m 벗어났어요", Color(0xFFB42318))
                 }
                 if (rerouting) StatusPill("길을 다시 찾는 중…", Color(0xFF2F6FDB))
