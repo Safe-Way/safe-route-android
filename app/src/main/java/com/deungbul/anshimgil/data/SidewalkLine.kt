@@ -34,8 +34,16 @@ fun interface BothSide {
     }
 }
 
+/**
+ * Off (11/11): moving the line sideways without knowing where the pavement really is cut across buildings at every
+ * corner (virtual walk with both + offsetM). The line is drawn as the server sends it; the server is to put routes
+ * on mapped pavements itself. The code stays so it can be switched back on.
+ */
+const val MOVE_LINE_TO_SIDEWALK = false
+
 /** Where path point [i] is drawn: moved towards the pavement when the stretch it is on has one on one side. */
 fun sidewalkOffsetAt(path: List<LatLon>, sidewalks: List<Sidewalk>, i: Int, both: BothSide = BothSide.RIGHT): LatLon {
+    if (!MOVE_LINE_TO_SIDEWALK) return LatLon(0.0, 0.0)
     if (path.size < 2 || i !in path.indices) return LatLon(0.0, 0.0)
     val stretch = sidewalks.firstOrNull { i >= it.from && i <= it.to } ?: return LatLon(0.0, 0.0)
     val distance = stretch.offsetM?.takeIf { it <= SIDEWALK_MAX_OFFSET_M } ?: SIDEWALK_DRAW_OFFSET_M
@@ -69,7 +77,7 @@ fun sidewalkOffsetAt(path: List<LatLon>, sidewalks: List<Sidewalk>, i: Int, both
 
 /** The route's line as drawn on the map, moved onto the pavement side where that is known. */
 fun drawnPath(route: RouteOption, both: BothSide = BothSide.RIGHT): List<LatLon> =
-    if (route.sidewalks.isEmpty()) route.path
+    if (!MOVE_LINE_TO_SIDEWALK || route.sidewalks.isEmpty()) route.path
     else route.path.mapIndexed { i, p -> sidewalkOffsetAt(route.path, route.sidewalks, i, both).let { LatLon(p.lat + it.lat, p.lon + it.lon) } }
 
 /** [here] on the route near path point [i], moved the same way as the line there, so the marker sits on it. */

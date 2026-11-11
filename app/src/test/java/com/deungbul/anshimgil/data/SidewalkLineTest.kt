@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@org.junit.Ignore("길 선 옮기기는 꺼 둠 (MOVE_LINE_TO_SIDEWALK, 11/11)")
 class SidewalkLineTest {
     private val start = LatLon(35.1460, 126.9200)
     private fun north(m: Double) = LatLon(start.lat + m / 111_320.0, start.lon)
