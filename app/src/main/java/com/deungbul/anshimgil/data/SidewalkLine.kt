@@ -35,17 +35,24 @@ fun interface BothSide {
 }
 
 /**
- * Off (11/11): moving the line sideways without knowing where the pavement really is cut across buildings at every
- * corner (virtual walk with both + offsetM). The line is drawn as the server sends it; the server is to put routes
- * on mapped pavements itself. The code stays so it can be switched back on.
+ * On again for big roads only (11/11 재휘 수정안): with the server's offsetM the big roads came out on the pavement,
+ * but alleys (no separate pavement, people walk in the middle) went through buildings. So only the roads below are
+ * moved; an alley, or a stretch whose road kind is not sent, is drawn as it comes.
  */
-const val MOVE_LINE_TO_SIDEWALK = false
+const val MOVE_LINE_TO_SIDEWALK = true
+
+/** Road kinds (OSM highway) whose line is moved onto the pavement. */
+val SIDEWALK_MOVE_HIGHWAYS: Set<String> = setOf(
+    "trunk", "primary", "secondary", "tertiary",
+    "trunk_link", "primary_link", "secondary_link", "tertiary_link",
+)
 
 /** Where path point [i] is drawn: moved towards the pavement when the stretch it is on has one on one side. */
 fun sidewalkOffsetAt(path: List<LatLon>, sidewalks: List<Sidewalk>, i: Int, both: BothSide = BothSide.RIGHT): LatLon {
     if (!MOVE_LINE_TO_SIDEWALK) return LatLon(0.0, 0.0)
     if (path.size < 2 || i !in path.indices) return LatLon(0.0, 0.0)
     val stretch = sidewalks.firstOrNull { i >= it.from && i <= it.to } ?: return LatLon(0.0, 0.0)
+    if (stretch.highway !in SIDEWALK_MOVE_HIGHWAYS) return LatLon(0.0, 0.0)
     val distance = stretch.offsetM?.takeIf { it <= SIDEWALK_MAX_OFFSET_M } ?: SIDEWALK_DRAW_OFFSET_M
     // "both" only comes with the server's own offsetM: without it (older servers) it is not moved, as before.
     val side = if (stretch.side == SidewalkSide.BOTH) (if (stretch.offsetM != null) both.of(stretch) else null) else stretch.side

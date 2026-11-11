@@ -4,7 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-@org.junit.Ignore("길 선 옮기기는 꺼 둠 (MOVE_LINE_TO_SIDEWALK, 11/11)")
 class SidewalkLineTest {
     private val start = LatLon(35.1460, 126.9200)
     private fun north(m: Double) = LatLon(start.lat + m / 111_320.0, start.lon)
@@ -13,7 +12,7 @@ class SidewalkLineTest {
 
     @Test
     fun walkingNorthTheRightPavementIsEast() {
-        val r = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT)))
+        val r = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT, highway = "tertiary")))
         val drawn = drawnPath(r)
         assertEquals(6.0, eastM(path[1], drawn[1]), 0.1)
         assertEquals(path[1].lat, drawn[1].lat, 1e-9)
@@ -21,9 +20,9 @@ class SidewalkLineTest {
 
     @Test
     fun leftIsWestAndBothOrUnknownStay() {
-        val left = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.LEFT)))
+        val left = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.LEFT, highway = "tertiary")))
         assertEquals(-6.0, eastM(path[1], drawnPath(left)[1]), 0.1)
-        val both = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.BOTH)))
+        val both = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.BOTH, highway = "tertiary")))
         assertEquals(path, drawnPath(both))
         val none = RouteOption(RouteType.SAFE, 100, 2, path)
         assertTrue(drawnPath(none) === none.path)
@@ -31,19 +30,19 @@ class SidewalkLineTest {
 
     @Test
     fun theMarkerMovesWithTheLine() {
-        val r = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT)))
+        val r = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT, highway = "tertiary")))
         assertEquals(6.0, eastM(north(70.0), drawnPoint(r, north(70.0), 1)), 0.1)
     }
 
     @Test
     fun theServersOffsetIsUsedWhenItComes() {
-        val r = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT, offsetM = 12.4)))
+        val r = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT, offsetM = 12.4, highway = "tertiary")))
         assertEquals(12.4, eastM(path[1], drawnPath(r)[1]), 0.1)
         // An offset with no side known: not moved.
-        val u = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.UNKNOWN, offsetM = 12.4)))
+        val u = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.UNKNOWN, offsetM = 12.4, highway = "tertiary")))
         assertEquals(path, drawnPath(u))
         // A silly value: the old 6 m instead.
-        val big = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT, offsetM = 80.0)))
+        val big = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT, offsetM = 80.0, highway = "tertiary")))
         assertEquals(6.0, eastM(path[1], drawnPath(big)[1]), 0.1)
     }
 
@@ -66,7 +65,7 @@ class SidewalkLineTest {
 
     @Test
     fun bothSidesGoesToTheWalkersSideOrRight() {
-        val both = listOf(Sidewalk(0, 2, SidewalkSide.BOTH, offsetM = 8.0))
+        val both = listOf(Sidewalk(0, 2, SidewalkSide.BOTH, offsetM = 8.0, highway = "tertiary"))
         val r = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = both)
         // No position yet: right (east when walking north).
         assertEquals(8.0, eastM(path[1], drawnPath(r)[1]), 0.1)
@@ -78,7 +77,17 @@ class SidewalkLineTest {
         // On the line: cannot tell.
         assertEquals(null, walkerSide(path, north(50.0), 0))
         // "both" from an older server without offsetM: not moved.
-        val old = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.BOTH)))
+        val old = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.BOTH, highway = "tertiary")))
         assertEquals(path, drawnPath(old))
+    }
+
+    @Test
+    fun alleysAndUnknownRoadKindsStayPut() {
+        for (kind in listOf("residential", "service", "living_street", "unclassified", "track", null)) {
+            val r = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.RIGHT, offsetM = 4.8, highway = kind)))
+            assertEquals("$kind", path, drawnPath(r))
+        }
+        val big = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.LEFT, offsetM = 6.4, highway = "primary_link")))
+        assertEquals(-6.4, eastM(path[1], drawnPath(big)[1]), 0.1)
     }
 }
