@@ -147,6 +147,7 @@ import com.deungbul.anshimgil.data.Guidance
 import com.deungbul.anshimgil.data.GuidanceState
 import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.arrowHeading
+import com.deungbul.anshimgil.data.drawnPoint
 import com.deungbul.anshimgil.data.OffRouteCounter
 import com.deungbul.anshimgil.data.atCrossing
 import com.deungbul.anshimgil.data.offRouteLimitM
@@ -418,6 +419,9 @@ fun GuideScreen(
 
     // A tapped 신고 쌓인 곳 says what it is in the notice line.
     var tappedReport by remember { mutableStateOf<ReportSpot?>(null) }
+    // Where the walker's marker and the camera sit: on the line as drawn, moved onto the pavement side (11/11).
+    val shownAt = drawnPoint(route, state.snapped, guidance.pointIndexAt(state.progressM))
+
     // Drawn again whenever the route changes (after finding a new one).
     LaunchedEffect(map, route) {
         val m = map ?: return@LaunchedEffect
@@ -431,8 +435,8 @@ fun GuideScreen(
         m.showRoutes(context, active.copy(routes = listOf(route.copy(stops = emptyList()))), route.type, destinationName, walking = true)
         m.addStopPins(context, plannedStops.withIndex().filter { it.index !in stopsDone }.map { it.index + 1 to it.value.point })
         if (showTurnSigns) m.addTurnArrows(context, guidance.turnMarks)
-        me = m.addMyLocation(context, state.snapped, sizeDp = 24f)
-        m.moveCamera(CameraUpdateFactory.newCenterPosition(state.snapped.toLatLng(), GUIDE_ZOOM))
+        me = m.addMyLocation(context, shownAt, sizeDp = 24f)
+        m.moveCamera(CameraUpdateFactory.newCenterPosition(shownAt.toLatLng(), GUIDE_ZOOM))
         m.tiltForWalking()
         // Crosswalks the route goes over: the map's crosswalks lying on the route line.
         val crossings = try {
@@ -466,17 +470,17 @@ fun GuideScreen(
     // hence the minus.
     // A turn is shown quickly; a move alone glides over the time until the next fix.
     var shownBearing by remember { mutableFloatStateOf(mapBearing) }
-    LaunchedEffect(map, state.snapped, mapBearing) {
+    LaunchedEffect(map, shownAt, mapBearing) {
         val turning = angleBetween(shownBearing, mapBearing) > 0.5f
         shownBearing = mapBearing
         // Glide to each new position over about the time until the next fix, instead of jumping.
-        me?.moveTo(state.snapped.toLatLng(), FOLLOW_MS)
+        me?.moveTo(shownAt.toLatLng(), FOLLOW_MS)
         val m = map ?: return@LaunchedEffect
         val now = m.cameraPosition
         m.moveCamera(
             CameraUpdateFactory.newCameraPosition(
                 CameraPosition.from(
-                    state.snapped.lat, state.snapped.lon, GUIDE_ZOOM,
+                    shownAt.lat, shownAt.lon, GUIDE_ZOOM,
                     now?.tiltAngle ?: Math.toRadians(WALK_TILT_DEGREES), Math.toRadians(((360 - mapBearing) % 360).toDouble()), now?.height ?: 0.0,
                 ),
             ),
