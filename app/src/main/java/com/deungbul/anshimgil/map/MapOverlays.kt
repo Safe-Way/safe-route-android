@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import com.deungbul.anshimgil.data.Facility
+import com.deungbul.anshimgil.data.drawnPath
 import com.deungbul.anshimgil.data.FacilityKind
 import com.deungbul.anshimgil.data.FacilityLook
 import com.deungbul.anshimgil.data.HELP_KINDS
@@ -144,7 +145,7 @@ fun KakaoMap.showRoutes(
         val width = (if (walking) 11f else if (isSelected) 8f else 5f) * density
         val style = RouteLineStyle.from(width, color, (if (walking) 2.5f else 1.5f) * density, 0xFFFFFFFF.toInt())
         lineLayer.addRouteLine(
-            RouteLineOptions.from(RouteLineSegment.from(route.path.map { it.toLatLng() }, style)),
+            RouteLineOptions.from(RouteLineSegment.from(drawnPath(route).map { it.toLatLng() }, style)),
         )
     }
 
