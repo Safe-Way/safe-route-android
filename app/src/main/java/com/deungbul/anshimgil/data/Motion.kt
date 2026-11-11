@@ -23,6 +23,12 @@ private const val WINDOW_MS = 10_000L
 /** The course needs at least this much movement in the window, or GPS noise would steer it. */
 private const val COURSE_MIN_M = 8.0
 
+/** A fix rougher than this (meters) is left out of speed and vehicle judging: it jumps about (m26, 11/11). */
+const val MOTION_MAX_ACCURACY_M = 20f
+
+/** A car or bus moves fast fix after fix; one jump between two fixes is GPS, not a ride (m26). */
+private const val VEHICLE_FAST_STEPS = 3
+
 /** Feeds raw position fixes; tells speed, course and whether the walker is in a vehicle. */
 class MotionTracker {
     private val fixes = ArrayDeque<Pair<LatLon, Long>>()
@@ -41,7 +47,18 @@ class MotionTracker {
     var courseDeg: Float? = null
         private set
 
-    fun add(position: LatLon, timeMs: Long) {
+    private var fastSteps = 0
+
+    /**
+     * Feeds one fix. [accuracyM] is the phone's own error for it (0 = unknown): a rough one is skipped, since a
+     * jump of a few tens of meters read as 6 m/s for 8 s showed "차로 이동 중" while walking (영상 9:40, m26).
+     */
+    fun add(position: LatLon, timeMs: Long, accuracyM: Float = 0f) {
+        if (accuracyM > MOTION_MAX_ACCURACY_M) return
+        fixes.lastOrNull()?.let { (prev, prevAt) ->
+            val dt = (timeMs - prevAt) / 1000.0
+            if (dt > 0) fastSteps = if (metersBetween(prev, position) / dt >= VEHICLE_SPEED_MPS) fastSteps + 1 else 0
+        }
         fixes.addLast(position to timeMs)
         while (fixes.size > 2 && timeMs - fixes.first().second > WINDOW_MS) fixes.removeFirst()
         val (first, firstAt) = fixes.first()
@@ -55,7 +72,7 @@ class MotionTracker {
         if (speed >= VEHICLE_SPEED_MPS) {
             slowSince = null
             val since = fastSince ?: timeMs.also { fastSince = it }
-            if (timeMs - since >= VEHICLE_AFTER_MS) inVehicle = true
+            if (timeMs - since >= VEHICLE_AFTER_MS && fastSteps >= VEHICLE_FAST_STEPS) inVehicle = true
         } else if (speed <= WALK_AGAIN_SPEED_MPS) {
             fastSince = null
             val since = slowSince ?: timeMs.also { slowSince = it }
