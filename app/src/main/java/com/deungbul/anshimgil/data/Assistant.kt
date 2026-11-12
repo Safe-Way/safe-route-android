@@ -108,6 +108,8 @@ data class AssistantContext(
     val where: suspend () -> LatLon? = { null },
     /** The usual way of walking while a temporary one is on (TempMode.kt); else [mode]. */
     val usualMode: UserMode = mode,
+    /** The speech recognizer's other guesses of the last line (best first, without the line itself); empty when typed. */
+    val alternatives: List<String> = emptyList(),
 )
 
 interface AppAssistant {
@@ -441,6 +443,7 @@ class ServerAppAssistant(
             conversationId = conversationId,
             choice = offered[said],
             favorites = runCatching { favorites() }.getOrDefault(emptyList()),
+            alternatives = context.alternatives,
         )
         // The phone's reading of a trip with a start or stops, else the phone's own assistant.
         suspend fun fallback() = if (rule is AssistantAction.GoTrip) rule else local.reply(history, context)
@@ -488,6 +491,7 @@ internal fun serverAssistantRequest(
     conversationId: String?,
     choice: String?,
     favorites: List<Pair<String, LatLon>>,
+    alternatives: List<String> = emptyList(),
 ): JSONObject = JSONObject()
     .put("guestId", guestId ?: JSONObject.NULL)
     .put("text", withStopWordsFixed(text))
@@ -499,6 +503,9 @@ internal fun serverAssistantRequest(
     .put("conversationId", conversationId ?: JSONObject.NULL)
     .put("choice", choice ?: JSONObject.NULL)
     .put("favorites", JSONArray(favorites.map { (name, p) -> JSONObject().put("name", name).put("lat", p.lat).put("lon", p.lon) }))
+    // The recognizer's other guesses (best first, not including text), for the server to pick one whose place it finds
+    // (채림 11/12). Not read by the server until it names the field; then the name is matched.
+    .put("alternatives", JSONArray(alternatives.map { withStopWordsFixed(it) }))
 
 /**
  * Reads `POST /api/assistant`'s answer: a recommended trip or a found place becomes [AssistantAction.GoPlace],
