@@ -135,6 +135,23 @@ class AssistantTest {
     }
 
     @Test
+    fun serverRequestCarriesTheOtherGuessesOfWhatWasSaid() {
+        // 채림 11/12: 후보 여러 개를 보내면 서버가 장소가 찾아지는 후보를 고른다.
+        val spoken = serverAssistantRequest(
+            guestId = "g", text = "남광주 시장 가자", mode = UserMode.SENIOR, where = null,
+            now = java.time.LocalDateTime.of(2026, 11, 12, 18, 0), conversationId = null, choice = null,
+            favorites = emptyList(), alternatives = listOf("남광주시장 가자", "남광주 시장 가자고"),
+        )
+        val a = spoken.getJSONArray("alternatives")
+        assertEquals(listOf("남광주시장 가자", "남광주 시장 가자고"), (0 until a.length()).map { a.getString(it) })
+        val typed = serverAssistantRequest(
+            guestId = "g", text = "문화전당 가자", mode = UserMode.SENIOR, where = null,
+            now = java.time.LocalDateTime.of(2026, 11, 12, 18, 0), conversationId = null, choice = null, favorites = emptyList(),
+        )
+        assertEquals(0, typed.getJSONArray("alternatives").length())
+    }
+
+    @Test
     fun urgentWordsNeverGoToTheServer() = runBlocking {
         // Not configured for a real server in tests: if it were asked, the call would fail and fall back,
         // so check the rule answer comes straight back as Emergency.

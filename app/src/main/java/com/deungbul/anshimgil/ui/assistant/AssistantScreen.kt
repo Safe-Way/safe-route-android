@@ -313,7 +313,9 @@ fun AssistantScreen(
         choices = STARTERS
     }
 
-    fun send(text: String, byVoice: Boolean = false) {
+    // The recognizer's other guesses of the last thing said, sent along to the server (alternatives).
+    var heardGuesses by remember { mutableStateOf<List<String>>(emptyList()) }
+    fun send(text: String, byVoice: Boolean = false, guesses: List<String> = emptyList()) {
         val said = text.trim()
         if (said.isEmpty() || thinking != null) return
         // "대화 지워 줘": start over, on the phone.
@@ -322,6 +324,7 @@ fun AssistantScreen(
             return
         }
         heard = if (byVoice) said else null
+        heardGuesses = if (byVoice) guesses.map { it.trim() }.filter { it.isNotEmpty() && it != said }.distinct() else emptyList()
         pendingGo?.let { go ->
             when (goAnswer(said)) {
                 true -> {
@@ -387,7 +390,7 @@ fun AssistantScreen(
         }
         scope.launch {
             // The greeting is the app's own, so only what the user said and the replies go out.
-            val action = assistant.reply(lines.drop(1), context)
+            val action = assistant.reply(lines.drop(1), context.copy(alternatives = heardGuesses))
             slow.cancel()
             say(action.say)
             when (action) {
@@ -435,13 +438,17 @@ fun AssistantScreen(
     }
     DisposableEffect(recognizer) { onDispose { recognizer?.destroy() } }
     val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { send(it, byVoice = true) }
+        val guesses = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty()
+        guesses.firstOrNull()?.let { send(it, byVoice = true, guesses = guesses) }
     }
     fun listenWithDialog() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
             .putExtra(RecognizerIntent.EXTRA_PROMPT, "말씀해 주세요")
+            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, HEARD_GUESSES)
+            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_DONE_MS)
+            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_DONE_MS)
         try {
             speech.launch(intent)
         } catch (e: ActivityNotFoundException) {
@@ -463,8 +470,9 @@ fun AssistantScreen(
             }
             override fun onResults(b: Bundle?) {
                 listening = false; partial = ""
-                val said = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                if (said.isNullOrBlank()) onError(SpeechRecognizer.ERROR_NO_MATCH) else { silences = 0; send(said, byVoice = true) }
+                val guesses = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
+                val said = guesses.firstOrNull()
+                if (said.isNullOrBlank()) onError(SpeechRecognizer.ERROR_NO_MATCH) else { silences = 0; send(said, byVoice = true, guesses = guesses) }
             }
             override fun onError(error: Int) {
                 listening = false; partial = ""
@@ -480,6 +488,7 @@ fun AssistantScreen(
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
                 .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, HEARD_GUESSES)
                 // Older walkers pause mid-sentence: wait longer for silence before the sentence counts as said.
                 .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_DONE_MS)
                 .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_DONE_MS)
@@ -708,10 +717,13 @@ const val UNDO_CHOICE = "되돌리기"
 private const val VOICE_CHAT_PAUSE_MS = 1_500L
 
 /** Silence this long ends what is said (the phone's default is about 1 s, too short mid-sentence). */
-private const val SILENCE_DONE_MS = 2_000L
+private const val SILENCE_DONE_MS = 3_000L
 
 /** Listen at least this long, so a slow start is not cut off. */
 private const val MIN_LISTEN_MS = 4_000L
+
+/** How many guesses of what was said to ask for; the server picks one whose place it can find (채림 11/12). */
+private const val HEARD_GUESSES = 5
 
 /** How long AI 비서 may think before it says it is still looking. */
 private const val SLOW_MS = 3_000L
