@@ -133,7 +133,7 @@ fun AssistantScreen(
     /** A trip with 들를 곳 on the way (AI 비서 planned them): the place, the stops in order, and whether by transit. */
     onRouteWithStops: (Place, List<StopPlace>, Boolean) -> Unit = { p, _, t -> if (t) onRouteByTransit(p) else onRoute(p) },
     /** A trip with its own start (null: here) and places on the way, in order, to the destination. */
-    onRouteTrip: (Place?, Place, List<StopPlace>) -> Unit = { _, d, s -> onRouteWithStops(d, s, false) },
+    onRouteTrip: (Place?, Place, List<StopPlace>, Boolean) -> Unit = { _, d, s, t -> onRouteWithStops(d, s, t) },
     onShowBuses: () -> Unit,
     onOpenReport: (AssistantAction.OpenReport) -> Unit,
     /** Go to the map and open SOS (it counts down before texting, so it can still be cancelled). */
@@ -251,7 +251,7 @@ fun AssistantScreen(
             val dest = find(trip.destination, near) ?: return say(missing(trip.destination))
             chat.lastPlace = dest
             say(tripFoundSay(start?.name, stops.map { it.name }, dest.name))
-            offerGo { onRouteTrip(start, dest, stops) }
+            offerGo { onRouteTrip(start, dest, stops, false) }
         } catch (e: ApiException) {
             say(e.message ?: "지금은 찾을 수 없어요. 잠시 뒤에 다시 해 주세요.")
         }
@@ -389,6 +389,8 @@ fun AssistantScreen(
                     "'${action.query}'을(를) 찾지 못했어요. 이름을 조금 다르게 말해 주세요.",
                 )
                 is AssistantAction.GoPlace -> { chat.lastPlace = action.place; offerGo { when {
+                    // The start the walker said, as it is (not the GPS), with the stops (채림 #237).
+                    action.start != null -> onRouteTrip(action.start, action.place, action.stops, action.transit)
                     action.stops.isNotEmpty() -> onRouteWithStops(action.place, action.stops, action.transit)
                     action.transit -> onRouteByTransit(action.place)
                     else -> onRoute(action.place)

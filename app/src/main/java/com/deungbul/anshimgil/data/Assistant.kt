@@ -73,7 +73,14 @@ sealed interface AssistantAction {
      * [transit] opens the 대중교통 tab, when the recommendation was the bus or subway.
      */
     /** [stops]: 들를 곳 on the way, in order, when AI 비서 planned them ("다이소 들르고 택배 찾고 집 갈래"). */
-    data class GoPlace(override val say: String, val place: Place, val transit: Boolean = false, val stops: List<StopPlace> = emptyList()) : AssistantAction
+    /** [start]: where the trip starts when one was said ("광주역에서 …", server pick.request.origin); null means here. */
+    data class GoPlace(
+        override val say: String,
+        val place: Place,
+        val transit: Boolean = false,
+        val stops: List<StopPlace> = emptyList(),
+        val start: Place? = null,
+    ) : AssistantAction
 
     /** A trip with its own start or places on the way ("문화전당역에서 서석동 거쳐 …으로 갈래"), read on the phone. */
     data class GoTrip(override val say: String, val trip: TripAsk) : AssistantAction
@@ -369,9 +376,12 @@ class FavoriteAppAssistant(
         val said = history.lastOrNull { it.fromUser }?.text.orEmpty()
         val rule = RuleAppAssistant.reply(history, context)
         if (rule is AssistantAction.Emergency) return rule
+        // A start or places on the way: the server reads them first (채림 #237); the phone's reading when it cannot.
         if (rule is AssistantAction.GoTrip) {
+            val answer = inner.reply(history, context)
+            if (answer !is AssistantAction.GoTrip) return answer
             val saved = runCatching { favorites() }.getOrDefault(emptyList())
-            return rule.copy(trip = rule.trip.withSaved(saved))
+            return answer.copy(trip = answer.trip.withSaved(saved))
         }
         // With stops on the way, AI 비서 on the server plans the trip (and its answer carries the saved place too).
         if (mentionsStops(said)) return inner.reply(history, context)
@@ -391,7 +401,7 @@ class FavoriteAppAssistant(
 /** Actions the phone does itself; the server assistant is not asked about these. */
 private fun AssistantAction.staysOnPhone(): Boolean = this is AssistantAction.Emergency ||
     this is AssistantAction.ChangeSettings || this is AssistantAction.ShowBuses ||
-    this is AssistantAction.OpenReport || this is AssistantAction.GoNearby || this is AssistantAction.GoTrip ||
+    this is AssistantAction.OpenReport || this is AssistantAction.GoNearby ||
     (this is AssistantAction.Ask && onPhone) || (this is AssistantAction.Answer && onPhone)
 // "○○ 가자" (GoTo) goes to the server, which reads it with Gemini first (the team's order); the phone's reading is the fallback.
 
@@ -440,6 +450,9 @@ class ServerAppAssistant(
             return local.reply(history, context)
         }
         val reply = parseServerAssistantReply(json) ?: return local.reply(history, context)
+        // A trip with a start or places on the way that the server did not plan (before 채림 #237 was deployed it
+        // asked "어느 곳을 첫 목적지로…"): the phone's reading.
+        if (rule is AssistantAction.GoTrip && reply.action !is AssistantAction.GoPlace) return rule
         // The server keeps its own profile, which the app never fills in: it would ask a new phone how the
         // walker gets around although the app knows the mode, and would save settings the app does not read.
         if (reply.setupQuestion || reply.tools.any { it in SERVER_SETTING_TOOLS }) return local.reply(history, context)
@@ -526,13 +539,28 @@ internal fun parseServerAssistantReply(json: JSONObject): ServerAssistantReply? 
         ask != null || choices.isNotEmpty() -> AssistantAction.Ask(say, choices.map { it.second })
         place != null -> AssistantAction.GoPlace(
             say, place, transit = json.optJSONObject("pick")?.optString("type") == "transit",
-            stops = assistantStops(json),
+            stops = assistantStops(json), start = assistantOrigin(json),
         )
         else -> AssistantAction.Answer(say)
     }
     val setup = "get_my_info" in tools && place == null && choices.any { it.first in SETUP_CHOICES }
     return ServerAssistantReply(action, json.text("conversationId"), choices, tools, setup)
 }
+
+/**
+ * The start the walker said, from the server assistant (채림 #237): `pick.request.origin` {lat, lon, name}; null
+ * when it is the phone's own position (name "지금 위치", the GPS the app sent) or not there.
+ */
+internal fun assistantOrigin(json: JSONObject): Place? {
+    val o = json.optJSONObject("pick")?.optJSONObject("request")?.optJSONObject("origin") ?: return null
+    if (!o.has("lat") || !o.has("lon") || o.isNull("lat") || o.isNull("lon")) return null
+    val name = o.optString("name").takeIf { !o.isNull("name") && it.isNotBlank() } ?: return null
+    if (name.replace(" ", "") in HERE_NAMES) return null
+    return Place(id = null, name = name, address = "", lat = o.getDouble("lat"), lon = o.getDouble("lon"), distanceM = null)
+}
+
+/** The server's names for the phone's own position as the start. */
+private val HERE_NAMES = setOf("지금위치", "현재위치", "내위치")
 
 /**
  * 들를 곳 from the server assistant (#121·#123): `pick.request.stops` (`via` before #123) as [{name, lat, lon}],
