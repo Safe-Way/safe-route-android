@@ -24,14 +24,17 @@ private val HERE_WORDS = setOf("여기", "지금 위치", "현재 위치", "현�
 /** Words that go via a place on the way (the server's 들르다 words are added when a start is given). */
 private const val VIA_WORDS = "이동\\s*(?:을\\s*)?(?:한|하고|해서|하고서)?\\s*(?:후에?|뒤에?|다음에?)?" +
     "|거쳐서?|거치고|경유\\s*(?:해서|하고|한\\s*(?:후에?|뒤에?|다음에?))?" +
-    "|갔다가|갔다\\s*가서|(?:^|(?<=\\s))간\\s*(?:후에?|뒤에?|다음에?)"
+    "|갔다가|갔다\\s*가서|(?:^|(?<=\\s)|(?<=에)|(?<=로)|(?<=을)|(?<=를))간\\s*(?:후에?|뒤에?|다음에?)"
 private const val STOP_VIA_WORDS = "|들렀다가?|들렀다\\s*가서|들러서|들러|들르고서?|들려서|들리고"
 
 private fun viaSplitter(withStopWords: Boolean) =
-    Regex("\\s+(?:$VIA_WORDS${if (withStopWords) STOP_VIA_WORDS else ""})\\s*")
+    Regex("\\s*(?:$VIA_WORDS${if (withStopWords) STOP_VIA_WORDS else ""})\\s*")
 
 /** Going words; the destination is what comes before the first of them (as in [placeToGo]). */
 private val TRIP_GO_WORDS = listOf("가고", "가는", "갈래", "갈게", "갈거", "갈 거", "갈꺼", "가려", "가자", "가야", "데려다", "가요", "갈까", "가줘", "가 줘", "안내", "길")
+
+/** A going word stuck to the place ("조선대로갈거야", "광주역가자"); the place is what comes before it. */
+private val GO_GLUED = Regex("^(.+?)(?:갈래|갈게|갈거|갈꺼|가자|가고싶|가려|가야|데려다|가줘|안내|갈까|가요)")
 
 /** Small words dropped around a place's name. */
 private val TRIP_FILLERS = setOf("먼저", "잠깐", "잠시", "그다음", "그다음에", "그리고", "다시", "지금", "오늘", "나", "저", "우리", "좀")
@@ -79,7 +82,13 @@ private fun destinationName(piece: String, needGoWord: Boolean): String? {
     val words = piece.trim().split(Regex("\\s+"))
     val at = (1 until words.size).firstOrNull { i -> TRIP_GO_WORDS.any { g -> words[i].startsWith(g.substringBefore(' ')) && (g.length > 1 || words[i].length <= 2) } }
         ?: words.indices.firstOrNull { i -> i > 0 && words[i] == "가" }
-    if (at == null && needGoWord) return null
+    if (at == null) {
+        // Said without spaces, as speech recognition often gives it: "조선대로갈거야".
+        // Only on the last word, and not a way of going ("걸어갈래", "뛰어가자").
+        GO_GLUED.find(words.last())?.groupValues?.get(1)?.takeUnless { Regex("(어|아|여|서|러)$").containsMatchIn(it) }
+            ?.let { return placeName((words.dropLast(1) + it).joinToString(" ")) }
+        if (needGoWord) return null
+    }
     return placeName(words.subList(0, at ?: words.size).joinToString(" "))
 }
 
@@ -104,15 +113,19 @@ internal fun withObject(word: String): String {
 }
 
 /**
- * The result named as said: the search near a point is by distance only, so "충장로우체국" gave a phone shop on
- * the way and "광주극장" a theater at 문화전당 (11/12 phone test). The entry named exactly so, else the landmark
- * the one whose name ends with the words, else the landmark among those whose name holds them; null when none does.
+ * The place meant by [query] in a trip. The search near a point is by distance only ("조선대" gave 도야짬뽕
+ * 광주조선대점, "광주극장" a theater at 문화전당, 11/12 phone tests); the search without a point is by name.
+ * 1) near: named exactly so, or ending with it ("광주충장로우체국" for 충장로우체국)
+ * 2) near: two or more beginning with it (a chain or a landmark's parts: 다이소 …, 문화전당역 …), the landmark of them
+ * 3) [anywhere] (the search without a point): the first named so, ending or beginning with it (조선대학교)
+ * 4) near: the landmark among those holding it, else the nearest
  */
-fun pickNamed(query: String, results: List<Place>): Place? {
+suspend fun pickTripPlace(query: String, near: List<Place>, anywhere: suspend () -> List<Place>): Place? {
     val q = query.replace(" ", "")
-    val named = results.filter { it.name.replace(" ", "").contains(q) }
-    // "광주충장로우체국" (the place itself) over "LG유플러스 충장로 우체국점" (a shop named after it).
-    return named.firstOrNull { it.name.replace(" ", "") == q }
-        ?: named.firstOrNull { it.name.replace(" ", "").endsWith(q) }
-        ?: pickLandmark(named)
+    fun name(p: Place) = p.name.replace(" ", "")
+    near.firstOrNull { name(it) == q }?.let { return it }
+    near.firstOrNull { name(it).endsWith(q) }?.let { return it }
+    near.filter { name(it).startsWith(q) }.takeIf { it.size >= 2 }?.let { return pickLandmark(it) }
+    anywhere().firstOrNull { name(it) == q || name(it).endsWith(q) || name(it).startsWith(q) }?.let { return it }
+    return pickLandmark(near.filter { name(it).contains(q) }) ?: pickLandmark(near)
 }
