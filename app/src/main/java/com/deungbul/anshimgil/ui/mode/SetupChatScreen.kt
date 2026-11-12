@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.mode
 
+import androidx.compose.foundation.text.selection.SelectionContainer
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.speech.RecognizerIntent
@@ -178,7 +179,12 @@ internal fun Bubble(line: ChatLine) {
             contentColor = if (line.fromUser) Color.White else Ink,
             shadowElevation = if (line.fromUser) 0.dp else 1.dp,
             modifier = Modifier.widthIn(max = 300.dp),
-        ) { Text(line.text, fontSize = 17.sp, lineHeight = 24.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) }
+        ) {
+            // Press and hold to select and copy, in both the walker's lines and the replies (11/12).
+            SelectionContainer {
+                Text(line.text, fontSize = 17.sp, lineHeight = 24.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
+            }
+        }
     }
 }
 
