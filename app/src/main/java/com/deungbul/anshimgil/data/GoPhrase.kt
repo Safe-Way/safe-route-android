@@ -65,8 +65,16 @@ fun pickLandmark(results: List<Place>): Place? {
     val counts = results.groupingBy(base).eachCount()
     val top = counts.maxByOrNull { it.value } ?: return results.first()
     if (top.value < 2) return results.first()
-    return results.first { base(it) == top.key }
+    val group = results.filter { base(it) == top.key }
+    // The place itself over its parts (11/12: "남광주시장 가자" took 남광주시장 공영주차장, then 공중화장실): the entry
+    // named just that, then the first that is not a car park or a toilet.
+    return group.firstOrNull { it.name.trim() == top.key }
+        ?: group.firstOrNull { PARTS.none { w -> w in it.name } }
+        ?: group.first()
 }
+
+/** Entries of a landmark that are its car parks or toilets, not the place to walk to. */
+private val PARTS = listOf("주차장", "주차", "화장실")
 
 /**
  * Words for stopping somewhere on the way: 들르다 and how speech recognition often hears it (11/9 on the phone,

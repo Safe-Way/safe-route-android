@@ -367,6 +367,8 @@ class FavoriteAppAssistant(
         if (rule is AssistantAction.Emergency) return rule
         // With stops on the way, AI 비서 on the server plans the trip (and its answer carries the saved place too).
         if (mentionsStops(said)) return inner.reply(history, context)
+        // "집에 하트 아이콘 뭐야" asks about a map picture, not the saved 집 (11/12 phone test).
+        if (iconAnswer(said) != null) return inner.reply(history, context)
         val favorite = runCatching { favoriteIn(said, favorites()) }.getOrNull() ?: return inner.reply(history, context)
         val place = favorite.place ?: return AssistantAction.Answer(
             "${withSubject(favorite.name)} 아직 등록되지 않았어요. 설정의 '자주 가는 곳'에서 등록하면 바로 안내해 드릴게요.",

@@ -191,6 +191,13 @@ class AssistantTest {
     }
 
     @Test
+    fun aQuestionAboutAMapPictureIsNotAboutTheSavedHome() = runBlocking {
+        // 11/12 phone test: "집에 하트 아이콘 뭐야" got "집이 아직 등록되지 않았어요".
+        val inner = AssistantAction.Answer("집 안 하트는 아동안전지킴이집이에요.")
+        assertEquals(inner, favoriteAssistant(inner).reply(listOf(ChatLine(true, "집에 하트 아이콘 뭐야")), now))
+    }
+
+    @Test
     fun placeNotSavedYetIsToldNotSearched() = runBlocking {
         val answer = favoriteAssistant(AssistantAction.GoTo("", "학교")).reply(listOf(ChatLine(true, "학교 가자")), now)
         assertEquals(AssistantAction.Answer("학교가 아직 등록되지 않았어요. 설정의 '자주 가는 곳'에서 등록하면 바로 안내해 드릴게요."), answer)
