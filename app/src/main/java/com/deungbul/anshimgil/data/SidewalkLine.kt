@@ -100,7 +100,6 @@ fun drawnPath(route: RouteOption, both: BothSide = BothSide.RIGHT): List<LatLon>
         if (c == null) { out += p; return@forEachIndexed }
         val before = sidewalkOffsetAt(path, route.sidewalks, i - 1, both)
         val after = sidewalkOffsetAt(path, route.sidewalks, i + 1, both)
-        if (before == LatLon(0.0, 0.0) && after == LatLon(0.0, 0.0)) { out += p; return@forEachIndexed }
         val w = c.crosswalk
         out += LatLon(w.lat + before.lat, w.lon + before.lon)
         out += w
@@ -109,8 +108,8 @@ fun drawnPath(route: RouteOption, both: BothSide = BothSide.RIGHT): List<LatLon>
     return out
 }
 
-/** A crossAt is matched to the route point nearest its place within this distance (meters), or left out. */
-const val CROSS_AT_MATCH_M = 8.0
+/** A crossAt is matched to the route point it names within this distance (meters), or left out. */
+const val CROSS_AT_MATCH_M = 3.0
 
 /** [here] on the route near path point [i], moved the same way as the line there, so the marker sits on it. */
 fun drawnPoint(route: RouteOption, here: LatLon, i: Int, both: BothSide = BothSide.RIGHT): LatLon =

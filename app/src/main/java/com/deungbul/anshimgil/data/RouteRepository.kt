@@ -206,13 +206,12 @@ internal fun parseRouteResult(json: JSONObject, mode: UserMode? = null): RouteRe
             stops = parseRouteStops(route),
             // w17 (server #228): where the walker changes pavement on a big road, an entry in `crossings` with
             // fromM = toM and the crosswalk's lat, lon and kind; turned into its route point straight away.
-            crossAt = route.optJSONArray("crossings").objects().mapNotNull { c ->
-                if (!c.has("lat") || !c.has("lon") || c.isNull("lat") || c.isNull("lon")) return@mapNotNull null
-                if (c.optInt("fromM", -1) != c.optInt("toM", -2)) return@mapNotNull null
-                CrossAt(
-                    pointAtMeters(line, c.optDouble("fromM")), LatLon(c.getDouble("lat"), c.getDouble("lon")),
-                    c.optString("kind").takeIf { !c.isNull("kind") && it.isNotBlank() },
-                )
+            // w17 as the team settled it (서버 #231, 11/12): routes[].crossAt, `at` a point number on the line as sent,
+            // turned into that point straight away; from/to come null for now, so the crosswalk is one point.
+            crossAt = route.optJSONArray("crossAt").objects().mapNotNull { c ->
+                val at = c.optInt("at", -1)
+                if (at !in line.indices || !c.has("lat") || !c.has("lon") || c.isNull("lat") || c.isNull("lon")) return@mapNotNull null
+                CrossAt(line[at], LatLon(c.getDouble("lat"), c.getDouble("lon")), c.optString("kind").takeIf { !c.isNull("kind") && it.isNotBlank() })
             },
         ).withoutEndDetours()
     }
