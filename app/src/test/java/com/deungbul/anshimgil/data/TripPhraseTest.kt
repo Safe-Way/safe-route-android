@@ -12,6 +12,14 @@ class TripPhraseTest {
         assertEquals(listOf("문화전당역", "서석동3", "한국예술종합교육원"), read("문화전당역에서 서석동3으로 이동후에 한국예술종합교육원으로 갈거야"))
     }
 
+    @Test fun withoutSpaces() {
+        // 11/12 폰 시험: 붙여 쓴 말이라 서버로 넘어가 문화전당역을 도착지로 잡았다.
+        assertEquals(listOf("문화전당역", "푸른길", "조선대"), read("문화전당역에서 푸른길에간다음 조선대로갈거야"))
+        assertEquals(listOf("문화전당역", "푸른길", "조선대"), read("문화전당역에서푸른길에간다음조선대로갈거야"))
+        assertEquals(listOf(null, "충장로", "광주극장"), read("충장로거쳐서 광주극장갈래"))
+        assertEquals(listOf("광주역", "충장로"), read("광주역에서 충장로갈래"))
+    }
+
     @Test fun viaWords() {
         assertEquals(listOf(null, "서석초", "남광주시장"), read("서석초 거쳐서 남광주시장 갈래"))
         assertEquals(listOf(null, "광주천", "양림동"), read("광주천 경유해서 양림동으로 가자"))
@@ -36,6 +44,7 @@ class TripPhraseTest {
         assertNull(read("어디에서 버스 타?"))
         assertNull(read("문화전당역에서 내려서 걸어갈래"))
         assertNull(read("한 시간 후에 집에 갈래"))
+        assertNull(read("한시간후에 집에 갈래"))
     }
 
     @Test fun savedPlaces() {
@@ -50,11 +59,17 @@ class TripPhraseTest {
         assertEquals("집으로 가는 길을 찾았어요.", tripFoundSay(null, emptyList(), "집"))
     }
 
-    @Test fun theNamedPlaceOverTheNearest() {
+    @Test fun theMeantPlace() = kotlinx.coroutines.runBlocking {
         fun p(n: String) = Place(n, n, "", 35.1, 126.9, null)
-        val near = listOf(p("T world 광주모바일대리점 우체국점"), p("LG유플러스 충장로 우체국점"), p("광주충장로우체국"))
-        assertEquals("광주충장로우체국", pickNamed("충장로우체국", near)?.name)
-        assertNull(pickNamed("광주극장", listOf(p("CGV 광주금남로"), p("국립아시아문화전당 어린이극장"))))
-        assertEquals("광주극장", pickNamed("광주극장", listOf(p("광주극장"), p("광주극장 주차장")))?.name)
+        // 11/12 폰 시험의 실제 검색 결과
+        val postNear = listOf(p("T world 광주모바일대리점 우체국점"), p("LG유플러스 충장로 우체국점"), p("광주충장로우체국"))
+        assertEquals("광주충장로우체국", pickTripPlace("충장로우체국", postNear) { emptyList() }?.name)
+        val univNear = listOf(p("조선대학교 총동창회"), p("도야짬뽕 광주조선대점"), p("굽네치킨 조선대점"))
+        assertEquals("조선대학교", pickTripPlace("조선대", univNear) { listOf(p("조선대학교"), p("조선대학교병원")) }?.name)
+        val theaterNear = listOf(p("CGV 광주금남로"), p("국립아시아문화전당 어린이극장"))
+        assertEquals("광주극장", pickTripPlace("광주극장", theaterNear) { listOf(p("광주극장"), p("CGV 광주충장로")) }?.name)
+        // 지점이 많은 곳은 가까운 지점 (멀리 있는 지점으로 가지 않음)
+        val chainNear = listOf(p("다이소 충장점"), p("다이소 금남로점"))
+        assertEquals("다이소 충장점", pickTripPlace("다이소", chainNear) { listOf(p("다이소 첨단점")) }?.name)
     }
 }
