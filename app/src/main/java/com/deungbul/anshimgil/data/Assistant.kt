@@ -75,6 +75,8 @@ sealed interface AssistantAction {
     /** [stops]: 들를 곳 on the way, in order, when AI 비서 planned them ("다이소 들르고 택배 찾고 집 갈래"). */
     data class GoPlace(override val say: String, val place: Place, val transit: Boolean = false, val stops: List<StopPlace> = emptyList()) : AssistantAction
 
+    /** A trip with its own start or places on the way ("문화전당역에서 서석동 거쳐 …으로 갈래"), read on the phone. */
+    data class GoTrip(override val say: String, val trip: TripAsk) : AssistantAction
     data class ShowBuses(override val say: String) : AssistantAction
     /** Open 불편 신고 filled in from what was said: the kind of problem when it is clear, and the words as the memo. */
     data class OpenReport(override val say: String, val type: ReportType? = null, val memo: String = "") : AssistantAction
@@ -141,6 +143,8 @@ object RuleAppAssistant : AppAssistant {
             if (wantsGo || s.length <= word.length + 3) return AssistantAction.GoNearby("가까운 ${withDirection(name)} 길을 찾을게요.", kind)
         }
         undoAdaptation(s, context.usage)?.let { return it }
+        // "문화전당역에서 서석동 거쳐 예술종합교육원 갈래": a start or places on the way, which the server does not read (11/12).
+        tripIn(said)?.let { trip -> return AssistantAction.GoTrip("길을 찾을게요.", trip) }
         // "문화전당 가자": straight to the route (사용성 점검표 5번).
         placeToGo(said)?.let { place -> return AssistantAction.GoTo("${withDirection(place)} 길을 찾을게요.", place, onPhone = true) }
         return when {
@@ -365,6 +369,10 @@ class FavoriteAppAssistant(
         val said = history.lastOrNull { it.fromUser }?.text.orEmpty()
         val rule = RuleAppAssistant.reply(history, context)
         if (rule is AssistantAction.Emergency) return rule
+        if (rule is AssistantAction.GoTrip) {
+            val saved = runCatching { favorites() }.getOrDefault(emptyList())
+            return rule.copy(trip = rule.trip.withSaved(saved))
+        }
         // With stops on the way, AI 비서 on the server plans the trip (and its answer carries the saved place too).
         if (mentionsStops(said)) return inner.reply(history, context)
         // "집에 하트 아이콘 뭐야" asks about a map picture, not the saved 집 (11/12 phone test).
@@ -383,7 +391,7 @@ class FavoriteAppAssistant(
 /** Actions the phone does itself; the server assistant is not asked about these. */
 private fun AssistantAction.staysOnPhone(): Boolean = this is AssistantAction.Emergency ||
     this is AssistantAction.ChangeSettings || this is AssistantAction.ShowBuses ||
-    this is AssistantAction.OpenReport || this is AssistantAction.GoNearby ||
+    this is AssistantAction.OpenReport || this is AssistantAction.GoNearby || this is AssistantAction.GoTrip ||
     (this is AssistantAction.Ask && onPhone) || (this is AssistantAction.Answer && onPhone)
 // "○○ 가자" (GoTo) goes to the server, which reads it with Gemini first (the team's order); the phone's reading is the fallback.
 

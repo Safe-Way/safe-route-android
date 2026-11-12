@@ -221,7 +221,8 @@ private sealed interface SavedMode {
 private sealed interface Screen {
     data object Home : Screen
     /** [startFor] is set while choosing a new start for that route. */
-    data class Search(val startFor: Route? = null) : Screen
+    /** [stopFor] is set while choosing a place to go via (경유지) on that route. */
+    data class Search(val startFor: Route? = null, val stopFor: Route? = null) : Screen
     data object Settings : Screen
     /** 내 정보 (m06): stairs, going round, resting, transit, keeping trips. */
     data object MyInfo : Screen
@@ -509,6 +510,7 @@ fun AppRoot(
                         onRoute = { place -> screen = Screen.Route(place, fromHome = true) },
                         onRouteByTransit = { place -> screen = Screen.Route(place, fromHome = true, transit = true) },
                         onRouteWithStops = { place, stops, transit -> screen = Screen.Route(place, fromHome = true, transit = transit, stops = stops) },
+                        onRouteTrip = { start, place, stops -> screen = Screen.Route(place, start = start, fromHome = true, stops = stops) },
                         onShowBuses = { busesOnHome = true; screen = Screen.Home },
                         onOpenReport = { r -> reportPrefill = r; if (guiding) { onClose(); reportOverGuide = true } else screen = Screen.Report },
                         onReported = { if (screen is Screen.Guide) { onClose(); reportedInGuide++ } },
@@ -646,19 +648,28 @@ fun AppRoot(
                 }
                 screen is Screen.Search -> {
                     val startFor = (screen as Screen.Search).startFor
-                    val back = { screen = startFor ?: Screen.Home }
+                    val stopFor = (screen as Screen.Search).stopFor
+                    val back = { screen = startFor ?: stopFor ?: Screen.Home }
                     BackHandler(onBack = back)
-                    // key: a fresh search box when switching between destination and start.
-                    androidx.compose.runtime.key(startFor) {
+                    // key: a fresh search box when switching between destination, start and a place on the way.
+                    androidx.compose.runtime.key(startFor, stopFor) {
                         SearchScreen(
                             placeRepository = placeRepository,
                             savedPlaces = savedPlaces,
                             onBack = back,
                             onPlaceSelected = { place ->
-                                screen = startFor?.copy(start = place) ?: Screen.Route(place)
+                                screen = when {
+                                    startFor != null -> startFor.copy(start = place)
+                                    stopFor != null -> stopFor.copy(stops = stopFor.stops + com.deungbul.anshimgil.data.StopPlace(place.name, LatLon(place.lat, place.lon)))
+                                    else -> Screen.Route(place)
+                                }
                             },
                             modifier = modifier,
-                            placeholder = if (startFor != null) "어디서 출발할까요?" else "어디로 갈까요?",
+                            placeholder = when {
+                                startFor != null -> "어디서 출발할까요?"
+                                stopFor != null -> "어디를 거쳐 갈까요?"
+                                else -> "어디로 갈까요?"
+                            },
                             onUseCurrentLocation = startFor?.let { route -> { screen = route.copy(start = null) } },
                         )
                     }
@@ -685,10 +696,12 @@ fun AppRoot(
                             autoConditions = settings.autoConditions,
                             onBack = back,
                             onPickStart = { screen = Screen.Search(startFor = route) },
+                            onAddStop = { screen = Screen.Search(stopFor = route) },
+                            onRemoveStop = { i -> screen = route.copy(stops = route.stops.filterIndexed { j, _ -> j != i }) },
                             onSwap = { from ->
                                 val fromPlace = route.start
                                     ?: Place("here", from.label, "", from.point.lat, from.point.lon, null)
-                                screen = Screen.Route(destination = fromPlace, start = route.destination, fromHome = route.fromHome)
+                                screen = Screen.Route(destination = fromPlace, start = route.destination, fromHome = route.fromHome, stops = route.stops.reversed())
                             },
                             onChangeDestination = { place -> screen = route.copy(destination = place) },
                             walkSpeedMPerMin = personalSpeed(mode, samples),
