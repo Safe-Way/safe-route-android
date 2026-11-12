@@ -111,14 +111,19 @@ class SidewalkLineTest {
     }
 
     @Test
-    fun readsCrossAt() {
+    fun readsTheServersCrossingSpots() {
+        // Server #228: a side change is a crossings entry with fromM = toM and the crosswalk's place; the old
+        // stretch entries (fromM < toM) stay as they were.
         val json = org.json.JSONObject(
-            """{"routes":[{"kind":"safe","distanceM":100,"durationMin":2,"geometry":[[126.92,35.146],[126.92,35.147],[126.92,35.148]],
-            "crossAt":[{"at":1,"lat":35.1471,"lon":126.9201,"kind":"crossing"},{"at":9,"lat":1,"lon":1}]}]}""",
+            """{"routes":[{"kind":"safe","distanceM":222,"durationMin":3,"geometry":[[126.92,35.146],[126.92,35.147],[126.92,35.148]],
+            "crossings":[{"fromM":111,"toM":111,"lat":35.1471,"lon":126.9201,"kind":"crossing","fromSide":"right","toSide":"left"},
+            {"fromM":150,"toM":170}]}]}""",
         )
-        val c = parseRouteResult(json, UserMode.GENERAL).routes.single().crossAt
-        assertEquals(1, c.size)
-        assertEquals(LatLon(35.147, 126.92), c[0].along)
-        assertEquals("crossing", c[0].kind)
+        val r = parseRouteResult(json, UserMode.GENERAL).routes.single()
+        val c = r.crossAt.single()
+        assertEquals(35.147, c.along.lat, 1e-4)
+        assertEquals(LatLon(35.1471, 126.9201), c.crosswalk)
+        assertEquals("crossing", c.kind)
+        assertEquals(2, r.crossings!!.size)
     }
 }

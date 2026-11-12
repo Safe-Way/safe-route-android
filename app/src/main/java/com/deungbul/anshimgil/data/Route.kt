@@ -31,13 +31,13 @@ data class RouteOption(
     val events: List<RouteEvent> = emptyList(),
     /** Places to stop at on the way, in order (routes[].stops, 들를 곳). */
     val stops: List<RouteStop> = emptyList(),
-    /** Crosswalks where the walker changes pavement on a big road (routes[].crossAt, w17); empty when not sent. */
+    /** Crosswalks where the walker changes pavement on a big road (w17, server #228 crossings with fromM = toM); empty when not sent. */
     val crossAt: List<CrossAt> = emptyList(),
 )
 
 /**
  * A crosswalk to draw the crossing at (w17): [crosswalk] is where it is, [along] the route point it belongs to
- * (the server's `at`, kept as a place so trimming the ends or joining stretches cannot shift it).
+ * (the server's fromM, kept as a place so trimming the ends or joining stretches cannot shift it).
  */
 data class CrossAt(val along: LatLon, val crosswalk: LatLon, val kind: String?)
 
