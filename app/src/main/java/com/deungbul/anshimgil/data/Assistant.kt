@@ -442,20 +442,22 @@ class ServerAppAssistant(
             choice = offered[said],
             favorites = runCatching { favorites() }.getOrDefault(emptyList()),
         )
+        // The phone's reading of a trip with a start or stops, else the phone's own assistant.
+        suspend fun fallback() = if (rule is AssistantAction.GoTrip) rule else local.reply(history, context)
         val json = try {
             ServerApi.post("/api/assistant", body)
         } catch (e: ApiException) {
-            return local.reply(history, context)
+            return fallback()
         } catch (e: IOException) {
-            return local.reply(history, context)
+            return fallback()
         }
-        val reply = parseServerAssistantReply(json) ?: return local.reply(history, context)
+        val reply = parseServerAssistantReply(json) ?: return fallback()
         // A trip with a start or places on the way that the server did not plan (before 채림 #237 was deployed it
         // asked "어느 곳을 첫 목적지로…"): the phone's reading.
         if (rule is AssistantAction.GoTrip && reply.action !is AssistantAction.GoPlace) return rule
         // The server keeps its own profile, which the app never fills in: it would ask a new phone how the
         // walker gets around although the app knows the mode, and would save settings the app does not read.
-        if (reply.setupQuestion || reply.tools.any { it in SERVER_SETTING_TOOLS }) return local.reply(history, context)
+        if (reply.setupQuestion || reply.tools.any { it in SERVER_SETTING_TOOLS }) return fallback()
         conversationId = reply.conversationId
         offered = reply.choices.associate { it.second to it.first }
         return reply.action
