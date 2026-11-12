@@ -77,6 +77,7 @@ internal fun joinStretches(parts: List<RouteResult>, stops: List<StopPlace>): Ro
                 crossings = if (legs.all { it.crossings != null }) legs.flatMap { it.crossings!! } else null,
                 events = events,
                 stops = routeStops,
+                crossAt = legs.flatMap { it.crossAt },
             ),
         ),
         explanation = Explanation(
@@ -203,6 +204,16 @@ internal fun parseRouteResult(json: JSONObject, mode: UserMode? = null): RouteRe
                 )
             },
             stops = parseRouteStops(route),
+            // w17 (server #228): where the walker changes pavement on a big road, an entry in `crossings` with
+            // fromM = toM and the crosswalk's lat, lon and kind; turned into its route point straight away.
+            crossAt = route.optJSONArray("crossings").objects().mapNotNull { c ->
+                if (!c.has("lat") || !c.has("lon") || c.isNull("lat") || c.isNull("lon")) return@mapNotNull null
+                if (c.optInt("fromM", -1) != c.optInt("toM", -2)) return@mapNotNull null
+                CrossAt(
+                    pointAtMeters(line, c.optDouble("fromM")), LatLon(c.getDouble("lat"), c.getDouble("lon")),
+                    c.optString("kind").takeIf { !c.isNull("kind") && it.isNotBlank() },
+                )
+            },
         ).withoutEndDetours()
     }
     val shortest = routes.firstOrNull { it.type == RouteType.SHORTEST }

@@ -90,4 +90,40 @@ class SidewalkLineTest {
         val big = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.LEFT, offsetM = 6.4, highway = "primary_link")))
         assertEquals(-6.4, eastM(path[1], drawnPath(big)[1]), 0.1)
     }
+
+    @Test
+    fun theLineCrossesAtTheCrosswalk() {
+        // North on a big road on the right (east) pavement, then on its left (west) pavement after point 2.
+        val p = listOf(north(0.0), north(40.0), north(80.0), north(120.0), north(160.0))
+        val walk = listOf(
+            Sidewalk(0, 2, SidewalkSide.RIGHT, offsetM = 8.0, highway = "primary"),
+            Sidewalk(2, 4, SidewalkSide.LEFT, offsetM = 8.0, highway = "primary"),
+        )
+        val crosswalk = north(70.0)
+        val r = RouteOption(RouteType.SAFE, 160, 3, p, sidewalks = walk, crossAt = listOf(CrossAt(p[2], crosswalk, "crossing")))
+        val d = drawnPath(r)
+        assertEquals(7, d.size) // point 2 became three: east end, the crosswalk, west end
+        assertEquals(8.0, eastM(crosswalk, d[2]), 0.1)
+        assertEquals(crosswalk, d[3])
+        assertEquals(-8.0, eastM(crosswalk, d[4]), 0.1)
+        // Without crossAt: as before.
+        assertEquals(5, drawnPath(r.copy(crossAt = emptyList())).size)
+    }
+
+    @Test
+    fun readsTheServersCrossingSpots() {
+        // Server #228: a side change is a crossings entry with fromM = toM and the crosswalk's place; the old
+        // stretch entries (fromM < toM) stay as they were.
+        val json = org.json.JSONObject(
+            """{"routes":[{"kind":"safe","distanceM":222,"durationMin":3,"geometry":[[126.92,35.146],[126.92,35.147],[126.92,35.148]],
+            "crossings":[{"fromM":111,"toM":111,"lat":35.1471,"lon":126.9201,"kind":"crossing","fromSide":"right","toSide":"left"},
+            {"fromM":150,"toM":170}]}]}""",
+        )
+        val r = parseRouteResult(json, UserMode.GENERAL).routes.single()
+        val c = r.crossAt.single()
+        assertEquals(35.147, c.along.lat, 1e-4)
+        assertEquals(LatLon(35.1471, 126.9201), c.crosswalk)
+        assertEquals("crossing", c.kind)
+        assertEquals(2, r.crossings!!.size)
+    }
 }
