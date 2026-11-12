@@ -1,5 +1,10 @@
 package com.deungbul.anshimgil.ui.route
 
+import androidx.compose.foundation.layout.widthIn
+import com.deungbul.anshimgil.data.MAX_WALK_STOPS
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.horizontalScroll
 import com.deungbul.anshimgil.data.withEulReul
 import com.deungbul.anshimgil.data.ElevatorExit
 import com.deungbul.anshimgil.data.ELEVATOR_EXIT_MODES
@@ -159,6 +164,10 @@ fun RouteScreen(
     onBack: () -> Unit,
     onPickStart: () -> Unit,
     onSwap: (Origin) -> Unit,
+    /** [+ 경유지]: search a place to go via (up to [MAX_WALK_STOPS]); null hides it. */
+    onAddStop: (() -> Unit)? = null,
+    /** Take the place on the way at this index out. */
+    onRemoveStop: ((Int) -> Unit)? = null,
     onChangeDestination: (Place) -> Unit,
     /** The walker's own pace (see personalSpeed); route times are worked out from it. */
     walkSpeedMPerMin: Double,
@@ -400,6 +409,10 @@ fun RouteScreen(
                         }
                     }
                 }
+                // 경유지 (11/12): the places on the way in order, each with ✕, and [+ 경유지] while there is room.
+                if (stops.isNotEmpty() || onAddStop != null) {
+                    StopsRow(stops, onAdd = onAddStop?.takeIf { stops.size < MAX_WALK_STOPS }, onRemove = onRemoveStop)
+                }
                 // Why the route starts at Chosun University instead of here, with a way to fix it.
                 origin?.issue?.takeIf { startPlace == null }?.let { issue ->
                     LocationNotice(issue, onFix = { fixLocation(issue) })
@@ -544,6 +557,40 @@ private fun NearerChoice(nearer: Nearer?, onGo: (Place) -> Unit, onSearch: () ->
         else -> Text("걸어서 갈 만한 거리에 같은 곳이 없어요", fontSize = 15.sp, color = Muted)
     }
     TextButton(onClick = onSearch) { Text("다른 곳 찾기") }
+}
+
+/** The places on the way as chips ("1 서석동 ✕"), then [+ 경유지]. */
+@Composable
+private fun StopsRow(stops: List<StopPlace>, onAdd: (() -> Unit)?, onRemove: ((Int) -> Unit)?) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+    ) {
+        stops.forEachIndexed { i, stop ->
+            Surface(shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 2.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp, end = 4.dp).heightIn(min = 40.dp)) {
+                    Text("경유 ${i + 1}  ${stop.name}", fontSize = 14.sp, color = Ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 180.dp))
+                    if (onRemove != null) {
+                        IconButton(onClick = { onRemove(i) }, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Filled.Close, contentDescription = "${stop.name} 경유 빼기", tint = Muted, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+            }
+        }
+        if (onAdd != null) {
+            Surface(
+                shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 2.dp,
+                modifier = Modifier.clickable(onClickLabel = "경유지 추가", onClick = onAdd),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp).heightIn(min = 40.dp)) {
+                    Icon(Icons.Filled.Add, contentDescription = null, tint = Ink, modifier = Modifier.size(18.dp))
+                    Text("경유지", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Ink)
+                }
+            }
+        }
+    }
 }
 
 @Composable

@@ -1,5 +1,10 @@
 package com.deungbul.anshimgil.ui.assistant
 
+import com.deungbul.anshimgil.data.LatLon
+import com.deungbul.anshimgil.data.MAX_WALK_STOPS
+import com.deungbul.anshimgil.data.tripFoundSay
+import com.deungbul.anshimgil.data.TripPart
+import com.deungbul.anshimgil.data.TripAsk
 import com.deungbul.anshimgil.TripBookings
 import com.deungbul.anshimgil.data.BOOK_NO
 import com.deungbul.anshimgil.data.BOOK_YES
@@ -126,6 +131,8 @@ fun AssistantScreen(
     onRouteByTransit: (Place) -> Unit = onRoute,
     /** A trip with 들를 곳 on the way (AI 비서 planned them): the place, the stops in order, and whether by transit. */
     onRouteWithStops: (Place, List<StopPlace>, Boolean) -> Unit = { p, _, t -> if (t) onRouteByTransit(p) else onRoute(p) },
+    /** A trip with its own start (null: here) and places on the way, in order, to the destination. */
+    onRouteTrip: (Place?, Place, List<StopPlace>) -> Unit = { _, d, s -> onRouteWithStops(d, s, false) },
     onShowBuses: () -> Unit,
     onOpenReport: (AssistantAction.OpenReport) -> Unit,
     /** Go to the map and open SOS (it counts down before texting, so it can still be cancelled). */
@@ -218,6 +225,30 @@ fun AssistantScreen(
         chat.lastPlace = place
         say("${withDirection(place.name)} 길을 찾았어요.")
         offerGo { onRoute(place) }
+    }
+
+    /** 출발지·경유지를 말로: find each place (the start near here, the rest near the start), then offer the route. */
+    suspend fun goTrip(trip: TripAsk) {
+        thinking = "찾는 중…"
+        val here = phoneOrigin(android).point
+        suspend fun find(part: TripPart, near: LatLon): Place? =
+            part.place ?: pickLandmark(placeRepository.search(part.query, near.lat, near.lon))
+        val missing = { part: TripPart -> "'${part.query}'을(를) 찾지 못했어요. 이름을 조금 다르게 말해 주세요." }
+        try {
+            val start = trip.start?.let { part -> find(part, here) ?: return say(missing(part)) }
+            val near = start?.let { LatLon(it.lat, it.lon) } ?: here
+            if (trip.stops.size > MAX_WALK_STOPS) say("들를 곳은 ${MAX_WALK_STOPS}곳까지 넣을 수 있어서 앞의 ${MAX_WALK_STOPS}곳만 넣을게요.")
+            val stops = trip.stops.take(MAX_WALK_STOPS).map { part ->
+                val p = find(part, near) ?: return say(missing(part))
+                StopPlace(p.name, LatLon(p.lat, p.lon))
+            }
+            val dest = find(trip.destination, near) ?: return say(missing(trip.destination))
+            chat.lastPlace = dest
+            say(tripFoundSay(start?.name, stops.map { it.name }, dest.name))
+            offerGo { onRouteTrip(start, dest, stops) }
+        } catch (e: ApiException) {
+            say(e.message ?: "지금은 찾을 수 없어요. 잠시 뒤에 다시 해 주세요.")
+        }
     }
 
     /**
@@ -356,6 +387,7 @@ fun AssistantScreen(
                     action.transit -> onRouteByTransit(action.place)
                     else -> onRoute(action.place)
                 } } }
+                is AssistantAction.GoTrip -> goTrip(action.trip)
                 is AssistantAction.ShowBuses -> offerGo { onShowBuses() }
                 is AssistantAction.OpenReport -> { delay(1200); onOpenReport(action) }
                 is AssistantAction.Ask -> choices = action.choices
