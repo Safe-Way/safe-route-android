@@ -222,7 +222,8 @@ private sealed interface Screen {
     data object Home : Screen
     /** [startFor] is set while choosing a new start for that route. */
     /** [stopFor] is set while choosing a place to go via (경유지) on that route. */
-    data class Search(val startFor: Route? = null, val stopFor: Route? = null) : Screen
+    /** [destFor] is set while choosing another destination for that route. */
+    data class Search(val startFor: Route? = null, val stopFor: Route? = null, val destFor: Route? = null) : Screen
     data object Settings : Screen
     /** 내 정보 (m06): stairs, going round, resting, transit, keeping trips. */
     data object MyInfo : Screen
@@ -649,10 +650,11 @@ fun AppRoot(
                 screen is Screen.Search -> {
                     val startFor = (screen as Screen.Search).startFor
                     val stopFor = (screen as Screen.Search).stopFor
-                    val back = { screen = startFor ?: stopFor ?: Screen.Home }
+                    val destFor = (screen as Screen.Search).destFor
+                    val back = { screen = startFor ?: stopFor ?: destFor ?: Screen.Home }
                     BackHandler(onBack = back)
                     // key: a fresh search box when switching between destination, start and a place on the way.
-                    androidx.compose.runtime.key(startFor, stopFor) {
+                    androidx.compose.runtime.key(startFor, stopFor, destFor) {
                         SearchScreen(
                             placeRepository = placeRepository,
                             savedPlaces = savedPlaces,
@@ -661,6 +663,7 @@ fun AppRoot(
                                 screen = when {
                                     startFor != null -> startFor.copy(start = place)
                                     stopFor != null -> stopFor.copy(stops = stopFor.stops + com.deungbul.anshimgil.data.StopPlace(place.name, LatLon(place.lat, place.lon)))
+                                    destFor != null -> destFor.copy(destination = place)
                                     else -> Screen.Route(place)
                                 }
                             },
@@ -696,6 +699,7 @@ fun AppRoot(
                             autoConditions = settings.autoConditions,
                             onBack = back,
                             onPickStart = { screen = Screen.Search(startFor = route) },
+                            onPickDestination = { screen = Screen.Search(destFor = route) },
                             onAddStop = { screen = Screen.Search(stopFor = route) },
                             onRemoveStop = { i -> screen = route.copy(stops = route.stops.filterIndexed { j, _ -> j != i }) },
                             onSwap = { from ->
