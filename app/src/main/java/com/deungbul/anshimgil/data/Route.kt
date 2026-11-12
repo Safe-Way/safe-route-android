@@ -39,17 +39,7 @@ data class RouteOption(
  * A crosswalk to draw the crossing at (w17): [crosswalk] is where it is, [along] the route point it belongs to
  * (the server's `at`, kept as a place so trimming the ends or joining stretches cannot shift it).
  */
-data class CrossAt(
-    val along: LatLon,
-    val crosswalk: LatLon,
-    val kind: String?,
-    /**
-     * The crosswalk's two ends in walking order (w17 addition, 11/12): the line goes all the way over to [to] instead
-     * of leaving the crosswalk halfway where the road's middle line turns off. Null when the server does not send them.
-     */
-    val from: LatLon? = null,
-    val to: LatLon? = null,
-)
+data class CrossAt(val along: LatLon, val crosswalk: LatLon, val kind: String?)
 
 enum class SidewalkSide { LEFT, RIGHT, BOTH, NONE, UNKNOWN }
 

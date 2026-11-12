@@ -84,7 +84,7 @@ fun sidewalkOffsetAt(path: List<LatLon>, sidewalks: List<Sidewalk>, i: Int, both
 
 /** The route's line as drawn on the map, moved onto the pavement side where that is known. */
 fun drawnPath(route: RouteOption, both: BothSide = BothSide.RIGHT): List<LatLon> {
-    if (!MOVE_LINE_TO_SIDEWALK || (route.sidewalks.isEmpty() && route.crossAt.none { it.from != null && it.to != null })) return route.path
+    if (!MOVE_LINE_TO_SIDEWALK || route.sidewalks.isEmpty()) return route.path
     val path = route.path
     val moved = path.mapIndexed { i, p -> sidewalkOffsetAt(path, route.sidewalks, i, both).let { LatLon(p.lat + it.lat, p.lon + it.lon) } }
     if (route.crossAt.isEmpty()) return moved
@@ -98,12 +98,6 @@ fun drawnPath(route: RouteOption, both: BothSide = BothSide.RIGHT): List<LatLon>
     moved.forEachIndexed { i, p ->
         val c = at[i]
         if (c == null) { out += p; return@forEachIndexed }
-        // The crosswalk's own ends when sent: over it from end to end, whatever the roads on either side are.
-        if (c.from != null && c.to != null) {
-            out += c.from
-            out += c.to
-            return@forEachIndexed
-        }
         val before = sidewalkOffsetAt(path, route.sidewalks, i - 1, both)
         val after = sidewalkOffsetAt(path, route.sidewalks, i + 1, both)
         if (before == LatLon(0.0, 0.0) && after == LatLon(0.0, 0.0)) { out += p; return@forEachIndexed }
