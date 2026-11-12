@@ -511,7 +511,7 @@ fun AppRoot(
                         onRoute = { place -> screen = Screen.Route(place, fromHome = true) },
                         onRouteByTransit = { place -> screen = Screen.Route(place, fromHome = true, transit = true) },
                         onRouteWithStops = { place, stops, transit -> screen = Screen.Route(place, fromHome = true, transit = transit, stops = stops) },
-                        onRouteTrip = { start, place, stops -> screen = Screen.Route(place, start = start, fromHome = true, stops = stops) },
+                        onRouteTrip = { start, place, stops, transit -> screen = Screen.Route(place, start = start, fromHome = true, transit = transit, stops = stops) },
                         onShowBuses = { busesOnHome = true; screen = Screen.Home },
                         onOpenReport = { r -> reportPrefill = r; if (guiding) { onClose(); reportOverGuide = true } else screen = Screen.Report },
                         onReported = { if (screen is Screen.Guide) { onClose(); reportedInGuide++ } },

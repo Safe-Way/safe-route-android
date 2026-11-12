@@ -106,6 +106,30 @@ class StopsTest {
     }
 
     @Test
+    fun assistantOriginAsSaidElseHere() {
+        // 채림 #237: "광주역에서 다이소 갔다가 약국 갔다가 문화전당 갈래"
+        val said = JSONObject(
+            """{"say":"광주역에서 다이소, 약국 들렀다 문화전당까지 30분 걸려요.",
+                "pick":{"type":"walk","request":{
+                  "origin":{"name":"광주역","lat":35.165,"lon":126.909},
+                  "destination":{"name":"국립아시아문화전당","lat":35.146,"lon":126.920},
+                  "stops":[{"name":"다이소 광주역점","lat":35.163,"lon":126.910},{"name":"약국","lat":35.155,"lon":126.915}]}}}""",
+        )
+        val go = parseServerAssistantReply(said)!!.action as AssistantAction.GoPlace
+        assertEquals("광주역", go.start?.name)
+        assertEquals(35.165, go.start!!.lat, 1e-9)
+        assertEquals(listOf("다이소 광주역점", "약국"), go.stops.map { it.name })
+        assertEquals("국립아시아문화전당", go.place.name)
+        // Not said: name "지금 위치" is the GPS the app sent, so no start.
+        val here = JSONObject(
+            """{"say":"문화전당까지 10분이에요.","pick":{"type":"walk","request":{
+                  "origin":{"name":"지금 위치","lat":35.14,"lon":126.93},
+                  "destination":{"name":"국립아시아문화전당","lat":35.146,"lon":126.920}}}}""",
+        )
+        assertEquals(null, (parseServerAssistantReply(here)!!.action as AssistantAction.GoPlace).start)
+    }
+
+    @Test
     fun assistantStopsFromPickRequestOrTop() {
         val req = JSONObject(
             """{"say":"GS25 충장점(택배), 다이소 충장로점 들렀다 집까지 25분 걸려요.",
