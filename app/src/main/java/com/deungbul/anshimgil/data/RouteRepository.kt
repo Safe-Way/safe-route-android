@@ -77,7 +77,6 @@ internal fun joinStretches(parts: List<RouteResult>, stops: List<StopPlace>): Ro
                 crossings = if (legs.all { it.crossings != null }) legs.flatMap { it.crossings!! } else null,
                 events = events,
                 stops = routeStops,
-                crossAt = legs.flatMap { it.crossAt },
             ),
         ),
         explanation = Explanation(
@@ -204,16 +203,6 @@ internal fun parseRouteResult(json: JSONObject, mode: UserMode? = null): RouteRe
                 )
             },
             stops = parseRouteStops(route),
-            // `at` is a point number on the line as sent: turned into that point straight away (w17).
-            crossAt = route.optJSONArray("crossAt").objects().mapNotNull { c ->
-                val at = c.optInt("at", -1)
-                if (at !in line.indices || c.isNull("lat") || c.isNull("lon") || !c.has("lat") || !c.has("lon")) return@mapNotNull null
-                fun end(key: String) = c.optJSONArray(key)?.takeIf { it.length() >= 2 }?.let { LatLon(it.getDouble(0), it.getDouble(1)) }
-                CrossAt(
-                    line[at], LatLon(c.getDouble("lat"), c.getDouble("lon")), c.optString("kind").takeIf { !c.isNull("kind") && it.isNotBlank() },
-                    from = end("from"), to = end("to"),
-                )
-            },
         ).withoutEndDetours()
     }
     val shortest = routes.firstOrNull { it.type == RouteType.SHORTEST }

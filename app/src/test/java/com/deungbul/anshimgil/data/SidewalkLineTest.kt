@@ -8,7 +8,6 @@ class SidewalkLineTest {
     private val start = LatLon(35.1460, 126.9200)
     private fun north(m: Double) = LatLon(start.lat + m / 111_320.0, start.lon)
     private val path = listOf(north(0.0), north(50.0), north(100.0))
-    private fun east(p: LatLon, m: Double) = LatLon(p.lat, p.lon + m / (111_320.0 * Math.cos(Math.toRadians(p.lat))))
     private fun eastM(p: LatLon, q: LatLon) = (q.lon - p.lon) * 111_320.0 * Math.cos(Math.toRadians(p.lat))
 
     @Test
@@ -90,58 +89,5 @@ class SidewalkLineTest {
         }
         val big = RouteOption(RouteType.SAFE, 100, 2, path, sidewalks = listOf(Sidewalk(0, 2, SidewalkSide.LEFT, offsetM = 6.4, highway = "primary_link")))
         assertEquals(-6.4, eastM(path[1], drawnPath(big)[1]), 0.1)
-    }
-
-    @Test
-    fun theLineCrossesAtTheCrosswalk() {
-        // North on a big road on the right (east) pavement, then on its left (west) pavement after point 2.
-        val p = listOf(north(0.0), north(40.0), north(80.0), north(120.0), north(160.0))
-        val walk = listOf(
-            Sidewalk(0, 2, SidewalkSide.RIGHT, offsetM = 8.0, highway = "primary"),
-            Sidewalk(2, 4, SidewalkSide.LEFT, offsetM = 8.0, highway = "primary"),
-        )
-        val crosswalk = north(70.0)
-        val r = RouteOption(RouteType.SAFE, 160, 3, p, sidewalks = walk, crossAt = listOf(CrossAt(p[2], crosswalk, "crossing")))
-        val d = drawnPath(r)
-        assertEquals(7, d.size) // point 2 became three: east end, the crosswalk, west end
-        assertEquals(8.0, eastM(crosswalk, d[2]), 0.1)
-        assertEquals(crosswalk, d[3])
-        assertEquals(-8.0, eastM(crosswalk, d[4]), 0.1)
-        // Without crossAt: as before.
-        assertEquals(5, drawnPath(r.copy(crossAt = emptyList())).size)
-    }
-
-    @Test
-    fun readsCrossAt() {
-        val json = org.json.JSONObject(
-            """{"routes":[{"kind":"safe","distanceM":100,"durationMin":2,"geometry":[[126.92,35.146],[126.92,35.147],[126.92,35.148]],
-            "crossAt":[{"at":1,"lat":35.1471,"lon":126.9201,"kind":"crossing"},{"at":9,"lat":1,"lon":1}]}]}""",
-        )
-        val c = parseRouteResult(json, UserMode.GENERAL).routes.single().crossAt
-        assertEquals(1, c.size)
-        assertEquals(LatLon(35.147, 126.92), c[0].along)
-        assertEquals("crossing", c[0].kind)
-    }
-
-    @Test
-    fun withItsEndsTheLineGoesAllTheWayOver() {
-        // A walk north that turns off at point 2; the crosswalk runs from 12 m west to 12 m east of it.
-        val p = listOf(north(0.0), north(40.0), north(80.0), north(120.0))
-        val a = east(north(80.0), -12.0)
-        val b = east(north(80.0), 12.0)
-        val r = RouteOption(RouteType.SAFE, 120, 2, p, crossAt = listOf(CrossAt(p[2], north(80.0), "footway", from = a, to = b)))
-        val d = drawnPath(r)
-        assertEquals(listOf(p[0], p[1], a, b, p[3]), d)
-    }
-
-    @Test
-    fun readsTheEnds() {
-        val json = org.json.JSONObject(
-            """{"routes":[{"kind":"safe","distanceM":100,"durationMin":2,"geometry":[[126.92,35.146],[126.92,35.147],[126.92,35.148]],
-            "crossAt":[{"at":1,"lat":35.147,"lon":126.92,"kind":"footway","from":[35.147,126.9199],"to":[35.147,126.9201]}]}]}""",
-        )
-        val c = parseRouteResult(json, UserMode.GENERAL).routes.single().crossAt.single()
-        assertEquals(LatLon(35.147, 126.9199), c.from)
-        assertEquals(LatLon(35.147, 126.9201), c.to)
     }
 }
