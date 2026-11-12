@@ -19,6 +19,7 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import com.deungbul.anshimgil.data.restArrivedText
 import com.deungbul.anshimgil.data.restOfferText
+import com.deungbul.anshimgil.data.NO_REST_AHEAD_TEXT
 import com.deungbul.anshimgil.data.restName
 import com.deungbul.anshimgil.data.restPlaceOnTheWay
 import com.deungbul.anshimgil.data.restReachedAt
@@ -190,6 +191,9 @@ private const val OFF_ROUTE_WARN_M = 25
 private const val BACKTRACK_M = 25.0
 /** Off the route this long before finding a new route from where the walker is. */
 private const val REROUTE_AFTER_MS = 8_000L
+
+/** How often the walking pace is looked at for tiring, besides each step. */
+private const val PACE_CHECK_MS = 5_000L
 
 /** How long AI 비서's short notice stays under the status line. */
 private const val AI_NOTICE_MS = 10_000L
@@ -670,11 +674,16 @@ fun GuideScreen(
     val demoPaceWatch = remember { PaceWatch(DEMO_STEP_M, DEMO_SLOW_WINDOW_MS) }
     var restOffer by remember { mutableStateOf<RestPlace?>(null) }
     var lastRestAsk by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(state.progressM) {
+    // Checked every few seconds as well as on each step: standing almost still, the progress hardly changes and the
+    // check never ran (11/12: tiring was seldom noticed).
+    val latestProgress by rememberUpdatedState(state.progressM)
+    var paceTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) { while (true) { delay(PACE_CHECK_MS); paceTick++ } }
+    LaunchedEffect(state.progressM, paceTick) {
         val now = android.os.SystemClock.elapsedRealtime()
         if (inVehicle) { paceWatch.reset(); demoPaceWatch.reset(); return@LaunchedEffect }
         val watch = if (demo) demoPaceWatch.also { paceWatch.reset() } else paceWatch.also { demoPaceWatch.reset() }
-        watch.add(state.progressM, now)
+        watch.add(latestProgress, now)
         val due = lastRestAsk?.let { now - it >= REST_ASK_AGAIN_MS } ?: true
         if (!asksToRest(mode) || resting != null || restOffer != null || !due || state.remainingM <= REST_NOT_NEAR_END_M) return@LaunchedEffect
         if (!watch.slow) return@LaunchedEffect
@@ -682,8 +691,14 @@ fun GuideScreen(
         val night = active.conditions.any { it.key == "night" && it.on }
         val place = restPlaceOnTheWay(active.facilities, if (demo) state.snapped else fix ?: state.snapped, state.progressM, night) {
             guidance.alongAndOff(LatLon(it.lat, it.lon))
-        } ?: return@LaunchedEffect
+        }
         lastRestAsk = now
+        if (place == null) {
+            // Nothing to rest at ahead: still say the slowing was noticed.
+            aiNotice = NO_REST_AHEAD_TEXT
+            if (voiceOn) tts.speak(NO_REST_AHEAD_TEXT, TextToSpeech.QUEUE_FLUSH, null, "rest")
+            return@LaunchedEffect
+        }
         restOffer = place
         val said = restOfferText(place)
         onLive(false, said)

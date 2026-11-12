@@ -17,15 +17,27 @@ class RestPaceTest {
         val w = PaceWatch(usualMps = 0.9)
         walk(w, 0.4, 100)
         assertTrue(w.slow)
+        // 11/12: a minute at 65 % of the usual pace is enough now.
+        PaceWatch(0.9).also { walk(it, 0.9 * 0.65, 61); assertTrue(it.slow) }
     }
 
     @Test
     fun usualPaceOrShortOrStoppedIsNot() {
         PaceWatch(0.9).also { walk(it, 0.85, 100); assertFalse(it.slow) }
-        // Not a full minute and a half yet.
-        PaceWatch(0.9).also { walk(it, 0.3, 60); assertFalse(it.slow) }
+        // Not a full minute yet.
+        PaceWatch(0.9).also { walk(it, 0.3, 50); assertFalse(it.slow) }
         // Standing still (a long red light, or resting already).
         PaceWatch(0.9).also { walk(it, 0.0, 100); assertFalse(it.slow) }
+    }
+
+    @Test
+    fun slowWalkingWithAStopIsStillSlow() {
+        // 11/12: slow walking, then a stop, then slow again: the stop is left out, the slow walking counts.
+        val w = PaceWatch(0.9)
+        walk(w, 0.45, 30)
+        walk(w, 0.0, 20, from = 13.5, startMs = 31_000)
+        walk(w, 0.45, 30, from = 13.5, startMs = 52_000)
+        assertTrue(w.slow)
     }
 
     @Test

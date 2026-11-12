@@ -7,14 +7,23 @@ package com.deungbul.anshimgil.data
  * With a watch later, the heart rate could join in; for now the pace on the route is the sign.
  */
 
-/** Slower than this share of the walker's own pace counts as slowing down. */
-const val SLOW_SHARE = 0.6
+/**
+ * Slower than this share of the walker's own pace counts as slowing down. 11/12: 0.6 over 90 s hardly ever came
+ * up while walking, so 0.7 over a minute.
+ */
+const val SLOW_SHARE = 0.7
 
 /** …over this long (a wait at a crossing is shorter). */
-const val SLOW_WINDOW_MS = 90_000L
+const val SLOW_WINDOW_MS = 60_000L
 
 /** Hardly moving at all is a stop (resting already, or a long red light), not slowing down. */
 const val STILL_MPS = 0.05
+
+/** Between two readings faster than this (m/s) the walker is moving; slower is a stop, left out of the pace. */
+const val MOVING_MPS = 0.15
+
+/** The pace needs moving for this share of the window, or a long stop is not judged at all. */
+const val MOVING_MIN_SHARE = 0.5
 
 /** Not asked again for this long after an offer. */
 const val REST_ASK_AGAIN_MS = 10 * 60_000L
@@ -61,17 +70,28 @@ class PaceWatch(private val usualMps: Double, private val windowMs: Long = SLOW_
         progress.clear()
     }
 
-    /** Walking speed over the window (m/s); null until the window is full. */
+    /**
+     * Walking speed over the window while actually moving (m/s): stops (a red light, a look at the phone) are left
+     * out, so only slow walking counts, not waiting (11/12). Null until the window is full or with under
+     * [MOVING_MIN_SHARE] of it spent moving.
+     */
     val paceMps: Double?
         get() {
             if (times.size < 2) return null
-            val span = times.last() - times.first()
-            if (span < windowMs) return null
-            return (progress.last() - progress.first()).coerceAtLeast(0.0) / (span / 1000.0)
+            if (times.last() - times.first() < windowMs) return null
+            var meters = 0.0
+            var movingMs = 0L
+            for (i in 1 until times.size) {
+                val dt = times[i] - times[i - 1]
+                val dm = (progress[i] - progress[i - 1]).coerceAtLeast(0.0)
+                if (dt > 0 && dm / (dt / 1000.0) > MOVING_MPS) { meters += dm; movingMs += dt }
+            }
+            if (movingMs < windowMs * MOVING_MIN_SHARE) return null
+            return meters / (movingMs / 1000.0)
         }
 
     val slow: Boolean
-        get() = paceMps?.let { it > STILL_MPS && it < usualMps * SLOW_SHARE } == true
+        get() = paceMps?.let { it < usualMps * SLOW_SHARE } == true
 }
 
 /** A place to rest and how far it is. */
@@ -82,7 +102,10 @@ data class RestPlace(val facility: Facility, val meters: Int, val ahead: Boolean
 const val REST_AHEAD_M = 300
 
 /** …and this close to the route. */
-const val REST_OFF_ROUTE_M = 50
+const val REST_OFF_ROUTE_M = 80
+
+/** When no rest place lies ahead: said once instead, so the slowing is still noticed (11/12). */
+const val NO_REST_AHEAD_TEXT = "걸음이 조금 느려지셨어요. 가는 길 가까이에는 쉼터가 없어요. 잠깐 서서 쉬었다 가셔도 괜찮아요."
 
 /** A place this far behind still counts as here (GPS wobble). */
 private const val REST_BEHIND_M = 10
