@@ -26,6 +26,7 @@ import com.deungbul.anshimgil.data.restReachedAt
 import com.deungbul.anshimgil.data.asksToRest
 import com.deungbul.anshimgil.data.REST_NOT_NEAR_END_M
 import com.deungbul.anshimgil.data.REST_ASK_AGAIN_MS
+import com.deungbul.anshimgil.data.REST_REACHED_M
 import com.deungbul.anshimgil.data.RestPlace
 import com.deungbul.anshimgil.data.PaceWatch
 import androidx.compose.runtime.SideEffect
@@ -703,6 +704,12 @@ fun GuideScreen(
         val said = restOfferText(place)
         onLive(false, said)
         if (voiceOn) tts.speak(said, TextToSpeech.QUEUE_FLUSH, null, "rest")
+    }
+    // The offer goes away once its place is passed or the walk ends (11/12: it stayed on, "108m 앞", after arriving).
+    LaunchedEffect(state.progressM, restOffer) {
+        val offer = restOffer ?: return@LaunchedEffect
+        val along = guidance.alongAndOff(LatLon(offer.facility.lat, offer.facility.lon)).first
+        if (state.arrived || state.progressM > along + REST_REACHED_M) restOffer = null
     }
     fun goRest(place: RestPlace) {
         onLive(true, "쉬었다 갈게요")
