@@ -83,9 +83,34 @@ fun sidewalkOffsetAt(path: List<LatLon>, sidewalks: List<Sidewalk>, i: Int, both
 }
 
 /** The route's line as drawn on the map, moved onto the pavement side where that is known. */
-fun drawnPath(route: RouteOption, both: BothSide = BothSide.RIGHT): List<LatLon> =
-    if (!MOVE_LINE_TO_SIDEWALK || route.sidewalks.isEmpty()) route.path
-    else route.path.mapIndexed { i, p -> sidewalkOffsetAt(route.path, route.sidewalks, i, both).let { LatLon(p.lat + it.lat, p.lon + it.lon) } }
+fun drawnPath(route: RouteOption, both: BothSide = BothSide.RIGHT): List<LatLon> {
+    if (!MOVE_LINE_TO_SIDEWALK || route.sidewalks.isEmpty()) return route.path
+    val path = route.path
+    val moved = path.mapIndexed { i, p -> sidewalkOffsetAt(path, route.sidewalks, i, both).let { LatLon(p.lat + it.lat, p.lon + it.lon) } }
+    if (route.crossAt.isEmpty()) return moved
+    // w17: where the walker changes pavement, the line goes along the first pavement to the crosswalk, over it, and
+    // on along the other pavement, instead of jumping across in the middle of the junction.
+    val at = route.crossAt.mapNotNull { c ->
+        val k = path.indices.minByOrNull { metersBetween(path[it], c.along) } ?: return@mapNotNull null
+        if (k == 0 || k == path.lastIndex || metersBetween(path[k], c.along) > CROSS_AT_MATCH_M) null else k to c
+    }.toMap()
+    val out = mutableListOf<LatLon>()
+    moved.forEachIndexed { i, p ->
+        val c = at[i]
+        if (c == null) { out += p; return@forEachIndexed }
+        val before = sidewalkOffsetAt(path, route.sidewalks, i - 1, both)
+        val after = sidewalkOffsetAt(path, route.sidewalks, i + 1, both)
+        if (before == LatLon(0.0, 0.0) && after == LatLon(0.0, 0.0)) { out += p; return@forEachIndexed }
+        val w = c.crosswalk
+        out += LatLon(w.lat + before.lat, w.lon + before.lon)
+        out += w
+        out += LatLon(w.lat + after.lat, w.lon + after.lon)
+    }
+    return out
+}
+
+/** A crossAt is matched to the route point it names within this distance (meters), or left out. */
+const val CROSS_AT_MATCH_M = 3.0
 
 /** [here] on the route near path point [i], moved the same way as the line there, so the marker sits on it. */
 fun drawnPoint(route: RouteOption, here: LatLon, i: Int, both: BothSide = BothSide.RIGHT): LatLon =
