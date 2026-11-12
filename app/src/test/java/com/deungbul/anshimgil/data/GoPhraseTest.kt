@@ -32,6 +32,11 @@ class GoPhraseTest {
         assertEquals("국립아시아문화전당 GATE3", pickLandmark(results)!!.name)
         assertEquals("남광주역 광주1호선", pickLandmark(listOf(p("남광주역 광주1호선"), p("그램버거")))!!.name)
         assertNull(pickLandmark(emptyList()))
+        // 11/12: the market itself, not its car park.
+        assertEquals("남광주시장", pickLandmark(listOf(p("남광주시장 공영주차장"), p("남광주시장"), p("남광주시장 해산물")))!!.name)
+        assertEquals("남광주시장 해산물", pickLandmark(listOf(p("남광주시장 공영주차장"), p("남광주시장 공중화장실"), p("남광주시장 해산물")))!!.name)
+        // Only parts: the nearest of them, as before.
+        assertEquals("남광주시장 공영주차장", pickLandmark(listOf(p("남광주시장 공영주차장"), p("남광주시장 공중화장실")))!!.name)
     }
 
     @Test
