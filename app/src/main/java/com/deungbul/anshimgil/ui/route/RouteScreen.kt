@@ -1,5 +1,7 @@
 package com.deungbul.anshimgil.ui.route
 
+import androidx.compose.ui.layout.boundsInParent
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.layout.widthIn
 import com.deungbul.anshimgil.data.MAX_WALK_STOPS
 import androidx.compose.material.icons.filled.Add
@@ -164,6 +166,8 @@ fun RouteScreen(
     onBack: () -> Unit,
     onPickStart: () -> Unit,
     onSwap: (Origin) -> Unit,
+    /** Tap the destination to search for another one (11/12: it could not be changed there). */
+    onPickDestination: () -> Unit = {},
     /** [+ 경유지]: search a place to go via (up to [MAX_WALK_STOPS]); null hides it. */
     onAddStop: (() -> Unit)? = null,
     /** Take the place on the way at this index out. */
@@ -359,8 +363,11 @@ fun RouteScreen(
         }
     }
 
-    LaunchedEffect(map, result, selected, transitTab, transit, transitSelected) {
+    // The route fits in the part of the map below the boxes on top (11/12: "지도가 한눈에 잘 안 보여").
+    var overlayBottomPx by remember { mutableIntStateOf(0) }
+    LaunchedEffect(map, result, selected, transitTab, transit, transitSelected, overlayBottomPx) {
         val m = map ?: return@LaunchedEffect
+        m.setPadding(0, overlayBottomPx, 0, 0)
         val t = (transit as? TransitState.Ready)?.result
         if (transitTab && t != null) {
             t.routes.getOrNull(transitSelected)?.let { m.showTransit(context, it, destination.name) }
@@ -374,7 +381,7 @@ fun RouteScreen(
             KakaoMapView(modifier = Modifier.fillMaxSize(), onMapReady = { map = it })
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(12.dp),
+                modifier = Modifier.padding(12.dp).onGloballyPositioned { overlayBottomPx = it.boundsInParent().bottom.toInt() },
             ) {
                 Surface(shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 4.dp) {
                     Row(
@@ -398,7 +405,11 @@ fun RouteScreen(
                         }
                         Text(
                             destination.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(onClickLabel = "도착지 바꾸기", onClick = onPickDestination)
+                                .padding(vertical = 8.dp),
                         )
                         val style = mode.style()
                         Surface(shape = RoundedCornerShape(12.dp), color = style.accent, contentColor = Color.White) {
@@ -419,7 +430,11 @@ fun RouteScreen(
                 }
                 // Night is always shown so it can also be switched on in daytime; weather is shown for information.
                 result?.let { r -> r.conditions.ifEmpty { listOf(Condition("night", "밤", false)) } }?.let { conditions ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // One row with the weather, so the map shows more (11/12).
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    ) {
                         Surface(shape = RoundedCornerShape(16.dp), color = Ink, contentColor = Color.White) {
                             Text("지금", fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
                         }
@@ -446,20 +461,19 @@ fun RouteScreen(
                                 modifier = Modifier.heightIn(min = 40.dp),
                             )
                         }
-                    }
-                }
-                autoNightNote?.let { note ->
-                    Surface(shape = RoundedCornerShape(12.dp), color = Color.White, shadowElevation = 2.dp) {
-                        Text(note, fontSize = 13.sp, color = Muted, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
-                    }
-                }
-                result?.weather?.takeIf { it.isNotEmpty() }?.let { notes ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        notes.forEach { note ->
+                        result?.weather?.forEach { note ->
                             Surface(shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 2.dp) {
                                 Text(note, fontSize = 14.sp, color = Ink, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
                             }
                         }
+                    }
+                }
+                // The reason shows for a while, then leaves the map free.
+                var noteShown by remember(autoNightNote) { mutableStateOf(true) }
+                LaunchedEffect(autoNightNote) { if (autoNightNote != null) { kotlinx.coroutines.delay(NIGHT_NOTE_MS); noteShown = false } }
+                autoNightNote?.takeIf { noteShown }?.let { note ->
+                    Surface(shape = RoundedCornerShape(12.dp), color = Color.White, shadowElevation = 2.dp) {
+                        Text(note, fontSize = 13.sp, color = Muted, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
                     }
                 }
             }
@@ -467,7 +481,7 @@ fun RouteScreen(
 
         // At most a bit over half the screen so the map stays visible with large text;
         // the details scroll while the start button stays in view.
-        val maxPanel = (LocalConfiguration.current.screenHeightDp * 0.55f).dp
+        val maxPanel = (LocalConfiguration.current.screenHeightDp * MAX_PANEL_SHARE).dp
         Surface(shadowElevation = 8.dp, color = Color.White, modifier = Modifier.heightIn(max = maxPanel)) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(16.dp)) {
                 ModeTabs(transitTab, onSelect = { transitTab = it })
@@ -558,6 +572,12 @@ private fun NearerChoice(nearer: Nearer?, onGo: (Place) -> Unit, onSearch: () ->
     }
     TextButton(onClick = onSearch) { Text("다른 곳 찾기") }
 }
+
+/** The bottom panel takes at most this share of the screen; the rest is map (0.55 before 11/12). */
+private const val MAX_PANEL_SHARE = 0.45f
+
+/** How long "저녁이라 밤 기준을 켰어요" stays over the map. */
+private const val NIGHT_NOTE_MS = 5_000L
 
 /** The places on the way as chips ("1 서석동 ✕"), then [+ 경유지]. */
 @Composable
