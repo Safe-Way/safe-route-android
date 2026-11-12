@@ -102,3 +102,17 @@ internal fun withObject(word: String): String {
     val code = word.lastOrNull()?.code?.minus(0xAC00) ?: return word
     return if (code in 0..11171 && code % 28 != 0) "${word}을" else "${word}를"
 }
+
+/**
+ * The result named as said: the search near a point is by distance only, so "충장로우체국" gave a phone shop on
+ * the way and "광주극장" a theater at 문화전당 (11/12 phone test). The entry named exactly so, else the landmark
+ * the one whose name ends with the words, else the landmark among those whose name holds them; null when none does.
+ */
+fun pickNamed(query: String, results: List<Place>): Place? {
+    val q = query.replace(" ", "")
+    val named = results.filter { it.name.replace(" ", "").contains(q) }
+    // "광주충장로우체국" (the place itself) over "LG유플러스 충장로 우체국점" (a shop named after it).
+    return named.firstOrNull { it.name.replace(" ", "") == q }
+        ?: named.firstOrNull { it.name.replace(" ", "").endsWith(q) }
+        ?: pickLandmark(named)
+}

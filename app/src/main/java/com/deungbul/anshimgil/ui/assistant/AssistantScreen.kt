@@ -5,6 +5,7 @@ import com.deungbul.anshimgil.data.MAX_WALK_STOPS
 import com.deungbul.anshimgil.data.tripFoundSay
 import com.deungbul.anshimgil.data.TripPart
 import com.deungbul.anshimgil.data.TripAsk
+import com.deungbul.anshimgil.data.pickNamed
 import com.deungbul.anshimgil.TripBookings
 import com.deungbul.anshimgil.data.BOOK_NO
 import com.deungbul.anshimgil.data.BOOK_YES
@@ -231,8 +232,14 @@ fun AssistantScreen(
     suspend fun goTrip(trip: TripAsk) {
         thinking = "찾는 중…"
         val here = phoneOrigin(android).point
-        suspend fun find(part: TripPart, near: LatLon): Place? =
-            part.place ?: pickLandmark(placeRepository.search(part.query, near.lat, near.lon))
+        // The place named so near there, else named so anywhere (the search without a point is by name), else the nearest.
+        suspend fun find(part: TripPart, near: LatLon): Place? {
+            part.place?.let { return it }
+            val around = placeRepository.search(part.query, near.lat, near.lon)
+            return pickNamed(part.query, around)
+                ?: pickNamed(part.query, placeRepository.search(part.query, null, null))
+                ?: pickLandmark(around)
+        }
         val missing = { part: TripPart -> "'${part.query}'을(를) 찾지 못했어요. 이름을 조금 다르게 말해 주세요." }
         try {
             val start = trip.start?.let { part -> find(part, here) ?: return say(missing(part)) }

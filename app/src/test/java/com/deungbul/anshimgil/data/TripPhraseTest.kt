@@ -49,4 +49,12 @@ class TripPhraseTest {
         assertEquals("문화전당역에서 출발해 서석동을 거쳐 예술원으로 가는 길을 찾았어요.", tripFoundSay("문화전당역", listOf("서석동"), "예술원"))
         assertEquals("집으로 가는 길을 찾았어요.", tripFoundSay(null, emptyList(), "집"))
     }
+
+    @Test fun theNamedPlaceOverTheNearest() {
+        fun p(n: String) = Place(n, n, "", 35.1, 126.9, null)
+        val near = listOf(p("T world 광주모바일대리점 우체국점"), p("LG유플러스 충장로 우체국점"), p("광주충장로우체국"))
+        assertEquals("광주충장로우체국", pickNamed("충장로우체국", near)?.name)
+        assertNull(pickNamed("광주극장", listOf(p("CGV 광주금남로"), p("국립아시아문화전당 어린이극장"))))
+        assertEquals("광주극장", pickNamed("광주극장", listOf(p("광주극장"), p("광주극장 주차장")))?.name)
+    }
 }
