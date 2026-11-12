@@ -1,5 +1,7 @@
 package com.deungbul.anshimgil.ui.assistant
 
+import com.deungbul.anshimgil.data.asksToClearChat
+import androidx.compose.material3.AlertDialog
 import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.data.MAX_WALK_STOPS
 import com.deungbul.anshimgil.data.tripFoundSay
@@ -301,9 +303,24 @@ fun AssistantScreen(
         return true
     }
 
+    var confirmClear by remember { mutableStateOf(false) }
+    fun clearChat() {
+        chat.clear()
+        pendingGo = null
+        input = ""
+        chat.greeted = true
+        lines += ChatLine(fromUser = false, text = "대화를 지웠어요. $HELLO")
+        choices = STARTERS
+    }
+
     fun send(text: String, byVoice: Boolean = false) {
         val said = text.trim()
         if (said.isEmpty() || thinking != null) return
+        // "대화 지워 줘": start over, on the phone.
+        if (asksToClearChat(said)) {
+            clearChat()
+            return
+        }
         heard = if (byVoice) said else null
         pendingGo?.let { go ->
             when (goAnswer(said)) {
@@ -511,7 +528,18 @@ fun AssistantScreen(
     Column(Modifier.fillMaxSize().imePadding()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 4.dp)) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "지도로 돌아가기", tint = Ink) }
-            Text("AI 비서", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Ink)
+            Text("AI 비서", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Ink, modifier = Modifier.weight(1f))
+            // The conversation stays until cleared here (or "대화 지워 줘").
+            TextButton(onClick = { confirmClear = true }, enabled = lines.size > 1) { Text("대화 지우기", fontSize = 15.sp) }
+        }
+        if (confirmClear) {
+            AlertDialog(
+                onDismissRequest = { confirmClear = false },
+                title = { Text("대화를 모두 지울까요?") },
+                text = { Text("AI 비서와 나눈 말이 이 폰에서 지워져요.") },
+                confirmButton = { TextButton(onClick = { confirmClear = false; clearChat() }) { Text("지우기") } },
+                dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("취소") } },
+            )
         }
         LazyColumn(
             state = listState,
@@ -722,13 +750,22 @@ private fun EmergencyCard(onCall: () -> Unit, onGuardian: () -> Unit, onPolice: 
  * AI 비서's conversation while the app runs: kept when leaving the screen and coming back, gone when the
  * app is closed (it is only in memory, never saved).
  */
-class AssistantChat {
-    val lines = mutableStateListOf<ChatLine>()
+class AssistantChat(saved: List<ChatLine> = emptyList()) {
+    /** Kept on the phone ([ChatStore]) until the walker clears it. */
+    val lines = mutableStateListOf<ChatLine>().apply { addAll(saved) }
     var choices by mutableStateOf<List<String>>(emptyList())
     /** The place found last, so "그곳 몇 층이야" is about it. */
     var lastPlace by mutableStateOf<Place?>(null)
     /** The greeting has been said (live lines may come in before AI 비서 is first opened). */
-    var greeted by mutableStateOf(false)
+    var greeted by mutableStateOf(saved.isNotEmpty())
+
+    /** [대화 지우기]: start over (the server's conversation starts over with the next line too). */
+    fun clear() {
+        lines.clear()
+        choices = emptyList()
+        lastPlace = null
+        greeted = false
+    }
 
     /**
      * A line from AI 비서's live bubbles (map, guidance) or the walker's tap on one, kept here so the chat shows

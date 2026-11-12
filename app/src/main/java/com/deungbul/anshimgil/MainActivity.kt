@@ -318,8 +318,12 @@ fun AppRoot(
     var assistantOpening by remember { mutableStateOf<String?>(null) }
     // Opened from the map's microphone button, so it listens at once.
     var assistantListen by remember { mutableStateOf(false) }
-    // AI 비서's conversation: kept while the app runs, gone when it is closed.
-    val assistantChat = remember { AssistantChat() }
+    // AI 비서's conversation: kept on the phone, also after the app is closed, until the walker clears it (11/12).
+    val assistantChat = remember { AssistantChat(com.deungbul.anshimgil.data.ChatStore.load(appContext)) }
+    LaunchedEffect(assistantChat) {
+        androidx.compose.runtime.snapshotFlow { assistantChat.lines.toList() }
+            .collect { com.deungbul.anshimgil.data.ChatStore.save(appContext, it) }
+    }
     val mapHints = remember {
         MapHintSource(
             EventRepository.create(),
