@@ -208,7 +208,11 @@ internal fun parseRouteResult(json: JSONObject, mode: UserMode? = null): RouteRe
             crossAt = route.optJSONArray("crossAt").objects().mapNotNull { c ->
                 val at = c.optInt("at", -1)
                 if (at !in line.indices || c.isNull("lat") || c.isNull("lon") || !c.has("lat") || !c.has("lon")) return@mapNotNull null
-                CrossAt(line[at], LatLon(c.getDouble("lat"), c.getDouble("lon")), c.optString("kind").takeIf { !c.isNull("kind") && it.isNotBlank() })
+                fun end(key: String) = c.optJSONArray(key)?.takeIf { it.length() >= 2 }?.let { LatLon(it.getDouble(0), it.getDouble(1)) }
+                CrossAt(
+                    line[at], LatLon(c.getDouble("lat"), c.getDouble("lon")), c.optString("kind").takeIf { !c.isNull("kind") && it.isNotBlank() },
+                    from = end("from"), to = end("to"),
+                )
             },
         ).withoutEndDetours()
     }
