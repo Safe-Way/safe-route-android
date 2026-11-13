@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.guide
 
+import com.deungbul.anshimgil.location.isLocationOn
 import com.deungbul.anshimgil.GuideSession
 import com.deungbul.anshimgil.GuideService
 import com.deungbul.anshimgil.data.arrivalText
@@ -344,7 +345,10 @@ fun GuideScreen(
         if (accel != null) sensors.registerListener(listener, accel, SensorManager.SENSOR_DELAY_GAME)
         onDispose { sensors?.unregisterListener(listener) }
     }
-    if (hasPermission) LocationUpdatesWithAccuracy(context) { it, accuracyM ->
+    // Whether the phone's location is switched on; asked again while there is no position, and the updates are
+    // asked for again when it comes on (the providers are picked when they start).
+    var locationOn by remember { mutableStateOf(isLocationOn(context)) }
+    if (hasPermission) androidx.compose.runtime.key(locationOn) { LocationUpdatesWithAccuracy(context) { it, accuracyM ->
         val now = android.os.SystemClock.elapsedRealtime()
         motion.add(it, now, accuracyM)
         runDetector.addSpeed(motion.speedMps)
@@ -355,7 +359,7 @@ fun GuideScreen(
         fix = it
         // A ride is not a walk: it would make the personal walking speed far too fast.
         if (!motion.inVehicle) meter.add(it, now)
-    }
+    } }
 
     // Along the route the walker only goes forward: a fix a few meters behind the last one is GPS noise,
     // so the marker stays put instead of sliding back and forth. A real step back (U-turn) still shows.
@@ -368,8 +372,23 @@ fun GuideScreen(
         }
     }
     LaunchedEffect(realState?.progressM) { realState?.let { furthest = it.progressM } }
-    val demo = realState == null || realState.offRouteM > FAR_FROM_ROUTE_M
-    val state: GuidanceState = if (demo) guidance.atProgress(demoProgress) else realState!!
+    // No position yet (location off, not allowed, or not found): no demo walk, which went on by itself as if the
+    // walker were moving (11/13); the guidance waits at the start and says why ([NoLocationCard]).
+    // A real position far from the route still walks the demo (testing away from the route).
+    val noFix = realState == null
+    LaunchedEffect(noFix) {
+        while (noFix) {
+            locationOn = isLocationOn(context)
+            hasPermission = hasLocationPermission(context)
+            delay(NO_FIX_CHECK_MS)
+        }
+    }
+    val demo = realState != null && realState.offRouteM > FAR_FROM_ROUTE_M
+    val state: GuidanceState = when {
+        demo -> guidance.atProgress(demoProgress)
+        realState != null -> realState
+        else -> guidance.atProgress(0.0)
+    }
 
     // 지치면 쉬는 곳으로: [resting] is the place ahead on the route to rest at. The walker keeps to the same route
     // (no new route, so no detour or turning back; 11/10) and rests on reaching its spot on the route.
@@ -419,9 +438,11 @@ fun GuideScreen(
     val tts = rememberTts(context)
     val instruction = instructionText(state, destinationName)
     val spokenKey = "${state.nextTurn}-${distanceBucket(state.metersToNextTurn)}-${state.arrived}"
-    LaunchedEffect(spokenKey, voiceOn) {
+    LaunchedEffect(spokenKey, voiceOn, noFix) {
         // At the rest place the rest card speaks instead of "목적지에 도착했어요".
         if (resting != null && state.arrived) return@LaunchedEffect
+        // Without a position it would say the way from the start: the card says why it waits instead.
+        if (noFix) return@LaunchedEffect
         if (voiceOn && !inVehicle) tts.speak(instruction.spoken, TextToSpeech.QUEUE_FLUSH, null, "guide")
     }
     // A running child near a crossing or where roads meet: vibrate, beep and say it, once for each place.
@@ -794,6 +815,18 @@ fun GuideScreen(
                     .onGloballyPositioned { overlayBottomPx = it.boundsInParent().bottom.toInt() },
             ) {
                 InstructionCard(state, instruction)
+                if (noFix) NoLocationCard(
+                    noLocationText(hasPermission, locationOn),
+                    button = when {
+                        !hasPermission -> "권한 허용"
+                        !locationOn -> "위치 켜기"
+                        else -> null
+                    },
+                    onClick = {
+                        if (!hasPermission) permissionLauncher.launch(LOCATION_PERMISSIONS)
+                        else runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS)) }
+                    },
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     StatusPill(if (type == RouteType.SAFE) "안전한 길로 가는 중" else "빠른 길로 가는 중", Green)
                     if (demo) StatusPill("시연: 가상 이동", Color(0xFF6D28D9))
@@ -1026,6 +1059,36 @@ fun GuideScreen(
 
     // SOS covers the whole screen, guidance included.
     if (sos) SosOverlay(guardians, here = { fix ?: state.snapped }, onClose = { sos = false }, onAddGuardian = null)
+    }
+}
+
+/** How often the location switch and permission are looked at again while there is no position. */
+private const val NO_FIX_CHECK_MS = 2_000L
+
+/** Why the guidance waits without a position. */
+internal fun noLocationText(hasPermission: Boolean, locationOn: Boolean): String = when {
+    !hasPermission -> "위치 권한이 없어요. 허용해야 안내할 수 있어요."
+    !locationOn -> "위치가 꺼져 있어요. 켜야 안내할 수 있어요."
+    else -> "현재 위치를 찾는 중이에요…"
+}
+
+@Composable
+private fun NoLocationCard(text: String, button: String?, onClick: () -> Unit) {
+    Surface(shape = RoundedCornerShape(14.dp), color = Color.White, shadowElevation = 3.dp) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+        ) {
+            Text(text, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFB42318), lineHeight = 21.sp, modifier = Modifier.weight(1f))
+            button?.let {
+                androidx.compose.material3.Button(
+                    onClick = onClick,
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFF2F6FDB)),
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) { Text(it, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+            }
+        }
     }
 }
 
