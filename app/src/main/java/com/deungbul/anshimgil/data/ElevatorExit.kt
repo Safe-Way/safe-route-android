@@ -13,6 +13,30 @@ data class ElevatorExit(val name: String, val point: LatLon) {
     val label: String get() = "$name 엘리베이터"
 }
 
+/**
+ * 지하상가 (11/13): an underground mall is entered from the station exits around it (금남지하상가 lies between
+ * 문화전당역 and 금남로4가역, server UndergroundLinks), so it is reached by the nearest exit with an elevator within
+ * [EXIT_SEARCH_M] of it, of any station; null when none is known.
+ */
+fun mallElevatorExit(destination: Place, from: LatLon, facilities: List<Facility>): ElevatorExit? {
+    val at = LatLon(destination.lat, destination.lon)
+    return facilities
+        .filter { it.kind == FacilityKind.SUBWAY_ENTRANCE && it.elevator && it.name != null }
+        .map { LatLon(it.lat, it.lon) to it }
+        .filter { (p, _) -> metersBetween(p, at) <= EXIT_SEARCH_M }
+        .minByOrNull { (p, _) -> metersBetween(p, from) }
+        ?.let { (p, f) ->
+            val station = stationName(f.name!!)
+            ElevatorExit(if (station != null) exitNumber(f.name)?.let { "$station ${it}번 출구" } ?: f.name else f.name, p)
+        }
+}
+
+/** Whether [placeName] is an underground mall ("금남지하상가", "충장로 지하상가"), not a shop in one. */
+fun isUndergroundMall(placeName: String): Boolean = placeName.replace(" ", "").let { n -> n.endsWith("지하상가") || n.endsWith("지하쇼핑센터") }
+
+/** Whether the route to [placeName] may end at an elevator exit: a station or an underground mall. */
+fun arrivesByElevatorExit(placeName: String): Boolean = stationName(placeName) != null || isUndergroundMall(placeName)
+
 /** What [ElevatorExit.label] ends with. */
 private const val ELEVATOR_SUFFIX = " 엘리베이터"
 
@@ -40,6 +64,7 @@ fun stationName(placeName: String): String? =
  * the destination is not a station or none of its exits is known to have an elevator.
  */
 fun elevatorExitFor(destination: Place, from: LatLon, facilities: List<Facility>): ElevatorExit? {
+    if (isUndergroundMall(destination.name)) return mallElevatorExit(destination, from, facilities)
     val station = stationName(destination.name) ?: return null
     val at = LatLon(destination.lat, destination.lon)
     return facilities

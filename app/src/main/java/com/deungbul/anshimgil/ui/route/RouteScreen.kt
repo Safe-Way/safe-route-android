@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.route
 
+import com.deungbul.anshimgil.data.arrivesByElevatorExit
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.layout.widthIn
@@ -13,7 +14,6 @@ import com.deungbul.anshimgil.data.ELEVATOR_EXIT_MODES
 import com.deungbul.anshimgil.data.FacilityRepository
 import com.deungbul.anshimgil.data.bboxAround
 import com.deungbul.anshimgil.data.elevatorExitFor
-import com.deungbul.anshimgil.data.stationName
 import com.deungbul.anshimgil.data.MAX_TRANSIT_STOPS
 import com.deungbul.anshimgil.data.StopPlace
 import com.deungbul.anshimgil.data.firstWait
@@ -215,7 +215,7 @@ fun RouteScreen(
         val from = (startPlace?.let { Origin(LatLon(it.lat, it.lon), it.name) }
             ?: phoneOrigin(context)).also { origin = it }
         val dest = LatLon(destination.lat, destination.lon)
-        exitTo = if (mode in ELEVATOR_EXIT_MODES && facilityRepository != null && stationName(destination.name) != null) {
+        exitTo = if (mode in ELEVATOR_EXIT_MODES && facilityRepository != null && arrivesByElevatorExit(destination.name)) {
             try {
                 elevatorExitFor(destination, from.point, facilityRepository.load(mode, emptySet(), bboxAround(listOf(dest), marginDeg = 0.005)).layers.facilities)
             } catch (e: ApiException) {
