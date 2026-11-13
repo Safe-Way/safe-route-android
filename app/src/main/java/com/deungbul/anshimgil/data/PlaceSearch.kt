@@ -29,3 +29,6 @@ suspend fun mergedSearch(query: String, near: List<Place>, anywhere: List<Place>
     val others = rest.filter { it !in begins && it !in holds }
     return listOfNotNull(best) + begins + holds + others
 }
+
+/** A bus line ("line:…", 03번 버스) or stop ("bus:…") from the server's search (채림 #258). */
+fun isBusResult(p: Place): Boolean = p.id?.startsWith("line:") == true || p.id?.startsWith("bus:") == true

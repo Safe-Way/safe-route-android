@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.search
 
+import com.deungbul.anshimgil.data.isBusResult
 import com.deungbul.anshimgil.data.hereLine
 import com.deungbul.anshimgil.data.mergedSearch
 import kotlinx.coroutines.coroutineScope
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MyLocation
@@ -318,10 +320,13 @@ private fun PlaceRow(place: Place, icon: ImageVector, onClick: () -> Unit) {
                 .clickable(onClick = onClick, role = Role.Button)
                 .padding(vertical = 8.dp),
         ) {
-            Icon(icon, contentDescription = null, tint = Color(0xFF6B776F))
+            // A bus line or stop from the server (채림 #258: id "line:…" / "bus:…") shows a bus, and a line's
+            // "기점 ↔ 종점 · 첫차 · 막차" gets two lines instead of being cut.
+            val bus = isBusResult(place)
+            Icon(if (bus) Icons.Filled.DirectionsBus else icon, contentDescription = null, tint = Color(0xFF6B776F))
             Column(Modifier.weight(1f)) {
                 Text(place.name, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(place.address, fontSize = 13.sp, color = Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(place.address, fontSize = 13.sp, lineHeight = 17.sp, color = Muted, maxLines = if (bus) 2 else 1, overflow = TextOverflow.Ellipsis)
             }
             place.distanceM?.let { Text(formatDistance(it), fontSize = 13.sp, color = Muted) }
         }
