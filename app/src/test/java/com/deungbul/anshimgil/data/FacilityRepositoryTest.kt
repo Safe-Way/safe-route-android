@@ -20,7 +20,11 @@ class FacilityRepositoryTest {
     @Test
     fun footbridgesAndCrossingsFollowWheelchairAccess() {
         val shown = UserMode.DISABLED.shownKinds(emptySet())
-        assertEquals(FacilityKind.ELEVATOR, poiKind("footbridge", null, true, shown))
+        // 11/13 운영 데이터: 승강기만 엘리베이터 육교. 경사로·"계단만 있음 · 휠체어 통과 가능"은 아님
+        assertEquals(FacilityKind.ELEVATOR, poiKind("footbridge", "승강기", true, shown))
+        assertEquals(FacilityKind.OVERPASS, poiKind("footbridge", "경사로", true, shown))
+        assertEquals(FacilityKind.OVERPASS, poiKind("footbridge", "없음", true, shown))
+        assertEquals(FacilityKind.OVERPASS, poiKind("footbridge", null, true, shown))
         assertEquals(FacilityKind.OVERPASS, poiKind("footbridge", "없음", false, shown))
         assertEquals(FacilityKind.CURB_RAMP, poiKind("crosswalk", null, true, shown))
         // Unknown curb height is a small gray dot; a known high curb is left off
