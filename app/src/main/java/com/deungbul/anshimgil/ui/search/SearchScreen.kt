@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.search
 
+import com.deungbul.anshimgil.data.hereLine
 import com.deungbul.anshimgil.data.mergedSearch
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
@@ -112,7 +113,15 @@ fun SearchScreen(
     var here by remember { mutableStateOf<LatLon?>(null) }
 
     LaunchedEffect(Unit) { focus.requestFocus() }
-    LaunchedEffect(Unit) { here = phoneOrigin(context, timeoutMs = 3_000).point }
+    // The address of where the walker is, under "현재 위치에서 출발" (only from a real fix).
+    var hereAddress by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        val origin = phoneOrigin(context, timeoutMs = 3_000)
+        here = origin.point
+        if (onUseCurrentLocation != null && origin.fromGps) {
+            hereAddress = placeRepository.here(origin.point.lat, origin.point.lon)?.let(::hereLine)
+        }
+    }
     LaunchedEffect(query, here) {
         val text = query.trim()
         if (text.length < 2) {
@@ -216,7 +225,11 @@ fun SearchScreen(
                                 .padding(horizontal = 16.dp),
                         ) {
                             Icon(Icons.Filled.MyLocation, contentDescription = null, tint = Color(0xFF2F6FDB))
-                            Text("현재 위치에서 출발", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink)
+                            Column {
+                                Text("현재 위치에서 출발", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                // Where that is (11/13): "광주 동구 필문대로 309 (조선대학교 본관)".
+                                hereAddress?.let { Text(it, fontSize = 14.sp, color = Muted, maxLines = 2) }
+                            }
                         }
                     }
                 }

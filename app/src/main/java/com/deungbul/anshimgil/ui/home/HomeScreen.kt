@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.home
 
+import com.deungbul.anshimgil.data.hereLine
 import com.deungbul.anshimgil.ui.common.AI_BUBBLE_ALPHA
 import com.deungbul.anshimgil.data.busesToShow
 import com.deungbul.anshimgil.data.BusRepository
@@ -255,8 +256,15 @@ fun HomeScreen(
         map?.moveCamera(CameraUpdateFactory.newCenterPosition(LatLng.from(p.lat, p.lon), WALK_ZOOM))
     }
 
+    // 현재 위치 주소 (11/13): where the walker is, shown for a while after the location button.
+    var hereAddress by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(hereAddress) { if (hereAddress != null) { kotlinx.coroutines.delay(HERE_ADDRESS_MS); hereAddress = null } }
+    fun showAddress(p: LatLon) {
+        scope.launch { placeRepository.here(p.lat, p.lon)?.let { hereAddress = "지금 위치 · ${hereLine(it)}" } }
+    }
+
     fun locate() {
-        here?.let { centerOn(it); nearbyMessage = null; return }
+        here?.let { centerOn(it); nearbyMessage = null; showAddress(it); return }
         if (locating) return
         locating = true
         centerOnFix = true
@@ -271,6 +279,7 @@ fun HomeScreen(
             // Say why the map went to Chosun University instead of the phone's position.
             nearbyMessage = origin.issue?.message?.replace("에서 출발해요", "을 보여 줘요")
             centerOn(origin.point)
+            if (origin.fromGps) showAddress(origin.point)
         }
     }
 
@@ -593,6 +602,11 @@ fun HomeScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Icon(Icons.Filled.Campaign, contentDescription = "불편 신고", tint = Color(0xFFB45309), modifier = Modifier.size(24.dp))
                     Text("신고", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Ink)
+                }
+            }
+            hereAddress?.let { line ->
+                Surface(shape = RoundedCornerShape(12.dp), color = Color.White, shadowElevation = 2.dp) {
+                    Text(line, fontSize = 16.sp, color = Ink, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
                 }
             }
             nearbyMessage?.let {
@@ -1033,3 +1047,6 @@ private fun AiAskBubble(text: String, answers: List<Pair<String, () -> Unit>>) {
         }
     }
 }
+
+/** How long the address under the location button stays. */
+private const val HERE_ADDRESS_MS = 8_000L

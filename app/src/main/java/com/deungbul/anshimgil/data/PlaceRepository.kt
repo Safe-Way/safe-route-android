@@ -8,6 +8,12 @@ interface PlaceRepository {
     suspend fun search(query: String, lat: Double?, lon: Double?): List<Place>
 
     /**
+     * The address where [lat]/[lon] is (server `GET /api/places/here`, 11/13): name is the building, else the road
+     * address. Null when there is none or it cannot be found now. The position is not logged by the server (NFR-07).
+     */
+    suspend fun here(lat: Double, lon: Double): Place? = null
+
+    /**
      * Up to 5 places of [kind] within 1 km, open ones first (server `kind`, e.g. "toilet").
      * The mode narrows them, e.g. wheelchair keeps only accessible toilets. Throws [ApiException].
      */
@@ -19,6 +25,15 @@ interface PlaceRepository {
 }
 
 class ServerPlaceRepository : PlaceRepository {
+    override suspend fun here(lat: Double, lon: Double): Place? =
+        try {
+            Place.fromJson(ServerApi.get("/api/places/here", mapOf("lat" to lat, "lon" to lon)))
+        } catch (e: ApiException) {
+            null // NO_ADDRESS (404), or the search is down
+        } catch (e: org.json.JSONException) {
+            null
+        }
+
     override suspend fun search(query: String, lat: Double?, lon: Double?): List<Place> {
         val json = ServerApi.get("/api/places", mapOf("query" to query, "lat" to lat, "lon" to lon))
         val places = json.optJSONArray("places") ?: return emptyList()
