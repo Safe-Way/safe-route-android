@@ -12,6 +12,8 @@ package com.deungbul.anshimgil.data
 
 /** The near and the by-name results as one list, with each one's distance from [here]. */
 suspend fun mergedSearch(query: String, near: List<Place>, anywhere: List<Place>, here: LatLon?): List<Place> {
+    // "현재 위치", "내 위치": the server answers with where the walker is, alone (채림 #248).
+    near.firstOrNull(::isHerePlace)?.let { return listOf(it) }
     val inGwangju = anywhere.filter { isInGwangju(LatLon(it.lat, it.lon)) }
     val all = (near + inGwangju)
         .distinctBy { it.id ?: "${it.name}@${"%.4f".format(java.util.Locale.US, it.lat)},${"%.4f".format(java.util.Locale.US, it.lon)}" }
