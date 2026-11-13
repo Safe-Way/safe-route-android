@@ -152,6 +152,26 @@ class AssistantTest {
     }
 
     @Test
+    fun whatTheServerUnderstood() {
+        // 채림 #243: heard{text, alternative, origin, stops, destination}
+        val json = JSONObject(
+            """{"say":"'광주역에서 다이소 갔다가 문화전당 갈래'라고 알아들었어요. 30분 걸려요.",
+                "pick":{"type":"walk","request":{"origin":{"name":"광주역","lat":35.165,"lon":126.909},
+                  "destination":{"name":"국립아시아문화전당","lat":35.146,"lon":126.92},
+                  "stops":[{"name":"다이소 광주역점","lat":35.163,"lon":126.91}]}},
+                "heard":{"text":"광주역에서 다이소 갔다가 문화전당 갈래","alternative":true,"origin":"광주역",
+                  "stops":["다이소 광주역점"],"destination":"국립아시아문화전당"}}""",
+        )
+        val heard = parseServerAssistantReply(json)!!.action.heard!!
+        assertTrue(heard.alternative)
+        assertEquals("출발 광주역 → 들를 곳 다이소 광주역점 → 도착 국립아시아문화전당", heard.summary())
+        // No route: just the words. Here: no start.
+        assertEquals("글씨 크게 해 줘", Heard("글씨 크게 해 줘", false, null, emptyList(), null).summary())
+        assertEquals("도착 집", Heard("집 가자", false, null, emptyList(), "집").summary())
+        assertNull(parseServerAssistantReply(JSONObject("""{"say":"안녕하세요"}"""))!!.action.heard)
+    }
+
+    @Test
     fun urgentWordsNeverGoToTheServer() = runBlocking {
         // Not configured for a real server in tests: if it were asked, the call would fail and fall back,
         // so check the rule answer comes straight back as Emergency.

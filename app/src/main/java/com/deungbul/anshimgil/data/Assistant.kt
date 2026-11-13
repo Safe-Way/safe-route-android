@@ -38,6 +38,9 @@ private fun nearbyKindIn(s: String): Pair<String, String>? =
 sealed interface AssistantAction {
     val say: String
 
+    /** What the server assistant understood (채림 #243 heard), shown as "이렇게 알아들었어요"; null when not given. */
+    val heard: Heard? get() = null
+
     /** Change settings; null fields stay as they are. */
     data class ChangeSettings(
         override val say: String,
@@ -80,6 +83,7 @@ sealed interface AssistantAction {
         val transit: Boolean = false,
         val stops: List<StopPlace> = emptyList(),
         val start: Place? = null,
+        override val heard: Heard? = null,
     ) : AssistantAction
 
     /** A trip with its own start or places on the way ("문화전당역에서 서석동 거쳐 …으로 갈래"), read on the phone. */
@@ -89,13 +93,39 @@ sealed interface AssistantAction {
     data class OpenReport(override val say: String, val type: ReportType? = null, val memo: String = "") : AssistantAction
 
     /** Ask back, with ready answers. [onPhone]: the phone's own question, whose answer it handles too. */
-    data class Ask(override val say: String, val choices: List<String>, val onPhone: Boolean = false) : AssistantAction
+    data class Ask(override val say: String, val choices: List<String>, val onPhone: Boolean = false, override val heard: Heard? = null) : AssistantAction
 
     /** Something urgent (a fall, pain, danger): ask first whether to call 112 or tell a guardian. */
     data class Emergency(override val say: String) : AssistantAction
 
     /** Just an answer, nothing to do. [onPhone]: the phone's own, not to be asked of the server. */
-    data class Answer(override val say: String, val onPhone: Boolean = false) : AssistantAction
+    data class Answer(override val say: String, val onPhone: Boolean = false, override val heard: Heard? = null) : AssistantAction
+}
+
+/**
+ * What AI 비서 on the server understood (채림 #243, `heard`): the words after taking out "어.. 잠시만" and fixing
+ * mishearings; [alternative] when it used another of the recognizer's guesses than the first; the start (null: here),
+ * the stops and the destination named in it (null when no route was found).
+ */
+data class Heard(val text: String, val alternative: Boolean, val origin: String?, val stops: List<String>, val destination: String?)
+
+/** "출발 광주역 → 들를 곳 다이소, 약국 → 도착 문화전당", or the words when no route was found. */
+fun Heard.summary(): String {
+    val dest = destination ?: return text
+    return listOfNotNull(
+        origin?.let { "출발 $it" },
+        stops.takeIf { it.isNotEmpty() }?.let { "들를 곳 ${it.joinToString(", ")}" },
+        "도착 $dest",
+    ).joinToString(" → ")
+}
+
+/** `heard` in the server assistant's answer; null without its words. */
+internal fun parseHeard(json: JSONObject): Heard? {
+    val h = json.optJSONObject("heard") ?: return null
+    fun JSONObject.text(key: String): String? = optString(key).takeIf { !isNull(key) && it.isNotBlank() }
+    val text = h.text("text") ?: return null
+    val stops = h.optJSONArray("stops")?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).takeIf { s -> s.isNotBlank() } } }.orEmpty()
+    return Heard(text, h.optBoolean("alternative"), h.text("origin"), stops, h.text("destination"))
 }
 
 /** What the assistant knows about the app right now, so "글씨 더 크게" builds on the current setting. */
@@ -543,14 +573,15 @@ internal fun parseServerAssistantReply(json: JSONObject): ServerAssistantReply? 
     val because = json.optJSONArray("because")?.let { a -> (0 until a.length()).map { a.optString(it).trim() } }.orEmpty()
         .filter { it.isNotEmpty() && !say.contains(it) }
     if (place != null && ask == null && choices.isEmpty() && because.isNotEmpty()) say = say + "\n" + because.joinToString("\n") { "· $it" }
+    val heard = parseHeard(json)
     val action = when {
         // A question waits for the walker, even when a place came with it.
-        ask != null || choices.isNotEmpty() -> AssistantAction.Ask(say, choices.map { it.second })
+        ask != null || choices.isNotEmpty() -> AssistantAction.Ask(say, choices.map { it.second }, heard = heard)
         place != null -> AssistantAction.GoPlace(
             say, place, transit = json.optJSONObject("pick")?.optString("type") == "transit",
-            stops = assistantStops(json), start = assistantOrigin(json),
+            stops = assistantStops(json), start = assistantOrigin(json), heard = heard,
         )
-        else -> AssistantAction.Answer(say)
+        else -> AssistantAction.Answer(say, heard = heard)
     }
     val setup = "get_my_info" in tools && place == null && choices.any { it.first in SETUP_CHOICES }
     return ServerAssistantReply(action, json.text("conversationId"), choices, tools, setup)
