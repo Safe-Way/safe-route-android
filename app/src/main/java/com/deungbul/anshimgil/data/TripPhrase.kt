@@ -130,6 +130,7 @@ suspend fun pickTripPlace(query: String, nearAll: List<Place>, anywhereAll: susp
     near.firstOrNull { name(it) == q }?.let { return it }
     near.firstOrNull { name(it).endsWith(q) }?.let { return it }
     near.filter { it.name.trim().substringBefore(' ') == query.trim() }.takeIf { it.isNotEmpty() }?.let { return pickLandmark(it) }
-    anywhereAll().notParts().firstOrNull()?.let { return it }
+    // Only in Gwangju: the search without a point is nationwide ("광천터미널" gave 광천버스터미널 in 충남, 11/13).
+    anywhereAll().filter { isInGwangju(LatLon(it.lat, it.lon)) }.notParts().firstOrNull()?.let { return it }
     return pickLandmark(near.filter { name(it).contains(q) }) ?: pickLandmark(near)
 }

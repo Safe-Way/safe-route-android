@@ -78,6 +78,10 @@ class TripPhraseTest {
             "전남광주통합특별시청 광주청사",
             pickTripPlace("광주광역시청", hallNear.take(2)) { listOf(p("전남광주통합특별시청 광주청사"), p("광주광역시청새마을금고 본점")) }?.name,
         )
+        // 광주 밖은 아님 (11/13 시연: 광천터미널 → 충남 광천버스터미널)
+        val far = Place("x", "광천버스터미널", "", 36.50, 126.62, null)
+        val gwangju = Place("y", "유스퀘어(광주종합버스터미널)", "", 35.1604, 126.8790, null)
+        assertEquals("유스퀘어(광주종합버스터미널)", pickTripPlace("광천터미널", emptyList()) { listOf(far, gwangju) }?.name)
         // 근처에 지점이 하나라도 있으면 먼 곳 대신 그 지점
         assertEquals("스타벅스 충장로점", pickTripPlace("스타벅스", listOf(p("스타벅스 충장로점"))) { listOf(p("스타벅스 첨단점")) }?.name)
         // 지점이 많은 곳은 가까운 지점 (멀리 있는 지점으로 가지 않음)
