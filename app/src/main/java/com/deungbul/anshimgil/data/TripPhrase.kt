@@ -120,7 +120,11 @@ internal fun withObject(word: String): String {
  * 3) [anywhere] (the search without a point): the first named so, ending or beginning with it (조선대학교)
  * 4) near: the landmark among those holding it, else the nearest
  */
-suspend fun pickTripPlace(query: String, near: List<Place>, anywhere: suspend () -> List<Place>): Place? {
+suspend fun pickTripPlace(query: String, nearAll: List<Place>, anywhereAll: suspend () -> List<Place>): Place? {
+    // The place itself over its car park or toilet ("양동시장역" gave 양동시장역환승주차장, 11/13), unless only those.
+    fun List<Place>.notParts() = filter { p -> PARTS.none { it in p.name } }.ifEmpty { this }
+    val near = nearAll.notParts()
+    val anywhere = suspend { anywhereAll().notParts() }
     val q = query.replace(" ", "")
     fun name(p: Place) = p.name.replace(" ", "")
     near.firstOrNull { name(it) == q }?.let { return it }

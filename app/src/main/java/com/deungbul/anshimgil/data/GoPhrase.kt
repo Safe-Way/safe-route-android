@@ -74,7 +74,7 @@ fun pickLandmark(results: List<Place>): Place? {
 }
 
 /** Entries of a landmark that are its car parks or toilets, not the place to walk to. */
-private val PARTS = listOf("주차장", "주차", "화장실")
+internal val PARTS = listOf("주차장", "주차", "화장실")
 
 /**
  * Words for stopping somewhere on the way: 들르다 and how speech recognition often hears it (11/9 on the phone,
