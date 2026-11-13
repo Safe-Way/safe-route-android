@@ -39,6 +39,8 @@
             android:theme="@style/Theme.Seipjido"
             android:windowSoftInputMode="adjustResize"
             android:screenOrientation="portrait"
+            android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|uiMode|density|fontScale">
             <!-- Walking guidance is laid out for portrait. Compose redraws on the other changes itself;
                  recreating the activity would drop the current screen (route, guidance) and the map. -->

@@ -273,6 +273,10 @@ fun GuideScreen(
     onArrivedChange: (Boolean) -> Unit = {},
     /** AI 비서's live words here and the walker's answers, for the chat (fromUser, text). */
     onLive: (Boolean, String) -> Unit = { _, _ -> },
+    /** In the small window (PIP) over another app: only the map and the next turn (voice goes on as usual). */
+    compact: Boolean = false,
+    /** Taken up again after Android closed the app during it (이어서 안내): says so once. */
+    resumed: Boolean = false,
 ) {
     var sos by remember { mutableStateOf(false) }
     var showHelpList by remember { mutableStateOf(false) }
@@ -575,7 +579,7 @@ fun GuideScreen(
         }
     }
     // AI 비서's short word about what just happened (a new route found), shown under the status line for a while.
-    var aiNotice by remember { mutableStateOf<String?>(null) }
+    var aiNotice by remember { mutableStateOf<String?>(if (resumed) RESUMED_TEXT else null) }
 
     // 신고 쌓인 곳 along the route (11/10): drawn on the map, and told once each when coming up ahead.
     var reportSpotsOnRoute by remember { mutableStateOf<List<ReportSpot>>(emptyList()) }
@@ -753,6 +757,15 @@ fun GuideScreen(
     val keepArrival = arrivalShown?.let { steadyArrival(it, arrivalNow) }
     if (keepArrival != arrivalShown) SideEffect { arrivalShown = keepArrival }
     val shownArrival = (keepArrival ?: arrivalNow).format(java.time.format.DateTimeFormatter.ofPattern("a h:mm", java.util.Locale.KOREAN))
+
+    // The small window (PIP, 11/13): the map with the next turn on top, nothing to tap.
+    if (compact) {
+        Box(modifier.fillMaxSize()) {
+            KakaoMapView(modifier = Modifier.fillMaxSize().onSizeChanged { mapHeightPx = it.height }, onMapReady = { map = it })
+            CompactInstruction(state, instruction, Modifier.align(Alignment.TopCenter).onGloballyPositioned { overlayBottomPx = it.boundsInParent().bottom.toInt() })
+        }
+        return
+    }
 
     Box(modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
@@ -1030,6 +1043,32 @@ private fun sideText(side: Turn) = when (side) {
     Turn.RIGHT -> "오른쪽"
     else -> "앞"
 }
+
+@Composable
+private fun CompactInstruction(state: GuidanceState, instruction: Instruction, modifier: Modifier = Modifier) {
+    Surface(color = Ink, contentColor = Color.White, modifier = modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+        ) {
+            val icon = when {
+                state.arrived || state.nextTurn == Turn.ARRIVE -> Icons.Filled.Flag
+                state.nextTurn == Turn.LEFT -> Icons.Filled.TurnLeft
+                state.nextTurn == Turn.RIGHT -> Icons.Filled.TurnRight
+                else -> Icons.Filled.Straight
+            }
+            Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+            Column {
+                Text(instruction.big, fontSize = 15.sp, fontWeight = FontWeight.Black, maxLines = 1)
+                Text(instruction.action, fontSize = 12.sp, lineHeight = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+/** Said once when the guidance was taken up again after the app was closed. */
+internal const val RESUMED_TEXT = "앱이 닫혀서 같은 길로 이어서 안내해요."
 
 @Composable
 private fun InstructionCard(state: GuidanceState, instruction: Instruction) {
