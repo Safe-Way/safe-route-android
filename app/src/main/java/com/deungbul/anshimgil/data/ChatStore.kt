@@ -48,3 +48,16 @@ fun asksToClearChat(said: String): Boolean {
     if (s.startsWith("처음부터다시")) return true
     return CHAT_WORDS.any { it in s } && CLEAR_WORDS.any { it in s }
 }
+
+/** Asked before clearing by voice, as the [대화 지우기] button does (11/13: "대화 삭제" cleared at once). */
+const val CLEAR_QUESTION = "대화를 모두 지울까요? 지우면 되돌릴 수 없어요."
+const val CLEAR_YES = "지우기"
+const val CLEAR_NO = "취소"
+
+/** The answer to [CLEAR_QUESTION]: true to clear, false not to, null for something else. */
+fun clearAnswer(said: String): Boolean? {
+    val s = said.replace(" ", "")
+    if (s == CLEAR_NO || listOf("취소", "아니", "안지", "괜찮", "말고", "그만", "싫어", "놔둬", "두세요", "둬").any { it in s }) return false
+    if (s == CLEAR_YES || (s.length <= 12 && listOf("지우", "지워", "삭제", "네", "응", "예", "그래", "좋아").any { it in s })) return true
+    return null
+}
