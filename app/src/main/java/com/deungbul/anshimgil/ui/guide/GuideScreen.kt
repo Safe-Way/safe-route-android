@@ -1056,7 +1056,8 @@ private fun InstructionCard(state: GuidanceState, instruction: Instruction) {
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(instruction.big, fontSize = 24.sp, fontWeight = FontWeight.Black, maxLines = 1)
-                Text(instruction.action, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // Two lines, so "상무역 4번 출구 엘리베이터에 도착했어요" is not cut (11/13).
+                Text(instruction.action, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 23.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }
