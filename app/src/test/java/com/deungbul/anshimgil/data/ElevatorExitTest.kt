@@ -51,4 +51,23 @@ class ElevatorExitTest {
         assertEquals("목적지에 도착했어요", arrivalText("광주사직공원").first)
         assertEquals(null, elevatorExitName("광주사직공원"))
     }
+
+    @Test
+    fun anUndergroundMallByTheNearestElevatorExitAroundIt() {
+        // 11/13: 금남지하상가는 문화전당역과 금남로4가역 출구로 드나든다.
+        val mall = Place("3", "금남지하상가", "", 35.1475, 126.9180, null)
+        val exits = listOf(
+            Facility(FacilityKind.SUBWAY_ENTRANCE, 35.1468, 126.9195, name = "문화전당역 3번 출구", elevator = true),
+            Facility(FacilityKind.SUBWAY_ENTRANCE, 35.1490, 126.9160, name = "금남로4가역 1번 출구", elevator = true),
+            Facility(FacilityKind.SUBWAY_ENTRANCE, 35.1480, 126.9170, name = "금남로4가역 3번 출구", elevator = false),
+        )
+        val fromSouth = LatLon(35.1420, 126.9230)
+        assertEquals("문화전당역 3번 출구", elevatorExitFor(mall, fromSouth, exits)!!.name)
+        val fromNorth = LatLon(35.1540, 126.9120)
+        assertEquals("금남로4가역 1번 출구", elevatorExitFor(mall, fromNorth, exits)!!.name)
+        assertTrue(arrivesByElevatorExit("금남지하상가"))
+        assertTrue(arrivesByElevatorExit("충장로 지하상가"))
+        assertTrue(!arrivesByElevatorExit("금남지하상가 다이소"))
+        assertTrue(!arrivesByElevatorExit("광주극장"))
+    }
 }
