@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.map
 
+import com.deungbul.anshimgil.data.elevatorExitName
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -183,7 +184,9 @@ fun KakaoMap.showRoutes(
                     LabelStyles.from(
                         // On a stem like the report tags: on arrival the walker's arrow stands on the destination and
                         // covered its name (11/10 phone video).
-                        LabelStyle.from(stemmed(pillBitmap(destinationName.take(12), 0xFFB42318.toInt(), density), 0xFFB42318.toInt(), density))
+                        // An elevator exit shows its name with the elevator sign ("돌고개역 2번 출구 ▣", 11/13: the
+                        // name was cut at "…2번 출구 엘").
+                        LabelStyle.from(stemmed(destinationPill(destinationName, density), 0xFFB42318.toInt(), density))
                             .setAnchorPoint(0.5f, 1f)
                             .setApplyDpScale(false),
                     ),
@@ -641,6 +644,17 @@ internal fun drawPicture(canvas: Canvas, kind: FacilityKind, color: Int) {
     }
 }
 
+/** The destination's tag: an elevator exit's name with the elevator sign, else the name (cut with … when long). */
+internal fun destinationPill(destinationName: String, density: Float): Bitmap {
+    val exit = elevatorExitName(destinationName)
+    return pillBitmap(pinText(exit ?: destinationName), 0xFFB42318.toInt(), density, elevator = exit != null)
+}
+
+/** At most [PIN_CHARS] characters, the last one … when cut. */
+internal fun pinText(name: String): String = if (name.length <= PIN_CHARS) name else name.take(PIN_CHARS - 1) + "…"
+
+private const val PIN_CHARS = 14
+
 /**
  * A white rounded tag with a colored border and bold text, like the design mockup.
  * With [elevator], a small elevator sign follows the text (a station or exit with an elevator).
@@ -743,7 +757,7 @@ fun KakaoMap.showTransit(context: Context, route: TransitRoute, destinationName:
     )
     labelManager?.layer?.addLabel(
         LabelOptions.from(end.toLatLng())
-            .setStyles(LabelStyles.from(LabelStyle.from(pillBitmap(destinationName.take(12), 0xFFB42318.toInt(), density)).setAnchorPoint(0.5f, 1f).setApplyDpScale(false))),
+            .setStyles(LabelStyles.from(LabelStyle.from(destinationPill(destinationName, density)).setAnchorPoint(0.5f, 1f).setApplyDpScale(false))),
     )
     if (all.isNotEmpty()) moveCamera(CameraUpdateFactory.fitMapPoints(all.map { it.toLatLng() }.toTypedArray(), (48 * density).toInt()))
 }

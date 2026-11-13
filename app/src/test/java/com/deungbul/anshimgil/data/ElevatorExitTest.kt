@@ -2,6 +2,7 @@ package com.deungbul.anshimgil.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ElevatorExitTest {
@@ -38,5 +39,16 @@ class ElevatorExitTest {
         assertNull(elevatorExitFor(Place("2", "스타벅스", "", 35.1385, 126.92, null), from, listOf(exit(4, 35.139, elevator = true))))
         // Too far from the station to be its exit.
         assertNull(elevatorExitFor(station, from, listOf(exit(4, 35.1440, elevator = true))))
+    }
+
+    @Test
+    fun arrivingAtAnElevatorExitSaysSo() {
+        // 11/13 폰 시연: 돌고개역 2번 출구에 도착했는데 "목적지에 도착했어요"뿐이었다.
+        val label = ElevatorExit("돌고개역 2번 출구", LatLon(35.1516, 126.8955)).label
+        assertEquals("돌고개역 2번 출구", elevatorExitName(label))
+        assertEquals("돌고개역 2번 출구 엘리베이터에 도착했어요", arrivalText(label).first)
+        assertTrue(arrivalText(label).second.contains("엘리베이터를 타고"))
+        assertEquals("목적지에 도착했어요", arrivalText("광주사직공원").first)
+        assertEquals(null, elevatorExitName("광주사직공원"))
     }
 }

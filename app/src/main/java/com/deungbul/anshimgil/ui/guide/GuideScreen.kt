@@ -1,5 +1,6 @@
 package com.deungbul.anshimgil.ui.guide
 
+import com.deungbul.anshimgil.data.arrivalText
 import com.deungbul.anshimgil.data.DEMO_SLOW_WINDOW_MS
 import com.deungbul.anshimgil.data.demoStepM
 import com.deungbul.anshimgil.map.WALK_TILT_DEGREES
@@ -396,7 +397,7 @@ fun GuideScreen(
     LaunchedEffect(state.arrived, resting) { onArrivedChange(state.arrived && resting == null) }
 
     val tts = rememberTts(context)
-    val instruction = instructionText(state)
+    val instruction = instructionText(state, destinationName)
     val spokenKey = "${state.nextTurn}-${distanceBucket(state.metersToNextTurn)}-${state.arrived}"
     LaunchedEffect(spokenKey, voiceOn) {
         // At the rest place the rest card speaks instead of "목적지에 도착했어요".
@@ -1004,10 +1005,10 @@ private data class Instruction(val big: String, val action: String, val spoken: 
 /** Closer than this to the turn, say "지금" instead of "0m 앞". */
 private const val TURN_NOW_M = 5
 
-private fun instructionText(state: GuidanceState): Instruction {
+private fun instructionText(state: GuidanceState, destinationName: String): Instruction {
     val m = state.metersToNextTurn
     return when {
-        state.arrived -> Instruction("도착", "목적지에 도착했어요", "목적지에 도착했어요. 안내를 마칩니다.")
+        state.arrived -> arrivalText(destinationName).let { (shown, spoken) -> Instruction("도착", shown, spoken) }
         m < TURN_NOW_M && state.nextTurn == Turn.LEFT -> Instruction("지금", "왼쪽으로 가세요", "지금 왼쪽으로 가세요")
         m < TURN_NOW_M && state.nextTurn == Turn.RIGHT -> Instruction("지금", "오른쪽으로 가세요", "지금 오른쪽으로 가세요")
         state.nextTurn == Turn.LEFT -> Instruction("${m}m 앞", "왼쪽으로 가세요", "${m}미터 앞에서 왼쪽으로 가세요")
@@ -1055,7 +1056,8 @@ private fun InstructionCard(state: GuidanceState, instruction: Instruction) {
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(instruction.big, fontSize = 24.sp, fontWeight = FontWeight.Black, maxLines = 1)
-                Text(instruction.action, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // Two lines, so "상무역 4번 출구 엘리베이터에 도착했어요" is not cut (11/13).
+                Text(instruction.action, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 23.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }
