@@ -37,4 +37,15 @@ class PlaceSearchTest {
         val anywhere = listOf(p("2", "전남광주통합특별시청 광주청사", 35.1601, 126.8514), p("1", "광주광역시청새마을금고 본점", 35.1600, 126.8520))
         assertEquals("전남광주통합특별시청 광주청사", mergedSearch("광주광역시청", near, anywhere, here).first().name)
     }
+
+    @Test fun busLinesStayOnceAndInTheServerOrder() = runBlocking {
+        // 채림 #258: "버스 03"은 위치가 있든 없든 같은 노선 목록을 준다. 두 번 보이지 않고 서버 순서 그대로.
+        val lines = listOf(
+            p("line:1", "03번 버스", 35.2000, 126.8500),
+            p("line:2", "03-1번 버스", 35.1600, 126.8800),
+        ).map { it.copy(address = "첨단 ↔ 조선대 · 첫차 05:30 · 막차 22:30") }
+        val r = mergedSearch("버스 03", lines, lines, here)
+        assertEquals(listOf("03번 버스", "03-1번 버스"), r.map { it.name })
+        assertTrue(r.all { isBusResult(it) })
+    }
 }
