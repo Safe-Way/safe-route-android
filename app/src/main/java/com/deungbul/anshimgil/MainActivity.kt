@@ -1,5 +1,9 @@
 package com.deungbul.anshimgil
 
+import com.deungbul.anshimgil.data.RouteRequest
+import androidx.compose.runtime.DisposableEffect
+import com.deungbul.anshimgil.data.SavedGuide
+import com.deungbul.anshimgil.data.GuideStore
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -112,6 +116,35 @@ class MainActivity : ComponentActivity() {
         intent.removeExtra(EXTRA_GO_NAME)
     }
 
+    /** In the small window (PIP) now. */
+    private val inPip = androidx.compose.runtime.mutableStateOf(false)
+    /** Walking guidance is on screen: leaving the app shrinks it to the small window instead of hiding it (11/13). */
+    private var guidingNow = false
+
+    private fun canPip() = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)
+
+    private fun pipParams(): android.app.PictureInPictureParams =
+        android.app.PictureInPictureParams.Builder()
+            .setAspectRatio(android.util.Rational(3, 4))
+            .apply { if (android.os.Build.VERSION.SDK_INT >= 31) setAutoEnterEnabled(guidingNow) }
+            .build()
+
+    private fun setGuiding(on: Boolean) {
+        guidingNow = on
+        if (canPip()) runCatching { setPictureInPictureParams(pipParams()) }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // Android 12+ shrinks by itself (setAutoEnterEnabled); before that, on the home button here.
+        if (guidingNow && canPip() && android.os.Build.VERSION.SDK_INT < 31) runCatching { enterPictureInPictureMode(pipParams()) }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        inPip.value = isInPictureInPictureMode
+    }
+
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         readReminder(intent)
@@ -182,6 +215,8 @@ class MainActivity : ComponentActivity() {
                             usageRepository = usageRepository,
                             reminded = reminded.value,
                             onRemindedHandled = { reminded.value = null },
+                            inPip = inPip.value,
+                            onGuiding = ::setGuiding,
                         )
                     }
                 }
@@ -244,7 +279,8 @@ private sealed interface Screen {
         /** 들를 곳 on the way, in order (AI 비서 planned them). */
         val stops: List<com.deungbul.anshimgil.data.StopPlace> = emptyList(),
     ) : Screen
-    data class Guide(val route: Route, val result: RouteResult, val type: RouteType, val arriveAt: String? = null) : Screen
+    /** [resumed]: taken up again after Android closed the app during it (이어서 안내). */
+    data class Guide(val route: Route, val result: RouteResult, val type: RouteType, val arriveAt: String? = null, val resumed: Boolean = false) : Screen
     data class TransitGuide(val route: Route, val transit: TransitRoute) : Screen
 }
 
@@ -266,6 +302,10 @@ fun AppRoot(
     /** From the 출발 시간 알림 or a booked guidance: open the route there (place, by transit, start at once). */
     reminded: Triple<Place, Boolean, Boolean>? = null,
     onRemindedHandled: () -> Unit = {},
+    /** In the small window (PIP) over other apps: walking guidance shows only the map and the next turn. */
+    inPip: Boolean = false,
+    /** Walking guidance is open (true) or closed: the home button then shrinks it to the small window. */
+    onGuiding: (Boolean) -> Unit = {},
 ) {
     val savedFlow = remember(modeRepository) { modeRepository.mode.map { SavedMode.Ready(it) } }
     val saved by savedFlow.collectAsStateWithLifecycle(initialValue = SavedMode.Loading)
@@ -435,6 +475,16 @@ fun AppRoot(
                 if (com.deungbul.anshimgil.data.ServerApi.isConfigured) runCatching { myInfoRepository.syncMode(usual) }
                 // Walking or transit first: the server learns it from the trip records (PreferenceLearner).
                 if (com.deungbul.anshimgil.data.ServerApi.isConfigured) runCatching { serverPreferTransit = myInfoRepository.load().preferTransit }
+            }
+            // 이어서 안내 (11/13): guidance left when Android closed the app goes on with the same route.
+            LaunchedEffect(mode) {
+                val m = mode ?: return@LaunchedEffect
+                if (screen != Screen.Home) return@LaunchedEffect
+                val g = GuideStore.load(appContext) ?: return@LaunchedEffect
+                val result = runCatching { routeRepository.findRoutes(RouteRequest(g.from, g.to, m, stops = g.stops)) }.getOrNull()
+                if (result == null || result.routes.isEmpty() || screen != Screen.Home) return@LaunchedEffect
+                val type = if (result.route(g.type) != null) g.type else result.routes.first().type
+                screen = Screen.Guide(Screen.Route(g.destination, start = g.start, fromHome = true, stops = g.stops), result, type, g.arriveAt, resumed = true)
             }
             // 몸 상태가 잠깐 바뀜: past the end day the usual way of walking is back; on the end day, ask (team server rule).
             LaunchedEffect(Unit) {
@@ -751,8 +801,18 @@ fun AppRoot(
                 }
                 screen is Screen.Guide -> {
                     val guide = screen as Screen.Guide
-                    BackHandler { screen = guide.route }
-                    LaunchedEffect(guide) { guideArrived = false; startTrip(guide.route.destination, transit = false, result = guide.result, type = guide.type, mode = mode) }
+                    BackHandler { GuideStore.clear(appContext); screen = guide.route }
+                    LaunchedEffect(guide) {
+                        guideArrived = false
+                        if (!guide.resumed) startTrip(guide.route.destination, transit = false, result = guide.result, type = guide.type, mode = mode)
+                        // Kept until the guidance ends, so it goes on if Android closes the app meanwhile.
+                        val path = (guide.result.route(guide.type) ?: guide.result.routes.first()).path
+                        if (path.isNotEmpty()) GuideStore.save(
+                            appContext,
+                            SavedGuide(guide.route.destination, guide.route.start, guide.route.stops, guide.type, guide.arriveAt, path.first(), path.last(), System.currentTimeMillis()),
+                        )
+                    }
+                    DisposableEffect(Unit) { onGuiding(true); onDispose { onGuiding(false) } }
                     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                     GuideScreen(
                         onArrivedChange = { guideArrived = it },
@@ -771,14 +831,17 @@ fun AppRoot(
                         showSos = settings.sosButton,
                         routeRepository = routeRepository,
                         walkSpeedRepository = walkSpeedRepository,
-                        onFinish = { finishTrip(arrived = guideArrived); screen = Screen.Home },
+                        onFinish = { GuideStore.clear(appContext); finishTrip(arrived = guideArrived); screen = Screen.Home },
                         modifier = modifier,
+                        compact = inPip,
+                        resumed = guide.resumed,
                     )
-                    if (assistantOverGuide) {
+                    // The small window (PIP) shows the guidance alone.
+                    if (assistantOverGuide && !inPip) {
                         BackHandler { assistantOverGuide = false }
                         assistantPanel(mode) { assistantOverGuide = false }
                     }
-                    reportPanel(mode)
+                    if (!inPip) reportPanel(mode)
                     }
                 }
                 else -> HomeScreen(
