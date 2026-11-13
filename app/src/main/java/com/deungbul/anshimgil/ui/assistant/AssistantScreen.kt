@@ -1,5 +1,7 @@
 package com.deungbul.anshimgil.ui.assistant
 
+import com.deungbul.anshimgil.data.summary
+import com.deungbul.anshimgil.data.Heard
 import com.deungbul.anshimgil.data.asksToClearChat
 import androidx.compose.material3.AlertDialog
 import com.deungbul.anshimgil.data.LatLon
@@ -180,6 +182,8 @@ fun AssistantScreen(
     var input by remember { mutableStateOf("") }
     // What the microphone heard last, shown with 다시 말하기 / 글자 고치기 (사용성 점검표 6번).
     var heard by remember { mutableStateOf<String?>(null) }
+    // What the server understood from it (채림 #243): "이렇게 알아들었어요".
+    var understood by remember { mutableStateOf<Heard?>(null) }
     val listState = rememberLazyListState()
 
     // Replies are read aloud when 음성 안내 is on (or in a voice chat).
@@ -324,6 +328,7 @@ fun AssistantScreen(
             return
         }
         heard = if (byVoice) said else null
+        understood = null
         heardGuesses = if (byVoice) guesses.map { it.trim() }.filter { it.isNotEmpty() && it != said }.distinct() else emptyList()
         pendingGo?.let { go ->
             when (goAnswer(said)) {
@@ -391,6 +396,7 @@ fun AssistantScreen(
         scope.launch {
             // The greeting is the app's own, so only what the user said and the replies go out.
             val action = assistant.reply(lines.drop(1), context.copy(alternatives = heardGuesses))
+            if (heard != null) understood = action.heard
             slow.cancel()
             say(action.say)
             when (action) {
@@ -611,9 +617,17 @@ fun AssistantScreen(
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp),
             ) {
+                understood?.let { u ->
+                    Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFEFF5F0), modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                            Text("이렇게 알아들었어요", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Muted)
+                            Text(u.summary(), fontSize = 16.sp, lineHeight = 22.sp, color = Ink)
+                        }
+                    }
+                }
                 Text("잘못 들었나요?", fontSize = 16.sp, color = Muted, modifier = Modifier.align(Alignment.CenterVertically))
-                OutlinedButton(onClick = { heard = null; listen() }, modifier = Modifier.heightIn(min = 48.dp)) { Text("다시 말하기", fontSize = 16.sp) }
-                OutlinedButton(onClick = { input = h; heard = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("글자 고치기", fontSize = 16.sp) }
+                OutlinedButton(onClick = { heard = null; understood = null; listen() }, modifier = Modifier.heightIn(min = 48.dp)) { Text("다시 말하기", fontSize = 16.sp) }
+                OutlinedButton(onClick = { input = understood?.text ?: h; heard = null; understood = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("글자 고치기", fontSize = 16.sp) }
             }
         }
         // While listening: a big strip that moves with the voice and shows the words as they are heard (11/10).
