@@ -289,7 +289,10 @@ fun AssistantScreen(
                 val place = try {
                     when (val q = ask.query) {
                         null -> chat.lastPlace
-                        else -> findSaved(q) ?: phoneOrigin(android).point.let { pickLandmark(placeRepository.search(q, it.lat, it.lon)) }
+                        // The place meant, near here or by name (11/13: "광주극장" gave a theater at 문화전당), as for a trip.
+                        else -> findSaved(q) ?: phoneOrigin(android).point.let { here ->
+                            pickTripPlace(q, placeRepository.search(q, here.lat, here.lon)) { placeRepository.search(q, null, null) }
+                        }
                     }
                 } catch (e: ApiException) {
                     thinking = null
@@ -437,7 +440,7 @@ fun AssistantScreen(
                     "1km 안에서 ${NEARBY_KINDS[action.kind]}을(를) 찾지 못했어요.",
                 )
                 is AssistantAction.GoTo -> findAndGo(
-                    { lat, lon -> pickLandmark(placeRepository.search(action.query, lat, lon)) },
+                    { lat, lon -> pickTripPlace(action.query, placeRepository.search(action.query, lat, lon)) { placeRepository.search(action.query, null, null) } },
                     "'${action.query}'을(를) 찾지 못했어요. 이름을 조금 다르게 말해 주세요.",
                 )
                 is AssistantAction.GoPlace -> { chat.lastPlace = action.place; offerGo { when {
