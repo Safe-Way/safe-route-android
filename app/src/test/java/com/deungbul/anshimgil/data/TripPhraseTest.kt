@@ -74,7 +74,12 @@ class TripPhraseTest {
         assertEquals("남광주시장 공영주차장", pickTripPlace("남광주시장 공영주차장", listOf(p("남광주시장 공영주차장"))) { emptyList() }?.name)
         // 이름이 그 말로 시작하는 다른 가게가 아니라 그곳 (11/13 시연: 광주광역시청 → 새마을금고)
         val hallNear = listOf(p("광주광역시청새마을금고 본점"), p("광주광역시청새마을금고 ATM"), p("광주광역시청 민원실"))
-        assertEquals("광주광역시청", pickTripPlace("광주광역시청", hallNear) { listOf(p("광주광역시청"), p("광주광역시청 민원실")) }?.name)
+        assertEquals(
+            "전남광주통합특별시청 광주청사",
+            pickTripPlace("광주광역시청", hallNear.take(2)) { listOf(p("전남광주통합특별시청 광주청사"), p("광주광역시청새마을금고 본점")) }?.name,
+        )
+        // 근처에 지점이 하나라도 있으면 먼 곳 대신 그 지점
+        assertEquals("스타벅스 충장로점", pickTripPlace("스타벅스", listOf(p("스타벅스 충장로점"))) { listOf(p("스타벅스 첨단점")) }?.name)
         // 지점이 많은 곳은 가까운 지점 (멀리 있는 지점으로 가지 않음)
         val chainNear = listOf(p("다이소 충장점"), p("다이소 금남로점"))
         assertEquals("다이소 충장점", pickTripPlace("다이소", chainNear) { listOf(p("다이소 첨단점")) }?.name)
