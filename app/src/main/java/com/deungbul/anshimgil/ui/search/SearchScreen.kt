@@ -1,5 +1,8 @@
 package com.deungbul.anshimgil.ui.search
 
+import com.deungbul.anshimgil.data.mergedSearch
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.async
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -120,8 +123,13 @@ fun SearchScreen(
         results = Results.Loading
         // Wait for the position so the distances are not from the wrong place.
         val from = here ?: return@LaunchedEffect
+        // Near here and by name over Gwangju, joined (11/13: from 조선대 "상무역" showed no 상무역).
         results = try {
-            Results.Done(placeRepository.search(text, from.lat, from.lon))
+            coroutineScope {
+                val near = async { placeRepository.search(text, from.lat, from.lon) }
+                val anywhere = async { runCatching { placeRepository.search(text, null, null) }.getOrDefault(emptyList()) }
+                Results.Done(mergedSearch(text, near.await(), anywhere.await(), from))
+            }
         } catch (e: ApiException) {
             Results.Failed(e.message)
         }
