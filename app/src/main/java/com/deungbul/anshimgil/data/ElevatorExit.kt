@@ -13,6 +13,18 @@ data class ElevatorExit(val name: String, val point: LatLon) {
     val label: String get() = "$name 엘리베이터"
 }
 
+/** What [ElevatorExit.label] ends with. */
+private const val ELEVATOR_SUFFIX = " 엘리베이터"
+
+/** The exit's name without " 엘리베이터" when [label] is an elevator exit's ("돌고개역 2번 출구"); null otherwise. */
+fun elevatorExitName(label: String): String? = label.takeIf { it.endsWith(ELEVATOR_SUFFIX) }?.removeSuffix(ELEVATOR_SUFFIX)
+
+/** On arrival: (shown, spoken). At an elevator exit it names the exit and the elevator (11/13, was "목적지에 도착했어요"). */
+fun arrivalText(destinationName: String): Pair<String, String> =
+    elevatorExitName(destinationName)?.let { exit ->
+        "$exit 엘리베이터에 도착했어요" to "$exit 엘리베이터에 도착했어요. 엘리베이터를 타고 역으로 내려가세요. 안내를 마칩니다."
+    } ?: ("목적지에 도착했어요" to "목적지에 도착했어요. 안내를 마칩니다.")
+
 /** Modes that are led to an elevator exit. */
 val ELEVATOR_EXIT_MODES: Set<UserMode> = setOf(UserMode.DISABLED, UserMode.SENIOR)
 
