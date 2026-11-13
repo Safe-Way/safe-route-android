@@ -129,7 +129,9 @@ internal fun poiKind(kind: String, sub: String?, wheelchair: Boolean?, shown: Se
         "toilet" -> if (wheelchair == true) listOf(FacilityKind.ACCESSIBLE_TOILET, FacilityKind.TOILET) else listOf(FacilityKind.TOILET)
         // Lowered curbs are shown; unknown ones as a gray dot (see [poiLook]); known high curbs are left out.
         "crosswalk" -> if (wheelchair != false) listOf(FacilityKind.CURB_RAMP) else emptyList()
-        "footbridge" -> if (wheelchair == true) listOf(FacilityKind.ELEVATOR) else listOf(FacilityKind.OVERPASS)
+        // An elevator footbridge is one whose sub says 승강기 (the team's rule, safe-route #244 map_layer); a ramp or a
+        // wheelchair flag alone is not an elevator (11/13: 9 shown as elevators, 3 had one).
+        "footbridge" -> if (sub?.contains("승강기") == true) listOf(FacilityKind.ELEVATOR) else listOf(FacilityKind.OVERPASS)
         "stairs" -> listOf(FacilityKind.STAIRS)
         "school_zone" -> listOf(FacilityKind.SCHOOL_ZONE)
         "subway" -> listOf(FacilityKind.SUBWAY)
