@@ -1,5 +1,8 @@
 package com.deungbul.anshimgil.ui.assistant
 
+import com.deungbul.anshimgil.data.MAX_FILLER_WAITS
+import com.deungbul.anshimgil.data.saysSomething
+import com.deungbul.anshimgil.data.waitsForMore
 import com.deungbul.anshimgil.data.CLEAR_NO
 import com.deungbul.anshimgil.data.CLEAR_YES
 import com.deungbul.anshimgil.data.CLEAR_QUESTION
@@ -490,9 +493,15 @@ fun AssistantScreen(
             say("이 휴대폰은 음성 입력을 쓸 수 없어요. 글로 써 주세요.")
         }
     }
-    fun listenInApp() {
+    // 뜸 말 (채림 11/13): what was heard before a pause on "어", "뭐더라"…, kept to join with what comes next.
+    var carried by remember { mutableStateOf("") }
+    var fillerWaits by remember { mutableIntStateOf(0) }
+    // The walker pressed [다 말했어요]: what is heard is sent as it is, without listening on.
+    var stopAsked by remember { mutableStateOf(false) }
+    fun listenInApp(goOn: Boolean = false) {
         val r = recognizer ?: return listenWithDialog()
         tts.stop(); speaking = 0
+        if (!goOn) { carried = ""; fillerWaits = 0; stopAsked = false }
         r.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) { listening = true; partial = ""; level = 0f }
             override fun onBeginningOfSpeech() {}
@@ -507,10 +516,29 @@ fun AssistantScreen(
                 listening = false; partial = ""
                 val guesses = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
                 val said = guesses.firstOrNull()
-                if (said.isNullOrBlank()) onError(SpeechRecognizer.ERROR_NO_MATCH) else { silences = 0; send(said, byVoice = true, guesses = guesses) }
+                if (said.isNullOrBlank()) { onError(SpeechRecognizer.ERROR_NO_MATCH); return }
+                silences = 0
+                val before = carried
+                val joined = listOf(before, said).filter { it.isNotBlank() }.joinToString(" ")
+                // Paused on a filler: listen on and join (not after [다 말했어요]).
+                if (!stopAsked && waitsForMore(said) && fillerWaits < MAX_FILLER_WAITS) {
+                    carried = joined
+                    fillerWaits++
+                    Handler(Looper.getMainLooper()).post { listenInApp(goOn = true) }
+                    return
+                }
+                carried = ""; fillerWaits = 0
+                if (!saysSomething(joined)) return
+                send(joined, byVoice = true, guesses = if (before.isBlank()) guesses else guesses.map { "$before $it" })
             }
             override fun onError(error: Int) {
                 listening = false; partial = ""
+                // Listening on after a filler and then nothing more: send what was said before, if it says anything.
+                if (carried.isNotBlank()) {
+                    val kept = carried
+                    carried = ""; fillerWaits = 0
+                    if (saysSomething(kept)) { silences = 0; send(kept, byVoice = true); return }
+                }
                 if (chatOn) {
                     silences++
                     if (silences >= 2) { chatOn = false; lines += ChatLine(false, "말씀이 없으셔서 듣기를 멈췄어요. 마이크를 누르면 다시 들어요.") }
@@ -534,7 +562,7 @@ fun AssistantScreen(
         if (granted) listenInApp() else listenWithDialog()
     }
     fun listen() {
-        if (listening) { recognizer?.stopListening(); return }
+        if (listening) { stopAsked = true; recognizer?.stopListening(); return }
         val ok = androidx.core.content.ContextCompat.checkSelfPermission(android, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         if (ok) listenInApp() else micPermission.launch(Manifest.permission.RECORD_AUDIO)
@@ -660,7 +688,8 @@ fun AssistantScreen(
             }
         }
         // While listening: a big strip that moves with the voice and shows the words as they are heard (11/10).
-        if (listening) ListeningStrip(level, partial, onStop = { recognizer?.stopListening() })
+        // What was heard before a pause on a filler stays shown with what is being heard now.
+        if (listening) ListeningStrip(level, listOf(carried, partial).filter { it.isNotBlank() }.joinToString(" "), onStop = { stopAsked = true; recognizer?.stopListening() })
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(12.dp)) {
             OutlinedTextField(
                 value = input,
@@ -760,7 +789,7 @@ const val UNDO_CHOICE = "되돌리기"
 private const val VOICE_CHAT_PAUSE_MS = 1_500L
 
 /** Silence this long ends what is said (the phone's default is about 1 s, too short mid-sentence). */
-private const val SILENCE_DONE_MS = 3_000L
+private const val SILENCE_DONE_MS = 5_000L
 
 /** Listen at least this long, so a slow start is not cut off. */
 private const val MIN_LISTEN_MS = 4_000L
