@@ -1,5 +1,9 @@
 package com.deungbul.anshimgil.ui.assistant
 
+import com.deungbul.anshimgil.data.CLEAR_NO
+import com.deungbul.anshimgil.data.CLEAR_YES
+import com.deungbul.anshimgil.data.CLEAR_QUESTION
+import com.deungbul.anshimgil.data.clearAnswer
 import com.deungbul.anshimgil.data.summary
 import com.deungbul.anshimgil.data.Heard
 import com.deungbul.anshimgil.data.asksToClearChat
@@ -308,6 +312,8 @@ fun AssistantScreen(
     }
 
     var confirmClear by remember { mutableStateOf(false) }
+    // Asked "대화를 모두 지울까요?" by voice or typing; waiting for the answer.
+    var pendingClear by remember { mutableStateOf(false) }
     fun clearChat() {
         chat.clear()
         pendingGo = null
@@ -322,9 +328,29 @@ fun AssistantScreen(
     fun send(text: String, byVoice: Boolean = false, guesses: List<String> = emptyList()) {
         val said = text.trim()
         if (said.isEmpty() || thinking != null) return
-        // "대화 지워 줘": start over, on the phone.
+        // The answer to "대화를 모두 지울까요?".
+        if (pendingClear) {
+            pendingClear = false
+            when (clearAnswer(said)) {
+                true -> { clearChat(); return }
+                false -> {
+                    lines += ChatLine(fromUser = true, text = said)
+                    input = ""
+                    choices = emptyList()
+                    say("알겠어요. 대화는 그대로 둘게요.")
+                    return
+                }
+                null -> Unit // something else was said: carry on with it
+            }
+        }
+        // "대화 지워 줘": asked first, like the [대화 지우기] button (11/13: it cleared at once).
         if (asksToClearChat(said)) {
-            clearChat()
+            lines += ChatLine(fromUser = true, text = said)
+            input = ""
+            pendingGo = null
+            pendingClear = true
+            say(CLEAR_QUESTION)
+            choices = listOf(CLEAR_YES, CLEAR_NO)
             return
         }
         heard = if (byVoice) said else null

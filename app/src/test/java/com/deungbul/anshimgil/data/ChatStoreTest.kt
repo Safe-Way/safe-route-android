@@ -23,4 +23,10 @@ class ChatStoreTest {
         listOf("대화 지워 줘", "채팅 기록 초기화해줘", "대화 내역 삭제", "처음부터 다시 하자").forEach { assertTrue(it, asksToClearChat(it)) }
         listOf("문화전당 가자", "기록 보여 줘", "지우개 파는 곳").forEach { assertFalse(it, asksToClearChat(it)) }
     }
+
+    @Test fun answeringTheClearQuestion() {
+        listOf("지우기", "네", "응 지워", "삭제해", "대화 지워 줘").forEach { assertEquals(it, true, clearAnswer(it)) }
+        listOf("취소", "아니", "안 지울래", "괜찮아", "그냥 둬").forEach { assertEquals(it, false, clearAnswer(it)) }
+        assertEquals(null, clearAnswer("문화전당 가자"))
+    }
 }
