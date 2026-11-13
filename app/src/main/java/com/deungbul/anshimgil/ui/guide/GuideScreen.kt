@@ -1,5 +1,7 @@
 package com.deungbul.anshimgil.ui.guide
 
+import com.deungbul.anshimgil.GuideSession
+import com.deungbul.anshimgil.GuideService
 import com.deungbul.anshimgil.data.arrivalText
 import com.deungbul.anshimgil.data.DEMO_SLOW_WINDOW_MS
 import com.deungbul.anshimgil.data.demoStepM
@@ -185,12 +187,12 @@ private val Muted = Color(0xFF4A564E)
 private val Green = Color(0xFF1F6B42)
 
 /** A real fix farther than this from the route switches to the demo walk (e.g. testing away from the route). */
-private const val FAR_FROM_ROUTE_M = 300
+internal const val FAR_FROM_ROUTE_M = 300
 // 11/8: 40 → 25. Replaying real routes with a made-up GPS, a wrong turn took 40–60 s to notice; at 25 m it takes
 // about 30 s, and a normal walk (6 m noise, jumps) was never taken for leaving the route.
-private const val OFF_ROUTE_WARN_M = 25
+internal const val OFF_ROUTE_WARN_M = 25
 /** Going back along the route less than this is treated as GPS noise. */
-private const val BACKTRACK_M = 25.0
+internal const val BACKTRACK_M = 25.0
 /** Off the route this long before finding a new route from where the walker is. */
 private const val REROUTE_AFTER_MS = 8_000L
 
@@ -399,6 +401,20 @@ fun GuideScreen(
     }
 
     LaunchedEffect(state.arrived, resting) { onArrivedChange(state.arrived && resting == null) }
+
+    // 화면이 꺼져도 길안내 (11/13): the service follows the same guidance with the screen off and shows the next turn.
+    LaunchedEffect(guidance, destinationName, voiceOn) {
+        GuideSession.guidance = guidance
+        GuideSession.destinationName = destinationName
+        GuideSession.voiceOn = voiceOn
+    }
+    DisposableEffect(hasPermission) {
+        if (hasPermission) GuideService.start(context)
+        onDispose {
+            GuideService.stop(context)
+            GuideSession.guidance = null
+        }
+    }
 
     val tts = rememberTts(context)
     val instruction = instructionText(state, destinationName)
@@ -1013,12 +1029,12 @@ fun GuideScreen(
     }
 }
 
-private data class Instruction(val big: String, val action: String, val spoken: String)
+internal data class Instruction(val big: String, val action: String, val spoken: String)
 
 /** Closer than this to the turn, say "지금" instead of "0m 앞". */
 private const val TURN_NOW_M = 5
 
-private fun instructionText(state: GuidanceState, destinationName: String): Instruction {
+internal fun instructionText(state: GuidanceState, destinationName: String): Instruction {
     val m = state.metersToNextTurn
     return when {
         state.arrived -> arrivalText(destinationName).let { (shown, spoken) -> Instruction("도착", shown, spoken) }
@@ -1032,7 +1048,7 @@ private fun instructionText(state: GuidanceState, destinationName: String): Inst
 }
 
 /** Speak again only when the turn changes or the walker gets noticeably closer. */
-private fun distanceBucket(meters: Int) = when {
+internal fun distanceBucket(meters: Int) = when {
     meters > 100 -> 2
     meters > 30 -> 1
     else -> 0
