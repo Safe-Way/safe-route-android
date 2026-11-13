@@ -114,18 +114,22 @@ internal fun withObject(word: String): String {
 
 /**
  * The place meant by [query] in a trip. The search near a point is by distance only ("조선대" gave 도야짬뽕
- * 광주조선대점, "광주극장" a theater at 문화전당, 11/12 phone tests); the search without a point is by name.
+ * 광주조선대점, "광주극장" a theater at 문화전당, 11/12 phone tests); the search without a point is by how well the
+ * name fits, and its first result was the place meant every time (조선대학교, 광주극장, and 전남광주통합특별시청 광주청사
+ * for 광주광역시청, a name no result holds, 11/13). Car parks and toilets only when nothing else is there.
  * 1) near: named exactly so, or ending with it ("광주충장로우체국" for 충장로우체국)
- * 2) near: two or more beginning with it (a chain or a landmark's parts: 다이소 …, 문화전당역 …), the landmark of them
- * 3) [anywhere] (the search without a point): the first named so, ending or beginning with it (조선대학교)
+ * 2) near: a branch or part whose first word is it (다이소 충장점, 양동시장역 광주1호선), the landmark of those
+ * 3) [anywhere] (the search without a point): its first result
  * 4) near: the landmark among those holding it, else the nearest
  */
-suspend fun pickTripPlace(query: String, near: List<Place>, anywhere: suspend () -> List<Place>): Place? {
+suspend fun pickTripPlace(query: String, nearAll: List<Place>, anywhereAll: suspend () -> List<Place>): Place? {
+    fun List<Place>.notParts() = filter { p -> PARTS.none { it in p.name } }.ifEmpty { this }
+    val near = nearAll.notParts()
     val q = query.replace(" ", "")
     fun name(p: Place) = p.name.replace(" ", "")
     near.firstOrNull { name(it) == q }?.let { return it }
     near.firstOrNull { name(it).endsWith(q) }?.let { return it }
-    near.filter { name(it).startsWith(q) }.takeIf { it.size >= 2 }?.let { return pickLandmark(it) }
-    anywhere().firstOrNull { name(it) == q || name(it).endsWith(q) || name(it).startsWith(q) }?.let { return it }
+    near.filter { it.name.trim().substringBefore(' ') == query.trim() }.takeIf { it.isNotEmpty() }?.let { return pickLandmark(it) }
+    anywhereAll().notParts().firstOrNull()?.let { return it }
     return pickLandmark(near.filter { name(it).contains(q) }) ?: pickLandmark(near)
 }
