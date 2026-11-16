@@ -124,6 +124,12 @@ data class RouteRequest(
     val conditionsOn: Set<String> = emptySet(),
     /** Places to stop at on the way (들를 곳), at most [MAX_WALK_STOPS] on a walk. */
     val stops: List<StopPlace> = emptyList(),
+    /**
+     * The place's name as found (카카오), sent as `destination.name`: for an underground mall or a station the server
+     * then ends the route at its best exit (an elevator exit in a wheelchair) and adds an `entrance` note (server #264).
+     * Null keeps the route to the point itself, as for a new route from where the walker is to the same end.
+     */
+    val destinationName: String? = null,
 )
 
 /** The server's `night` value: what the user chose, otherwise judged from sunset. */

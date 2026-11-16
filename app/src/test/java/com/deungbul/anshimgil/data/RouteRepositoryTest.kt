@@ -144,6 +144,17 @@ class RouteRepositoryTest {
         assertEquals(listOf(Condition("night", "밤", false)), parseRouteResult(json).conditions)
     }
 
+    /** 11/16 (server #264): the place's name goes with the destination so the server can pick the exit. */
+    @Test
+    fun toJson_sendsTheDestinationNameOnlyWhenKnown() {
+        val origin = LatLon(35.1468, 126.92)
+        val destination = LatLon(35.1512, 126.9132)
+        val named = RouteRequest(origin, destination, UserMode.DISABLED, destinationName = "금남지하상가").toJson().getJSONObject("destination")
+        assertEquals("금남지하상가", named.getString("name"))
+        assertEquals(35.1512, named.getDouble("lat"), 0.0)
+        assertFalse(RouteRequest(origin, destination, UserMode.DISABLED).toJson().getJSONObject("destination").has("name"))
+    }
+
     @Test
     fun toJson_sendsNightInsteadOfConditionsOff() {
         val origin = LatLon(35.14, 126.91)

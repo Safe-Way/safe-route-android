@@ -35,7 +35,7 @@ class ServerRouteRepository(private val guest: suspend () -> String? = { null })
         if (stops.isEmpty() || whole.routes.any { it.stops.isNotEmpty() }) return whole
         val points = listOf(request.origin) + stops.map { it.point } + request.destination
         val parts = points.zipWithNext().map { (a, b) ->
-            parseRouteResult(ServerApi.post("/api/route", request.copy(origin = a, destination = b, stops = emptyList()).toJson(guestId)), request.mode)
+            parseRouteResult(ServerApi.post("/api/route", request.copy(origin = a, destination = b, stops = emptyList(), destinationName = request.destinationName.takeIf { b == request.destination }).toJson(guestId)), request.mode)
         }
         return joinStretches(parts, stops)
     }
@@ -93,7 +93,7 @@ internal fun joinStretches(parts: List<RouteResult>, stops: List<StopPlace>): Ro
 
 internal fun RouteRequest.toJson(guestId: String? = null): JSONObject = JSONObject()
     .put("origin", JSONObject().put("lat", origin.lat).put("lon", origin.lon))
-    .put("destination", JSONObject().put("lat", destination.lat).put("lon", destination.lon))
+    .put("destination", JSONObject().put("lat", destination.lat).put("lon", destination.lon).apply { destinationName?.let { put("name", it) } })
     .put("mode", mode.key)
     .put("night", night)
     .apply { guestId?.let { put("guestId", it) } }
