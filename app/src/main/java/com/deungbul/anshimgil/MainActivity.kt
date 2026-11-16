@@ -716,7 +716,10 @@ fun AppRoot(
                             onPlaceSelected = { place ->
                                 screen = when {
                                     startFor != null -> startFor.copy(start = place)
-                                    stopFor != null -> stopFor.copy(stops = stopFor.stops + com.deungbul.anshimgil.data.StopPlace(place.name, LatLon(place.lat, place.lon)))
+                                    // The same place twice is refused by the server (400): keep the list and say so.
+                                    stopFor != null -> com.deungbul.anshimgil.data.withStop(stopFor.stops, com.deungbul.anshimgil.data.StopPlace(place.name, LatLon(place.lat, place.lon)))
+                                        ?.let { stopFor.copy(stops = it) }
+                                        ?: stopFor.also { android.widget.Toast.makeText(appContext, "${com.deungbul.anshimgil.data.eunNeun(place.name)} 이미 들를 곳에 있어요", android.widget.Toast.LENGTH_SHORT).show() }
                                     destFor != null -> destFor.copy(destination = place)
                                     else -> Screen.Route(place)
                                 }

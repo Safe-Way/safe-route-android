@@ -15,6 +15,7 @@ import com.deungbul.anshimgil.data.bboxAround
 import com.deungbul.anshimgil.data.elevatorExitFor
 import com.deungbul.anshimgil.data.serverExitLabel
 import com.deungbul.anshimgil.data.MAX_TRANSIT_STOPS
+import com.deungbul.anshimgil.data.transitStopsLeftOutText
 import com.deungbul.anshimgil.data.StopPlace
 import com.deungbul.anshimgil.data.firstWait
 import com.deungbul.anshimgil.data.FirstWait
@@ -496,7 +497,7 @@ fun RouteScreen(
                         .verticalScroll(rememberScrollState()),
                 ) {
                     if (transitTab) {
-                        TransitPanel(transit, transitSelected, onSelect = { transitSelected = it }, onWalk = { transitTab = false })
+                        TransitPanel(transit, transitSelected, onSelect = { transitSelected = it }, onWalk = { transitTab = false }, stopsLeftOut = transitStopsLeftOutText(stops.map { it.name }))
                     } else when (val s = state) {
                         RouteState.Loading -> Text(if (origin == null) "현재 위치를 찾는 중…" else "길을 찾는 중…", fontSize = 16.sp, color = Muted, modifier = Modifier.padding(vertical = 24.dp))
                         is RouteState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -868,7 +869,7 @@ private fun ModeTabs(transit: Boolean, onSelect: (Boolean) -> Unit) {
 
 /** Up to three transit routes; the chosen one shows its steps and is drawn on the map. */
 @Composable
-private fun TransitPanel(state: TransitState?, selected: Int, onSelect: (Int) -> Unit, onWalk: () -> Unit) {
+private fun TransitPanel(state: TransitState?, selected: Int, onSelect: (Int) -> Unit, onWalk: () -> Unit, stopsLeftOut: String? = null) {
     when (state) {
         null, TransitState.Loading -> Text("대중교통 길을 찾는 중…", fontSize = 16.sp, color = Muted, modifier = Modifier.padding(vertical = 24.dp))
         is TransitState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -882,6 +883,7 @@ private fun TransitPanel(state: TransitState?, selected: Int, onSelect: (Int) ->
             TextButton(onClick = onWalk) { Text("걸어서 가는 길 보기") }
         }
         is TransitState.Ready -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            stopsLeftOut?.let { Text(it, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D4ED8)) }
             state.result.note?.let { Text(it, fontSize = 14.sp, color = Muted) }
             state.result.routes.forEachIndexed { i, route ->
                 TransitCard(route, selected = i == selected, onClick = { onSelect(i) })

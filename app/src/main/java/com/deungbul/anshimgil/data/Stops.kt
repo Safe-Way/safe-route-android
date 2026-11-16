@@ -19,6 +19,30 @@ const val MAX_WALK_STOPS = 3
 /** At most this many on a transit trip: each costs the server one more ODsay call, 30 a day (채림, #121). */
 const val MAX_TRANSIT_STOPS = 1
 
+/**
+ * What the transit tab says when stops were left out (11/16, 원일): only the first [MAX_TRANSIT_STOPS] are asked for,
+ * e.g. "대중교통은 첫 번째 들를 곳(다이소)만 들러요. CU는 빠져요"; null when nothing is left out.
+ */
+fun transitStopsLeftOutText(stops: List<String>): String? {
+    if (stops.size <= MAX_TRANSIT_STOPS) return null
+    val kept = stops.take(MAX_TRANSIT_STOPS).joinToString(", ")
+    val left = stops.drop(MAX_TRANSIT_STOPS).joinToString(", ")
+    return "대중교통은 첫 번째 들를 곳(${kept})만 들러요. ${eunNeun(left)} 빠져요"
+}
+
+/** Within this many meters of a stop already on the list, a new one is the same place (11/16: the server refuses twice). */
+const val SAME_STOP_M = 30.0
+
+/** [stops] with [place] added at the end, or null when it is already there (same name or within [SAME_STOP_M]). */
+fun withStop(stops: List<StopPlace>, place: StopPlace): List<StopPlace>? =
+    if (stops.any { it.name == place.name || metersBetween(it.point, place.point) < SAME_STOP_M }) null else stops + place
+
+/** [word] with 은 after a closed syllable, 는 otherwise: 다이소는, 편의점은. */
+fun eunNeun(word: String): String {
+    val code = (word.lastOrNull()?.code ?: return word) - 0xAC00
+    return word + if (code in 0..11171 && code % 28 != 0) "은" else "는"
+}
+
 /** Within this many meters along the route of a stop counts as being there. */
 const val STOP_ARRIVE_M = 20.0
 
