@@ -771,11 +771,21 @@ const val GO_QUESTION = "지도에서 보여 드릴까요?"
 const val GO_YES = "지도에서 볼게요"
 const val GO_NO = "괜찮아요"
 
+/** Words of a yes or no to [GO_QUESTION] and what goes with them; longer ones first so their parts are not left over. */
+private val ANSWER_WORDS = listOf(
+    "주세요", "나중에", "오케이", "고마워", "괜찮", "됐어", "싫어", "아니", "말고", "좋아", "그래", "보여", "볼게", "보자",
+    "가자", "열어", "부탁", "알겠", "그럼", "지도", "에서", "한번", "빨리", "거기", "그곳", "지금", "바로", "할게",
+    "해요", "네", "응", "예", "어", "아", "요", "줘", "해", "로", "좀", "게", "거",
+)
+
 /** The answer to [GO_QUESTION] in what was said: true to open the map, false not to, null for something else. */
 internal fun goAnswer(said: String): Boolean? {
     val s = said.replace(" ", "")
     if (s == GO_YES.replace(" ", "")) return true
     if (s == GO_NO.replace(" ", "")) return false
+    // A place or anything else besides the answer words ("동명동 가자", "광주역 말고 동명동"): a new request,
+    // not a yes or no to what was asked (11/16 phone check opened the earlier place).
+    if (ANSWER_WORDS.fold(s.replace(Regex("[.,!?~…]"), "")) { rest, w -> rest.replace(w, "") }.length >= 2) return null
     if (listOf("아니", "괜찮", "됐어", "싫어", "나중에", "말고").any { s.contains(it) }) return false
     if (s in setOf("어", "어어", "응응")) return true
     if (s.length <= 12 && listOf("네", "응", "예", "좋아", "그래", "보여", "볼게", "보자", "가자", "열어", "부탁", "알겠").any { s.contains(it) }) return true
