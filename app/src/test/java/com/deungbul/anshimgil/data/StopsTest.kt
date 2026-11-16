@@ -184,4 +184,23 @@ class StopsTest {
         assertEquals(listOf("GS25 조대정문점", "다이소 광주충장로점"), reply.stops.map { it.name })
         assertTrue(reply.say.contains("들렀다 집까지"))
     }
+
+    /** 11/16 (원일): the server refuses the same stop twice, so it is not added again. */
+    @Test
+    fun theSameStopIsNotAddedTwice() {
+        val daiso = StopPlace("다이소 충장로점", LatLon(35.1490, 126.9150))
+        val cu = StopPlace("CU 금남로점", LatLon(35.1500, 126.9170))
+        assertEquals(listOf(daiso, cu), withStop(listOf(daiso), cu))
+        assertNull(withStop(listOf(daiso, cu), daiso))
+        assertNull(withStop(listOf(daiso), StopPlace("다이소", LatLon(35.14905, 126.91505))))
+    }
+
+    /** 11/16 (원일): transit stops at the first place only, and says what is left out. */
+    @Test
+    fun transitSaysWhichStopsAreLeftOut() {
+        assertNull(transitStopsLeftOutText(emptyList()))
+        assertNull(transitStopsLeftOutText(listOf("다이소")))
+        assertEquals("대중교통은 첫 번째 들를 곳(다이소)만 들러요. CU는 빠져요", transitStopsLeftOutText(listOf("다이소", "CU")))
+        assertEquals("대중교통은 첫 번째 들를 곳(다이소)만 들러요. CU, 약국은 빠져요", transitStopsLeftOutText(listOf("다이소", "CU", "약국")))
+    }
 }
