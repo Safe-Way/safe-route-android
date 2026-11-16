@@ -70,4 +70,15 @@ class ElevatorExitTest {
         assertTrue(!arrivesByElevatorExit("금남지하상가 다이소"))
         assertTrue(!arrivesByElevatorExit("광주극장"))
     }
+
+    /** 11/16: the server picks the exit from the name and says so in an `entrance` note (server #264). */
+    @Test
+    fun serverExitLabelFromTheEntranceNote() {
+        fun note(text: String) = listOf(RouteNote(false, "surface", "바닥 재질을 모르는 길"), RouteNote(false, "entrance", text))
+        assertEquals("문화전당역 3번 출구 엘리베이터", serverExitLabel(note("금남지하상가는 문화전당역 3번 출구(엘리베이터)로 들어가요")))
+        assertEquals("문화전당역 5번 출구", serverExitLabel(note("금남지하상가는 문화전당역 5번 출구(계단)로 들어가요")))
+        assertEquals("남광주역 2번 출구 엘리베이터", serverExitLabel(note("남광주역은 남광주역 2번 출구(엘리베이터)로 들어가요")))
+        assertEquals("남광주역 2번 출구 엘리베이터에 도착했어요", arrivalText(serverExitLabel(note("남광주역은 남광주역 2번 출구(엘리베이터)로 들어가요"))!!).first)
+        assertNull(serverExitLabel(listOf(RouteNote(false, "surface", "바닥 재질을 모르는 길"))))
+    }
 }

@@ -9,11 +9,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.horizontalScroll
 import com.deungbul.anshimgil.data.withEulReul
-import com.deungbul.anshimgil.data.ElevatorExit
 import com.deungbul.anshimgil.data.ELEVATOR_EXIT_MODES
 import com.deungbul.anshimgil.data.FacilityRepository
 import com.deungbul.anshimgil.data.bboxAround
 import com.deungbul.anshimgil.data.elevatorExitFor
+import com.deungbul.anshimgil.data.serverExitLabel
 import com.deungbul.anshimgil.data.MAX_TRANSIT_STOPS
 import com.deungbul.anshimgil.data.StopPlace
 import com.deungbul.anshimgil.data.firstWait
@@ -207,29 +207,33 @@ fun RouteScreen(
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { asked = true }
     LaunchedEffect(Unit) { if (!asked) permissionLauncher.launch(LOCATION_PERMISSIONS) }
 
-    // 휠체어·어르신 to a station: arrive at its exit with an elevator, like Naver's "4번 출구 엘리베이터 이용" (11/11).
-    var exitTo by remember { mutableStateOf<ElevatorExit?>(null) }
+    // The exit to arrive at: the server picks it from the place's name (11/16, server #264); when it does not know
+    // the place, 휠체어·어르신 to a station still arrive at its elevator exit picked here (11/11).
+    var arriveLabel by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(asked, conditionsOff, conditionsOn, retry) {
         if (!asked) return@LaunchedEffect
         state = RouteState.Loading
         val from = (startPlace?.let { Origin(LatLon(it.lat, it.lon), it.name) }
             ?: phoneOrigin(context)).also { origin = it }
         val dest = LatLon(destination.lat, destination.lon)
-        exitTo = if (mode in ELEVATOR_EXIT_MODES && facilityRepository != null && arrivesByElevatorExit(destination.name)) {
-            try {
-                elevatorExitFor(destination, from.point, facilityRepository.load(mode, emptySet(), bboxAround(listOf(dest), marginDeg = 0.005)).layers.facilities)
-            } catch (e: ApiException) {
-                null
-            }
-        } else {
-            null
-        }
+        arriveLabel = null
         state = try {
-            RouteState.Ready(
-                routeRepository.findRoutes(
-                    RouteRequest(from.point, exitTo?.point ?: dest, mode, conditionsOff, conditionsOn, stops = stops),
-                ),
+            var result = routeRepository.findRoutes(
+                RouteRequest(from.point, dest, mode, conditionsOff, conditionsOn, stops = stops, destinationName = destination.name),
             )
+            arriveLabel = serverExitLabel(result.explanation.notes)
+            if (arriveLabel == null && mode in ELEVATOR_EXIT_MODES && facilityRepository != null && arrivesByElevatorExit(destination.name)) {
+                val exitTo = try {
+                    elevatorExitFor(destination, from.point, facilityRepository.load(mode, emptySet(), bboxAround(listOf(dest), marginDeg = 0.005)).layers.facilities)
+                } catch (e: ApiException) {
+                    null
+                }
+                exitTo?.let { e ->
+                    result = routeRepository.findRoutes(RouteRequest(from.point, e.point, mode, conditionsOff, conditionsOn, stops = stops))
+                    arriveLabel = e.label
+                }
+            }
+            RouteState.Ready(result)
         } catch (e: ApiException) {
             RouteState.Failed(e.message, retryHelps = e.code !in NO_RETRY_CODES, code = e.code)
         }
@@ -337,7 +341,7 @@ fun RouteScreen(
             (state as? RouteState.Ready)?.let { s ->
                 val type = if (s.result.route(selected) != null) selected else s.result.routes.first().type
                 autoStarted = true
-                onStart(s.result, type, exitTo?.label)
+                onStart(s.result, type, arriveLabel)
             }
         }
     }
@@ -372,7 +376,7 @@ fun RouteScreen(
         if (transitTab && t != null) {
             t.routes.getOrNull(transitSelected)?.let { m.showTransit(context, it, destination.name) }
         } else if (!transitTab) {
-            result?.let { m.showRoutes(context, it, selected, exitTo?.label ?: destination.name) }
+            result?.let { m.showRoutes(context, it, selected, arriveLabel ?: destination.name) }
         }
     }
 
@@ -515,9 +519,9 @@ fun RouteScreen(
                             }
                         }
                         is RouteState.Ready -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            exitTo?.let { e ->
+                            arriveLabel?.let { label ->
                                 Text(
-                                    "${e.label}로 도착하게 안내해요.",
+                                    "${label}로 도착하게 안내해요.",
                                     fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D4ED8),
                                 )
                             }
@@ -528,7 +532,7 @@ fun RouteScreen(
                 if (!transitTab) (state as? RouteState.Ready)?.let { s ->
                     StartButton(s.result.atPace(walkSpeedMPerMin), selected, onStart = {
                         if (s.result.routes.size > 1) chosen(if (selected == RouteType.SHORTEST) RouteChoice.SHORTEST else RouteChoice.SAFE)
-                        onStart(s.result, selected, exitTo?.label)
+                        onStart(s.result, selected, arriveLabel)
                     })
                 }
                 if (transitTab) (transit as? TransitState.Ready)?.result?.routes?.getOrNull(transitSelected)?.let { t ->

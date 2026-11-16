@@ -74,3 +74,17 @@ fun elevatorExitFor(destination: Place, from: LatLon, facilities: List<Facility>
         .minByOrNull { (p, _) -> metersBetween(p, from) }
         ?.let { (p, f) -> ElevatorExit(exitNumber(f.name)?.let { "$station ${it}번 출구" } ?: (f.name ?: station), p) }
 }
+
+/**
+ * What to call the destination when the server chose the exit (11/16, server #264): its `entrance` note says
+ * "금남지하상가는 문화전당역 3번 출구(엘리베이터)로 들어가요", so the route ends at "문화전당역 3번 출구 엘리베이터"
+ * (the same label as [ElevatorExit], so arrival names the elevator) or, by stairs, "문화전당역 5번 출구".
+ * Null when there is no such note: the server did not know the place, and the app picks the exit itself.
+ */
+fun serverExitLabel(notes: List<RouteNote>): String? {
+    val text = notes.firstOrNull { it.kind == "entrance" }?.text ?: return null
+    val exit = Regex("""[은는]\s+(.+?)로\s*들어가요""").find(text)?.groupValues?.get(1)?.trim() ?: return null
+    val way = Regex("""\((계단|엘리베이터)\)$""").find(exit)?.groupValues?.get(1)
+    val name = exit.replace(Regex("""\s*\((계단|엘리베이터)\)$"""), "")
+    return if (way == "엘리베이터") "$name$ELEVATOR_SUFFIX" else name
+}
