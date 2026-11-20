@@ -13,6 +13,10 @@ val localProperties = Properties().apply {
 val kakaoNativeAppKey: String = localProperties.getProperty("KAKAO_NATIVE_APP_KEY", "")
 // e.g. http://10.0.2.2:8080 for a server on this computer seen from the emulator. Blank = example data.
 val serverBaseUrl: String = localProperties.getProperty("SERVER_BASE_URL", "")
+// The build number the server's 업데이트 안내 compares (GET /api/app/version): CI passes its run number,
+// so every CI build counts up. A build on a computer is 1 unless VERSION_CODE is set in local.properties.
+val appVersionCode: Int = (System.getenv("APP_VERSION_CODE") ?: localProperties.getProperty("VERSION_CODE"))
+    ?.toIntOrNull() ?: 1
 
 android {
     namespace = "com.deungbul.anshimgil"
@@ -24,7 +28,7 @@ android {
         applicationId = "com.deungbul.anshimgil"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
+        versionCode = appVersionCode
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

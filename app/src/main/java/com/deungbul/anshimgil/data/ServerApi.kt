@@ -20,8 +20,12 @@ object ServerApi {
     val baseUrl: String = BuildConfig.SERVER_BASE_URL.trimEnd('/')
     val isConfigured: Boolean get() = baseUrl.isNotBlank()
 
-    suspend fun get(path: String, query: Map<String, Any?> = emptyMap()): JSONObject =
-        request("GET", path + queryString(query), body = null)
+    suspend fun get(
+        path: String,
+        query: Map<String, Any?> = emptyMap(),
+        connectTimeoutMs: Int = 5_000,
+        readTimeoutMs: Int = 10_000,
+    ): JSONObject = request("GET", path + queryString(query), body = null, connectTimeoutMs, readTimeoutMs)
 
     suspend fun post(path: String, body: JSONObject): JSONObject = request("POST", path, body)
 
@@ -73,13 +77,19 @@ object ServerApi {
             readResponse(connection)
         }
 
-    private suspend fun request(method: String, path: String, body: JSONObject?): JSONObject =
+    private suspend fun request(
+        method: String,
+        path: String,
+        body: JSONObject?,
+        connectTimeoutMs: Int = 5_000,
+        readTimeoutMs: Int = 10_000,
+    ): JSONObject =
         withContext(Dispatchers.IO) {
             val connection = try {
                 (URL(baseUrl + path).openConnection() as HttpURLConnection).apply {
                     requestMethod = method
-                    connectTimeout = 5_000
-                    readTimeout = 10_000
+                    connectTimeout = connectTimeoutMs
+                    readTimeout = readTimeoutMs
                     setRequestProperty("Accept", "application/json")
                     if (body != null) {
                         doOutput = true

@@ -169,6 +169,8 @@ class MainActivity : ComponentActivity() {
         val usageRepository = UsageRepository(applicationContext)
         // Walks that could not be sent last time (offline, server not ready) go now.
         lifecycleScope.launch { runCatching { walkSpeedRepository.uploadPending() } }
+        // 업데이트 안내: asked once a run; a failure or odd answer shows nothing.
+        lifecycleScope.launch { com.deungbul.anshimgil.data.AppUpdateCheck.checkOnce() }
         // The mode next to the clock while the app is in front; taken away in onStop.
         lifecycleScope.launch {
             repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
@@ -219,8 +221,25 @@ class MainActivity : ComponentActivity() {
                             onGuiding = ::setGuiding,
                         )
                     }
+                    val update by com.deungbul.anshimgil.data.AppUpdateCheck.update.collectAsStateWithLifecycle()
+                    update?.let { u ->
+                        com.deungbul.anshimgil.ui.common.AppUpdateDialog(
+                            u,
+                            onUpdate = { openDownload(u.downloadUrl) },
+                            onLater = com.deungbul.anshimgil.data.AppUpdateCheck::later,
+                        )
+                    }
                 }
             }
+        }
+    }
+
+    /** [업데이트]: the download address in the phone's browser. */
+    private fun openDownload(url: String) {
+        try {
+            startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+        } catch (e: android.content.ActivityNotFoundException) {
+            android.widget.Toast.makeText(this, "인터넷 창을 열 수 없어요. 잠시 뒤 다시 해 주세요.", android.widget.Toast.LENGTH_LONG).show()
         }
     }
 
