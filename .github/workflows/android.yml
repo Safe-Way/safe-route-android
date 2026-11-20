@@ -22,6 +22,9 @@ jobs:
     name: 앱 빌드·단위 시험
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # 빌드할 때마다 versionCode가 올라가게 (서버 업데이트 안내 GET /api/app/version이 이 번호로 비교)
+      APP_VERSION_CODE: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
 
