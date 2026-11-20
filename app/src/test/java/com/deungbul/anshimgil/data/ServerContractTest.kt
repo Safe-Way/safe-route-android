@@ -82,7 +82,7 @@ class ServerContractTest {
             r.path.forEach { assertInGwangju("${r.type} 선", it) }
             r.sidewalks.forEach { assertTrue("보도 구간 ${it.from}..${it.to}", it.from <= it.to) }
         }
-        assertTrue("날씨·밤 같은 상황(conditions)이 안 읽혀요", result.conditions.isNotEmpty())
+        // result.conditions 는 밤이거나 사용자가 켠 조건만 담아 낮에는 비는 게 정상이라 보지 않는다.
         assertNotNull("해 지는 시각(conditions.sunset)이 안 읽혀요", result.sunset)
         assertFalse("경로 설명(explanation.summary)이 비었어요", result.explanation.summary.isBlank())
     }
