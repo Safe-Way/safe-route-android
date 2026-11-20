@@ -1,0 +1,84 @@
+{
+    "places": [
+        {
+            "id": "27233966",
+            "name": "\uad6d\ub9bd\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c 38",
+            "lat": 35.147333715652636,
+            "lon": 126.92135353457694,
+            "distanceM": 174
+        },
+        {
+            "id": "228904674",
+            "name": "\uad6d\ub9bd\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9 GATE1",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c26\ubc88\uae38 \uc9c0\ud558 7",
+            "lat": 35.1469703254411,
+            "lon": 126.919762657617,
+            "distanceM": 33
+        },
+        {
+            "id": "1050345381",
+            "name": "CU \uad6d\ub9bd\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9\uc810",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c26\ubc88\uae38 \uc9c0\ud558 7",
+            "lat": 35.14644131018696,
+            "lon": 126.91988937675735,
+            "distanceM": 39
+        },
+        {
+            "id": "575905160",
+            "name": "\uad6d\ub9bd\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9 \uad11\uc8fc\uc804\ub0a8\uad00\uad11\uc548\ub0b4\uc18c",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c 38",
+            "lat": 35.1463625402229,
+            "lon": 126.919359414837,
+            "distanceM": 43
+        },
+        {
+            "id": "24555316",
+            "name": "\uad6d\ub9bd\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9 \ubbfc\uc8fc\ud3c9\ud654\uad50\ub958\uc6d0",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c 38",
+            "lat": 35.146993889963724,
+            "lon": 126.91995797132209,
+            "distanceM": 46
+        },
+        {
+            "id": "1155250748",
+            "name": "\uce74\ud398\uc9c4\uc815\uc131 \uad11\uc8fc\ud3b8",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c 38",
+            "lat": 35.1470570338012,
+            "lon": 126.920031435214,
+            "distanceM": 55
+        },
+        {
+            "id": "1327811405",
+            "name": "\uad6d\ub9bd\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9 \uc5b4\ub9b0\uc774\uadf9\uc7a5",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c 38",
+            "lat": 35.1470570337578,
+            "lon": 126.920031435215,
+            "distanceM": 55
+        },
+        {
+            "id": "2030752038",
+            "name": "\uad6d\ub9bd\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9 \ubcf5\ud569\uc804\uc2dc2\uad00",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c 38",
+            "lat": 35.1470570337578,
+            "lon": 126.920031435215,
+            "distanceM": 55
+        },
+        {
+            "id": "947295574",
+            "name": "\uad6d\ub9bd\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9 \uadf9\uc7a52",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c 38",
+            "lat": 35.1470570337578,
+            "lon": 126.920031435215,
+            "distanceM": 55
+        },
+        {
+            "id": "1246703186",
+            "name": "\uad6d\ub9bd\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9 \uc544\ub730\ub9ac\uc5d01",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c 38",
+            "lat": 35.1470570337578,
+            "lon": 126.920031435215,
+            "distanceM": 55
+        }
+    ]
+}

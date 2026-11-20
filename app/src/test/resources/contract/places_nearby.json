@@ -1,0 +1,102 @@
+{
+    "radiusM": 1000,
+    "places": [
+        {
+            "id": 886059,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uc9c0\ud558\ucca0\uc5ed(\ubb38\ud654\uc804\ub2f9)",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c26\ubc88\uae38 \uc9c0\ud5587, \ubb38\ud654\uc804\ub2f9\uc5ed (\uad11\uc0b0\ub3d9)",
+            "lat": 35.1465467,
+            "lon": 126.919856,
+            "distanceM": 29,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 09:00~18:00",
+            "wheelchair": true,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 09:00~18:00 \u00b7 \uc7a5\uc560\uc778 \ud654\uc7a5\uc2e4"
+        },
+        {
+            "id": 886055,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9(\uc5b4\ub9b0\uc774\ubb38\ud654\uc6d0)",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c 38, \uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9 (\uad11\uc0b0\ub3d9)",
+            "lat": 35.1470573,
+            "lon": 126.9200314,
+            "distanceM": 56,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 09:00~20:00",
+            "wheelchair": true,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 09:00~20:00 \u00b7 \uc7a5\uc560\uc778 \ud654\uc7a5\uc2e4 \u00b7 \uae30\uc800\uadc0 \uad50\ud658\ub300"
+        },
+        {
+            "id": 886056,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uae08\ub0a8\uc9c0\ud558\uc0c1\uac00(\uae08\ub0a8\uacf5\uc6d0 \ubc11)",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \uc11c\uc11d\ub85c \uc9c0\ud55856, \uae08\ub0a8\uc9c0\ud558\uc0c1\uac00 (\uae08\ub0a8\ub85c1\uac00)",
+            "lat": 35.1478384,
+            "lon": 126.9200218,
+            "distanceM": 132,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 06:00~16:00",
+            "wheelchair": true,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 06:00~16:00 \u00b7 \uc7a5\uc560\uc778 \ud654\uc7a5\uc2e4"
+        },
+        {
+            "id": 886033,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uad11\uc8fc\ub300\uc131\ud559\uc6d0",
+            "address": "\uc81c\ubd09\ub85c 92 (\uc11c\uc11d\ub3d9)",
+            "lat": 35.1465785,
+            "lon": 126.922231,
+            "distanceM": 240,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 08:00~22:00",
+            "wheelchair": true,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 08:00~22:00 \u00b7 \uc7a5\uc560\uc778 \ud654\uc7a5\uc2e4"
+        },
+        {
+            "id": 886032,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uad11\uc8fc\uc601\uc0c1\ubcf5\ud569\ubb38\ud654\uad00",
+            "address": "\uc81c\ubd09\ub85c 96 (\uc11c\uc11d\ub3d9)",
+            "lat": 35.1469227,
+            "lon": 126.9222738,
+            "distanceM": 244,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 09:00~18:00",
+            "wheelchair": true,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 09:00~18:00 \u00b7 \uc7a5\uc560\uc778 \ud654\uc7a5\uc2e4"
+        }
+    ],
+    "closestClosed": null,
+    "message": null
+}

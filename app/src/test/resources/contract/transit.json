@@ -1,0 +1,1704 @@
+{
+    "paths": [
+        {
+            "totalMin": 21,
+            "fare": 1250,
+            "transfers": 0,
+            "walkM": 934,
+            "legs": [
+                {
+                    "type": "walk",
+                    "distanceM": 18,
+                    "minutes": 1,
+                    "from": {
+                        "name": null,
+                        "lat": 35.1543,
+                        "lon": 126.9142
+                    },
+                    "to": {
+                        "name": "\ub3d9\ubd80\uc18c\ubc29\uc11c",
+                        "lat": 35.154458,
+                        "lon": 126.914147
+                    },
+                    "lines": [],
+                    "way": null,
+                    "stationCount": null,
+                    "safeWalk": false,
+                    "geometry": null,
+                    "sidewalks": null,
+                    "liveAvailable": null,
+                    "buses": null,
+                    "trains": null,
+                    "stops": []
+                },
+                {
+                    "type": "bus",
+                    "distanceM": 1495,
+                    "minutes": 9,
+                    "from": {
+                        "name": "\ub3d9\ubd80\uc18c\ubc29\uc11c",
+                        "lat": 35.154458,
+                        "lon": 126.914147
+                    },
+                    "to": {
+                        "name": "\ud5a5\uad50",
+                        "lat": 35.145292,
+                        "lon": 126.909231
+                    },
+                    "lines": [
+                        "08"
+                    ],
+                    "way": null,
+                    "stationCount": 4,
+                    "safeWalk": null,
+                    "geometry": null,
+                    "sidewalks": null,
+                    "liveAvailable": true,
+                    "buses": [
+                        {
+                            "lineId": 75,
+                            "lineName": "08",
+                            "remainMin": 17,
+                            "remainStop": 12,
+                            "lowFloor": true,
+                            "direction": "\uc1a1\uc6d0\ub300",
+                            "nowAt": "\ubd81\uad6c\uccad"
+                        }
+                    ],
+                    "trains": null,
+                    "stops": [
+                        {
+                            "name": "\ub3d9\ubd80\uc18c\ubc29\uc11c",
+                            "lat": 35.154458,
+                            "lon": 126.914147
+                        },
+                        {
+                            "name": "\ub300\uc778\uc2dc\uc7a5(\uc11c)",
+                            "lat": 35.152636,
+                            "lon": 126.917047
+                        },
+                        {
+                            "name": "\uc608\uc220\uc758\uac70\ub9ac\uc785\uad6c",
+                            "lat": 35.151052,
+                            "lon": 126.916321
+                        },
+                        {
+                            "name": "\ucda9\uc7a5\ub3d9\ud589\uc815\ubcf5\uc9c0\uc13c\ud130",
+                            "lat": 35.14811,
+                            "lon": 126.912903
+                        },
+                        {
+                            "name": "\ud5a5\uad50",
+                            "lat": 35.145292,
+                            "lon": 126.909231
+                        }
+                    ]
+                },
+                {
+                    "type": "walk",
+                    "distanceM": 916,
+                    "minutes": 11,
+                    "from": {
+                        "name": "\ud5a5\uad50",
+                        "lat": 35.145292,
+                        "lon": 126.909231
+                    },
+                    "to": {
+                        "name": null,
+                        "lat": 35.1405,
+                        "lon": 126.9134
+                    },
+                    "lines": [],
+                    "way": null,
+                    "stationCount": null,
+                    "safeWalk": true,
+                    "geometry": [
+                        [
+                            126.909231,
+                            35.145292
+                        ],
+                        [
+                            126.909303,
+                            35.1452244
+                        ],
+                        [
+                            126.9094595,
+                            35.144769
+                        ],
+                        [
+                            126.9094662,
+                            35.1447202
+                        ],
+                        [
+                            126.9094579,
+                            35.1446406
+                        ],
+                        [
+                            126.909419,
+                            35.1445868
+                        ],
+                        [
+                            126.9090658,
+                            35.1443587
+                        ],
+                        [
+                            126.9090401,
+                            35.1442991
+                        ],
+                        [
+                            126.909019,
+                            35.1440058
+                        ],
+                        [
+                            126.9090215,
+                            35.1439169
+                        ],
+                        [
+                            126.9090479,
+                            35.1438358
+                        ],
+                        [
+                            126.9090731,
+                            35.1437543
+                        ],
+                        [
+                            126.9090837,
+                            35.143542
+                        ],
+                        [
+                            126.9091242,
+                            35.1432173
+                        ],
+                        [
+                            126.9091867,
+                            35.1428414
+                        ],
+                        [
+                            126.9093889,
+                            35.142234
+                        ],
+                        [
+                            126.9094438,
+                            35.1421012
+                        ],
+                        [
+                            126.9095713,
+                            35.1418733
+                        ],
+                        [
+                            126.9094804,
+                            35.1418503
+                        ],
+                        [
+                            126.9096722,
+                            35.1416381
+                        ],
+                        [
+                            126.9098658,
+                            35.141424
+                        ],
+                        [
+                            126.9103985,
+                            35.1408934
+                        ],
+                        [
+                            126.910433,
+                            35.1408572
+                        ],
+                        [
+                            126.9104921,
+                            35.1407952
+                        ],
+                        [
+                            126.9105468,
+                            35.1407557
+                        ],
+                        [
+                            126.91061,
+                            35.1407259
+                        ],
+                        [
+                            126.910691,
+                            35.1407028
+                        ],
+                        [
+                            126.9107901,
+                            35.1406911
+                        ],
+                        [
+                            126.9108925,
+                            35.140688
+                        ],
+                        [
+                            126.910998,
+                            35.1407039
+                        ],
+                        [
+                            126.9111026,
+                            35.1407355
+                        ],
+                        [
+                            126.9112488,
+                            35.1407905
+                        ],
+                        [
+                            126.9113923,
+                            35.1408385
+                        ],
+                        [
+                            126.9114924,
+                            35.1408517
+                        ],
+                        [
+                            126.911624,
+                            35.140851
+                        ],
+                        [
+                            126.9117967,
+                            35.1408278
+                        ],
+                        [
+                            126.9118973,
+                            35.1408068
+                        ],
+                        [
+                            126.9119732,
+                            35.1407859
+                        ],
+                        [
+                            126.9121337,
+                            35.1407213
+                        ],
+                        [
+                            126.9122158,
+                            35.1406821
+                        ],
+                        [
+                            126.9123011,
+                            35.1406328
+                        ],
+                        [
+                            126.9132072,
+                            35.1399782
+                        ],
+                        [
+                            126.9133589,
+                            35.1401265
+                        ],
+                        [
+                            126.9134,
+                            35.1405
+                        ]
+                    ],
+                    "sidewalks": [
+                        {
+                            "from": 1,
+                            "to": 11,
+                            "side": "no",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 11,
+                            "to": 16,
+                            "side": "no",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 16,
+                            "to": 17,
+                            "side": "right",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.0
+                        },
+                        {
+                            "from": 17,
+                            "to": 18,
+                            "side": "unknown",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 18,
+                            "to": 19,
+                            "side": "left",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.0
+                        },
+                        {
+                            "from": 19,
+                            "to": 21,
+                            "side": "left",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.1
+                        },
+                        {
+                            "from": 21,
+                            "to": 22,
+                            "side": "unknown",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 22,
+                            "to": 34,
+                            "side": "right",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.0
+                        },
+                        {
+                            "from": 34,
+                            "to": 40,
+                            "side": "both",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.0
+                        },
+                        {
+                            "from": 40,
+                            "to": 41,
+                            "side": "both",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.4
+                        },
+                        {
+                            "from": 41,
+                            "to": 42,
+                            "side": "no",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        }
+                    ],
+                    "liveAvailable": null,
+                    "buses": null,
+                    "trains": null,
+                    "stops": []
+                }
+            ]
+        },
+        {
+            "totalMin": 25,
+            "fare": 1250,
+            "transfers": 0,
+            "walkM": 1438,
+            "legs": [
+                {
+                    "type": "walk",
+                    "distanceM": 522,
+                    "minutes": 7,
+                    "from": {
+                        "name": null,
+                        "lat": 35.1543,
+                        "lon": 126.9142
+                    },
+                    "to": {
+                        "name": "\uae08\ub0a8\ub85c4\uac00\uc5ed2\ubc88\ucd9c\uad6c",
+                        "lat": 35.151243,
+                        "lon": 126.913487
+                    },
+                    "lines": [],
+                    "way": null,
+                    "stationCount": null,
+                    "safeWalk": true,
+                    "geometry": [
+                        [
+                            126.9142,
+                            35.1543
+                        ],
+                        [
+                            126.91417214106136,
+                            35.154333296645575
+                        ],
+                        [
+                            126.914111,
+                            35.1542991
+                        ],
+                        [
+                            126.9139955,
+                            35.1542394
+                        ],
+                        [
+                            126.9137188,
+                            35.1540828
+                        ],
+                        [
+                            126.9135303,
+                            35.1539933
+                        ],
+                        [
+                            126.9134416,
+                            35.1539239
+                        ],
+                        [
+                            126.9133874,
+                            35.1538815
+                        ],
+                        [
+                            126.9132061,
+                            35.1537552
+                        ],
+                        [
+                            126.9129847,
+                            35.1535831
+                        ],
+                        [
+                            126.913918,
+                            35.15295
+                        ],
+                        [
+                            126.9133714,
+                            35.152481
+                        ],
+                        [
+                            126.9127699,
+                            35.1519347
+                        ],
+                        [
+                            126.9130333,
+                            35.1517538
+                        ],
+                        [
+                            126.9135532,
+                            35.1513966
+                        ],
+                        [
+                            126.91342817303031,
+                            35.151288475079355
+                        ],
+                        [
+                            126.913487,
+                            35.151243
+                        ]
+                    ],
+                    "sidewalks": [
+                        {
+                            "from": 1,
+                            "to": 9,
+                            "side": "no",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 9,
+                            "to": 10,
+                            "side": "no",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 10,
+                            "to": 11,
+                            "side": "both",
+                            "highway": "tertiary",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 8.0,
+                            "sidewalkWidthM": 3.5
+                        },
+                        {
+                            "from": 11,
+                            "to": 12,
+                            "side": "both",
+                            "highway": "tertiary",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 8.0,
+                            "sidewalkWidthM": 5.0
+                        },
+                        {
+                            "from": 12,
+                            "to": 14,
+                            "side": "right",
+                            "highway": "tertiary",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 8.0,
+                            "sidewalkWidthM": 7.5
+                        }
+                    ],
+                    "liveAvailable": null,
+                    "buses": null,
+                    "trains": null,
+                    "stops": []
+                },
+                {
+                    "type": "bus",
+                    "distanceM": 961,
+                    "minutes": 7,
+                    "from": {
+                        "name": "\uae08\ub0a8\ub85c4\uac00\uc5ed2\ubc88\ucd9c\uad6c",
+                        "lat": 35.151243,
+                        "lon": 126.913487
+                    },
+                    "to": {
+                        "name": "\ud5a5\uad50",
+                        "lat": 35.145292,
+                        "lon": 126.909231
+                    },
+                    "lines": [
+                        "07"
+                    ],
+                    "way": null,
+                    "stationCount": 2,
+                    "safeWalk": null,
+                    "geometry": null,
+                    "sidewalks": null,
+                    "liveAvailable": true,
+                    "buses": [
+                        {
+                            "lineId": 70,
+                            "lineName": "07",
+                            "remainMin": 5,
+                            "remainStop": 3,
+                            "lowFloor": true,
+                            "direction": "\uc1a1\uc6d0\ub300",
+                            "nowAt": "\uc720\ub3d9\uc0ac\uac70\ub9ac"
+                        }
+                    ],
+                    "trains": null,
+                    "stops": [
+                        {
+                            "name": "\uae08\ub0a8\ub85c4\uac00\uc5ed2\ubc88\ucd9c\uad6c",
+                            "lat": 35.151243,
+                            "lon": 126.913487
+                        },
+                        {
+                            "name": "\ucda9\uc7a5\ub3d9\ud589\uc815\ubcf5\uc9c0\uc13c\ud130",
+                            "lat": 35.14811,
+                            "lon": 126.912903
+                        },
+                        {
+                            "name": "\ud5a5\uad50",
+                            "lat": 35.145292,
+                            "lon": 126.909231
+                        }
+                    ]
+                },
+                {
+                    "type": "walk",
+                    "distanceM": 916,
+                    "minutes": 11,
+                    "from": {
+                        "name": "\ud5a5\uad50",
+                        "lat": 35.145292,
+                        "lon": 126.909231
+                    },
+                    "to": {
+                        "name": null,
+                        "lat": 35.1405,
+                        "lon": 126.9134
+                    },
+                    "lines": [],
+                    "way": null,
+                    "stationCount": null,
+                    "safeWalk": true,
+                    "geometry": [
+                        [
+                            126.909231,
+                            35.145292
+                        ],
+                        [
+                            126.909303,
+                            35.1452244
+                        ],
+                        [
+                            126.9094595,
+                            35.144769
+                        ],
+                        [
+                            126.9094662,
+                            35.1447202
+                        ],
+                        [
+                            126.9094579,
+                            35.1446406
+                        ],
+                        [
+                            126.909419,
+                            35.1445868
+                        ],
+                        [
+                            126.9090658,
+                            35.1443587
+                        ],
+                        [
+                            126.9090401,
+                            35.1442991
+                        ],
+                        [
+                            126.909019,
+                            35.1440058
+                        ],
+                        [
+                            126.9090215,
+                            35.1439169
+                        ],
+                        [
+                            126.9090479,
+                            35.1438358
+                        ],
+                        [
+                            126.9090731,
+                            35.1437543
+                        ],
+                        [
+                            126.9090837,
+                            35.143542
+                        ],
+                        [
+                            126.9091242,
+                            35.1432173
+                        ],
+                        [
+                            126.9091867,
+                            35.1428414
+                        ],
+                        [
+                            126.9093889,
+                            35.142234
+                        ],
+                        [
+                            126.9094438,
+                            35.1421012
+                        ],
+                        [
+                            126.9095713,
+                            35.1418733
+                        ],
+                        [
+                            126.9094804,
+                            35.1418503
+                        ],
+                        [
+                            126.9096722,
+                            35.1416381
+                        ],
+                        [
+                            126.9098658,
+                            35.141424
+                        ],
+                        [
+                            126.9103985,
+                            35.1408934
+                        ],
+                        [
+                            126.910433,
+                            35.1408572
+                        ],
+                        [
+                            126.9104921,
+                            35.1407952
+                        ],
+                        [
+                            126.9105468,
+                            35.1407557
+                        ],
+                        [
+                            126.91061,
+                            35.1407259
+                        ],
+                        [
+                            126.910691,
+                            35.1407028
+                        ],
+                        [
+                            126.9107901,
+                            35.1406911
+                        ],
+                        [
+                            126.9108925,
+                            35.140688
+                        ],
+                        [
+                            126.910998,
+                            35.1407039
+                        ],
+                        [
+                            126.9111026,
+                            35.1407355
+                        ],
+                        [
+                            126.9112488,
+                            35.1407905
+                        ],
+                        [
+                            126.9113923,
+                            35.1408385
+                        ],
+                        [
+                            126.9114924,
+                            35.1408517
+                        ],
+                        [
+                            126.911624,
+                            35.140851
+                        ],
+                        [
+                            126.9117967,
+                            35.1408278
+                        ],
+                        [
+                            126.9118973,
+                            35.1408068
+                        ],
+                        [
+                            126.9119732,
+                            35.1407859
+                        ],
+                        [
+                            126.9121337,
+                            35.1407213
+                        ],
+                        [
+                            126.9122158,
+                            35.1406821
+                        ],
+                        [
+                            126.9123011,
+                            35.1406328
+                        ],
+                        [
+                            126.9132072,
+                            35.1399782
+                        ],
+                        [
+                            126.9133589,
+                            35.1401265
+                        ],
+                        [
+                            126.9134,
+                            35.1405
+                        ]
+                    ],
+                    "sidewalks": [
+                        {
+                            "from": 1,
+                            "to": 11,
+                            "side": "no",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 11,
+                            "to": 16,
+                            "side": "no",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 16,
+                            "to": 17,
+                            "side": "right",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.0
+                        },
+                        {
+                            "from": 17,
+                            "to": 18,
+                            "side": "unknown",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 18,
+                            "to": 19,
+                            "side": "left",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.0
+                        },
+                        {
+                            "from": 19,
+                            "to": 21,
+                            "side": "left",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.1
+                        },
+                        {
+                            "from": 21,
+                            "to": 22,
+                            "side": "unknown",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 22,
+                            "to": 34,
+                            "side": "right",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.0
+                        },
+                        {
+                            "from": 34,
+                            "to": 40,
+                            "side": "both",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.0
+                        },
+                        {
+                            "from": 40,
+                            "to": 41,
+                            "side": "both",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.4
+                        },
+                        {
+                            "from": 41,
+                            "to": 42,
+                            "side": "no",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        }
+                    ],
+                    "liveAvailable": null,
+                    "buses": null,
+                    "trains": null,
+                    "stops": []
+                }
+            ]
+        },
+        {
+            "totalMin": 33,
+            "fare": 1250,
+            "transfers": 1,
+            "walkM": 1782,
+            "legs": [
+                {
+                    "type": "walk",
+                    "distanceM": 18,
+                    "minutes": 1,
+                    "from": {
+                        "name": null,
+                        "lat": 35.1543,
+                        "lon": 126.9142
+                    },
+                    "to": {
+                        "name": "\ub3d9\ubd80\uc18c\ubc29\uc11c",
+                        "lat": 35.154458,
+                        "lon": 126.914147
+                    },
+                    "lines": [],
+                    "way": null,
+                    "stationCount": null,
+                    "safeWalk": false,
+                    "geometry": null,
+                    "sidewalks": null,
+                    "liveAvailable": null,
+                    "buses": null,
+                    "trains": null,
+                    "stops": []
+                },
+                {
+                    "type": "bus",
+                    "distanceM": 1100,
+                    "minutes": 8,
+                    "from": {
+                        "name": "\ub3d9\ubd80\uc18c\ubc29\uc11c",
+                        "lat": 35.154458,
+                        "lon": 126.914147
+                    },
+                    "to": {
+                        "name": "\uad6d\ub9bd\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9(\uad6c.\ub3c4\uccad)",
+                        "lat": 35.147961,
+                        "lon": 126.918403
+                    },
+                    "lines": [
+                        "228"
+                    ],
+                    "way": null,
+                    "stationCount": 3,
+                    "safeWalk": null,
+                    "geometry": null,
+                    "sidewalks": null,
+                    "liveAvailable": true,
+                    "buses": [
+                        {
+                            "lineId": 236,
+                            "lineName": "228",
+                            "remainMin": 20,
+                            "remainStop": 12,
+                            "lowFloor": false,
+                            "direction": "\ub3c4\uc6c5\ub9ac1\uad6c",
+                            "nowAt": "\uc6b4\uc554\ubcbd\uc0b0\ube14\ub8e8\ubc0d"
+                        }
+                    ],
+                    "trains": null,
+                    "stops": [
+                        {
+                            "name": "\ub3d9\ubd80\uc18c\ubc29\uc11c",
+                            "lat": 35.154458,
+                            "lon": 126.914147
+                        },
+                        {
+                            "name": "\ub300\uc778\uc2dc\uc7a5(\uc11c)",
+                            "lat": 35.152636,
+                            "lon": 126.917047
+                        },
+                        {
+                            "name": "5.18\ubbfc\uc8fc\ud654\uc6b4\ub3d9\uae30\ub85d\uad00",
+                            "lat": 35.149572,
+                            "lon": 126.916034
+                        },
+                        {
+                            "name": "\uad6d\ub9bd\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9(\uad6c.\ub3c4\uccad)",
+                            "lat": 35.147961,
+                            "lon": 126.918403
+                        }
+                    ]
+                },
+                {
+                    "type": "walk",
+                    "distanceM": 303,
+                    "minutes": 4,
+                    "from": {
+                        "name": "\uad6d\ub9bd\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9(\uad6c.\ub3c4\uccad)",
+                        "lat": 35.147961,
+                        "lon": 126.918403
+                    },
+                    "to": {
+                        "name": "\ubb38\ud654\uc804\ub2f9",
+                        "lat": 35.146434,
+                        "lon": 126.920004
+                    },
+                    "lines": [],
+                    "way": null,
+                    "stationCount": null,
+                    "safeWalk": true,
+                    "geometry": [
+                        [
+                            126.918403,
+                            35.147961
+                        ],
+                        [
+                            126.91843870475908,
+                            35.147997579334096
+                        ],
+                        [
+                            126.9184589,
+                            35.1479844
+                        ],
+                        [
+                            126.9185689,
+                            35.1479034
+                        ],
+                        [
+                            126.9186559,
+                            35.1478332
+                        ],
+                        [
+                            126.9187175,
+                            35.147765
+                        ],
+                        [
+                            126.9187683,
+                            35.1476957
+                        ],
+                        [
+                            126.9187753,
+                            35.1476861
+                        ],
+                        [
+                            126.9188166,
+                            35.1476046
+                        ],
+                        [
+                            126.9188697,
+                            35.1474189
+                        ],
+                        [
+                            126.9188656,
+                            35.1473005
+                        ],
+                        [
+                            126.9188399,
+                            35.1472088
+                        ],
+                        [
+                            126.9187671,
+                            35.1470764
+                        ],
+                        [
+                            126.918709,
+                            35.1470099
+                        ],
+                        [
+                            126.9186237,
+                            35.1469375
+                        ],
+                        [
+                            126.9185125,
+                            35.1468556
+                        ],
+                        [
+                            126.9185037,
+                            35.1468493
+                        ],
+                        [
+                            126.9185295,
+                            35.146836
+                        ],
+                        [
+                            126.9186364,
+                            35.1467817
+                        ],
+                        [
+                            126.9198415,
+                            35.1464259
+                        ],
+                        [
+                            126.920004,
+                            35.146434
+                        ]
+                    ],
+                    "sidewalks": [],
+                    "liveAvailable": null,
+                    "buses": null,
+                    "trains": null,
+                    "stops": []
+                },
+                {
+                    "type": "subway",
+                    "distanceM": 900,
+                    "minutes": 2,
+                    "from": {
+                        "name": "\ubb38\ud654\uc804\ub2f9",
+                        "lat": 35.146434,
+                        "lon": 126.920004
+                    },
+                    "to": {
+                        "name": "\ub0a8\uad11\uc8fc",
+                        "lat": 35.139482,
+                        "lon": 126.922828
+                    },
+                    "lines": [
+                        "\uad11\uc8fc 1\ud638\uc120"
+                    ],
+                    "way": "\ub0a8\uad11\uc8fc",
+                    "stationCount": 1,
+                    "safeWalk": null,
+                    "geometry": null,
+                    "sidewalks": null,
+                    "liveAvailable": true,
+                    "buses": null,
+                    "trains": [
+                        {
+                            "direction": "\ud3c9\ub3d9\ud589",
+                            "endStation": "\ud3c9\ub3d9",
+                            "arriveTime": "09:35",
+                            "inMin": 3,
+                            "nowNear": "\ud559\ub3d9\uc99d\uc2ec\uc0ac\uc785\uad6c",
+                            "stopsAway": 2
+                        },
+                        {
+                            "direction": "\ub179\ub3d9\ud589",
+                            "endStation": "\uc18c\ud0dc",
+                            "arriveTime": "09:36",
+                            "inMin": 4,
+                            "nowNear": "\uc591\ub3d9\uc2dc\uc7a5",
+                            "stopsAway": 3
+                        },
+                        {
+                            "direction": "\ub179\ub3d9\ud589",
+                            "endStation": "\uc18c\ud0dc",
+                            "arriveTime": "09:44",
+                            "inMin": 12,
+                            "nowNear": "\uc30d\ucd0c",
+                            "stopsAway": 7
+                        },
+                        {
+                            "direction": "\ud3c9\ub3d9\ud589",
+                            "endStation": "\ud3c9\ub3d9",
+                            "arriveTime": "09:45",
+                            "inMin": 13,
+                            "nowNear": null,
+                            "stopsAway": null
+                        }
+                    ],
+                    "stops": [
+                        {
+                            "name": "\ubb38\ud654\uc804\ub2f9",
+                            "lat": 35.146435,
+                            "lon": 126.920004
+                        },
+                        {
+                            "name": "\ub0a8\uad11\uc8fc",
+                            "lat": 35.139479,
+                            "lon": 126.922832
+                        }
+                    ]
+                },
+                {
+                    "type": "walk",
+                    "distanceM": 1461,
+                    "minutes": 18,
+                    "from": {
+                        "name": "\ub0a8\uad11\uc8fc",
+                        "lat": 35.139482,
+                        "lon": 126.922828
+                    },
+                    "to": {
+                        "name": null,
+                        "lat": 35.1405,
+                        "lon": 126.9134
+                    },
+                    "lines": [],
+                    "way": null,
+                    "stationCount": null,
+                    "safeWalk": true,
+                    "geometry": [
+                        [
+                            126.922828,
+                            35.139482
+                        ],
+                        [
+                            126.92286284663248,
+                            35.139466456430235
+                        ],
+                        [
+                            126.9227851,
+                            35.1393499
+                        ],
+                        [
+                            126.9227256,
+                            35.1392706
+                        ],
+                        [
+                            126.9226727,
+                            35.1391925
+                        ],
+                        [
+                            126.922617,
+                            35.1391103
+                        ],
+                        [
+                            126.9225247,
+                            35.1390025
+                        ],
+                        [
+                            126.9224371,
+                            35.1389078
+                        ],
+                        [
+                            126.92232,
+                            35.1388017
+                        ],
+                        [
+                            126.9221943,
+                            35.1387047
+                        ],
+                        [
+                            126.9219595,
+                            35.1385423
+                        ],
+                        [
+                            126.9217342,
+                            35.1383979
+                        ],
+                        [
+                            126.9215066,
+                            35.1382452
+                        ],
+                        [
+                            126.9212843,
+                            35.1381022
+                        ],
+                        [
+                            126.9210215,
+                            35.1379422
+                        ],
+                        [
+                            126.920892,
+                            35.137853
+                        ],
+                        [
+                            126.9207381,
+                            35.137743
+                        ],
+                        [
+                            126.9205077,
+                            35.1375648
+                        ],
+                        [
+                            126.920224,
+                            35.1373321
+                        ],
+                        [
+                            126.9199251,
+                            35.1371063
+                        ],
+                        [
+                            126.9196788,
+                            35.1369207
+                        ],
+                        [
+                            126.9193587,
+                            35.1366925
+                        ],
+                        [
+                            126.9191093,
+                            35.1365055
+                        ],
+                        [
+                            126.9184465,
+                            35.1359945
+                        ],
+                        [
+                            126.9179784,
+                            35.1356564
+                        ],
+                        [
+                            126.9179629,
+                            35.135748
+                        ],
+                        [
+                            126.9179129,
+                            35.1358978
+                        ],
+                        [
+                            126.9178791,
+                            35.1360125
+                        ],
+                        [
+                            126.9178493,
+                            35.1360877
+                        ],
+                        [
+                            126.9175929,
+                            35.1366765
+                        ],
+                        [
+                            126.9173835,
+                            35.1371837
+                        ],
+                        [
+                            126.917344,
+                            35.1372835
+                        ],
+                        [
+                            126.917132,
+                            35.1377946
+                        ],
+                        [
+                            126.9170962,
+                            35.1378883
+                        ],
+                        [
+                            126.9169647,
+                            35.1383642
+                        ],
+                        [
+                            126.9169333,
+                            35.1384565
+                        ],
+                        [
+                            126.9169041,
+                            35.1385158
+                        ],
+                        [
+                            126.9168588,
+                            35.1385861
+                        ],
+                        [
+                            126.9168039,
+                            35.1386701
+                        ],
+                        [
+                            126.9163729,
+                            35.1386746
+                        ],
+                        [
+                            126.915494,
+                            35.1386839
+                        ],
+                        [
+                            126.9149859,
+                            35.138691
+                        ],
+                        [
+                            126.9149641,
+                            35.1386915
+                        ],
+                        [
+                            126.9146807,
+                            35.1386973
+                        ],
+                        [
+                            126.9146164,
+                            35.1386981
+                        ],
+                        [
+                            126.9142805,
+                            35.1387034
+                        ],
+                        [
+                            126.9142216,
+                            35.1387035
+                        ],
+                        [
+                            126.913829,
+                            35.1386994
+                        ],
+                        [
+                            126.9138053,
+                            35.1387544
+                        ],
+                        [
+                            126.913479,
+                            35.1395114
+                        ],
+                        [
+                            126.9133612,
+                            35.1397846
+                        ],
+                        [
+                            126.9133094,
+                            35.139872
+                        ],
+                        [
+                            126.9132652,
+                            35.1399243
+                        ],
+                        [
+                            126.9132072,
+                            35.1399782
+                        ],
+                        [
+                            126.9133589,
+                            35.1401265
+                        ],
+                        [
+                            126.9134,
+                            35.1405
+                        ]
+                    ],
+                    "sidewalks": [
+                        {
+                            "from": 1,
+                            "to": 21,
+                            "side": "both",
+                            "highway": "primary",
+                            "lanes": 2,
+                            "oneway": true,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 3.3
+                        },
+                        {
+                            "from": 21,
+                            "to": 23,
+                            "side": "both",
+                            "highway": "primary",
+                            "lanes": 4,
+                            "oneway": true,
+                            "widthM": null,
+                            "offsetM": 8.0,
+                            "sidewalkWidthM": 4.3
+                        },
+                        {
+                            "from": 23,
+                            "to": 24,
+                            "side": "left",
+                            "highway": "primary",
+                            "lanes": 4,
+                            "oneway": true,
+                            "widthM": null,
+                            "offsetM": 8.0,
+                            "sidewalkWidthM": 5.0
+                        },
+                        {
+                            "from": 24,
+                            "to": 25,
+                            "side": "both",
+                            "highway": "secondary",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 8.0,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 25,
+                            "to": 28,
+                            "side": "unknown",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 28,
+                            "to": 30,
+                            "side": "both",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.5
+                        },
+                        {
+                            "from": 30,
+                            "to": 31,
+                            "side": "unknown",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 31,
+                            "to": 32,
+                            "side": "both",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.5
+                        },
+                        {
+                            "from": 32,
+                            "to": 33,
+                            "side": "unknown",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 33,
+                            "to": 38,
+                            "side": "both",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.5
+                        },
+                        {
+                            "from": 38,
+                            "to": 40,
+                            "side": "no",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 40,
+                            "to": 43,
+                            "side": "no",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 43,
+                            "to": 44,
+                            "side": "unknown",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 44,
+                            "to": 45,
+                            "side": "right",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.0
+                        },
+                        {
+                            "from": 45,
+                            "to": 46,
+                            "side": "unknown",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 46,
+                            "to": 47,
+                            "side": "right",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.0
+                        },
+                        {
+                            "from": 47,
+                            "to": 48,
+                            "side": "unknown",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        },
+                        {
+                            "from": 48,
+                            "to": 49,
+                            "side": "both",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 5.0
+                        },
+                        {
+                            "from": 49,
+                            "to": 53,
+                            "side": "both",
+                            "highway": "residential",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": 2.4
+                        },
+                        {
+                            "from": 53,
+                            "to": 54,
+                            "side": "no",
+                            "highway": "service",
+                            "lanes": null,
+                            "oneway": null,
+                            "widthM": null,
+                            "offsetM": 4.8,
+                            "sidewalkWidthM": null
+                        }
+                    ],
+                    "liveAvailable": null,
+                    "buses": null,
+                    "trains": null,
+                    "stops": []
+                }
+            ]
+        }
+    ],
+    "hiddenForWheelchair": 0,
+    "note": null
+}
