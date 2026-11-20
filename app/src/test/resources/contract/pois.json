@@ -1,0 +1,2247 @@
+{
+    "pois": [
+        {
+            "id": 899649,
+            "kind": "stairs",
+            "sub": "\uacc4\ub2e8",
+            "name": "\uacc4\ub2e8",
+            "address": null,
+            "lat": 35.1466334,
+            "lon": 126.9197042,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": false,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uacc4\ub2e8 \u00b7 \uae38\uc774 26m \u00b7 \uacbd\uc0ac\ub85c \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 891475,
+            "kind": "subway",
+            "sub": "\uc9c0\ud558\ucca0\uc5ed",
+            "name": "\ubb38\ud654\uc804\ub2f9\uc5ed",
+            "address": "\ubb38\ud654\uc804\ub2f9\ub85c 26\ubc88\uae38 \uc9c0\ud5587(\uad11\uc0b0\ub3d9)",
+            "lat": 35.1466782,
+            "lon": 126.9198143,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uc5f4\ucc28 05:30~23:55",
+            "wheelchair": true,
+            "count": 3,
+            "modes": [
+                "common"
+            ],
+            "detail": "\uc9c0\ud558\ucca0\uc5ed \u00b7 \uc5d8\ub9ac\ubca0\uc774\ud130 \uc788\ub294 \ucd9c\uad6c 3\uacf3(2\u00b73\u00b74\ubc88) \u00b7 \uc7a5\uc560\uc778 \ud654\uc7a5\uc2e4 2\uacf3 \u00b7 \uc804\ub3d9\ud720\uccb4\uc5b4 \ucda9\uc804\uae30 2\ub300 \u00b7 \uc5f4\ucc28 05:30~23:55"
+        },
+        {
+            "id": 886059,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uc9c0\ud558\ucca0\uc5ed(\ubb38\ud654\uc804\ub2f9)",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c26\ubc88\uae38 \uc9c0\ud5587, \ubb38\ud654\uc804\ub2f9\uc5ed (\uad11\uc0b0\ub3d9)",
+            "lat": 35.1465467,
+            "lon": 126.919856,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 09:00~18:00",
+            "wheelchair": true,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 09:00~18:00 \u00b7 \uc7a5\uc560\uc778 \ud654\uc7a5\uc2e4"
+        },
+        {
+            "id": 891531,
+            "kind": "subway_entrance",
+            "sub": "\uc9c0\ud558\ucca0 \ucd9c\uc785\uad6c",
+            "name": "\ubb38\ud654\uc804\ub2f9\uc5ed 5\ubc88 \ucd9c\uad6c",
+            "address": null,
+            "lat": 35.1467459,
+            "lon": 126.9199487,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": false,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\uc9c0\ud558\ucca0 \ucd9c\uc785\uad6c \u00b7 \uc5d8\ub9ac\ubca0\uc774\ud130 \uc5c6\uc74c"
+        },
+        {
+            "id": 891486,
+            "kind": "subway_entrance",
+            "sub": "\uc9c0\ud558\ucca0 \ucd9c\uc785\uad6c",
+            "name": "\ubb38\ud654\uc804\ub2f9\uc5ed 3\ubc88 \ucd9c\uad6c",
+            "address": null,
+            "lat": 35.147011,
+            "lon": 126.9191749,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": true,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\uc9c0\ud558\ucca0 \ucd9c\uc785\uad6c \u00b7 \uc5d8\ub9ac\ubca0\uc774\ud130 \uc788\uc74c"
+        },
+        {
+            "id": 891487,
+            "kind": "subway_entrance",
+            "sub": "\uc9c0\ud558\ucca0 \ucd9c\uc785\uad6c",
+            "name": "\ubb38\ud654\uc804\ub2f9\uc5ed 4\ubc88 \ucd9c\uad6c",
+            "address": null,
+            "lat": 35.1472016,
+            "lon": 126.9196241,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": true,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\uc9c0\ud558\ucca0 \ucd9c\uc785\uad6c \u00b7 \uc5d8\ub9ac\ubca0\uc774\ud130 \uc788\uc74c"
+        },
+        {
+            "id": 886055,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9(\uc5b4\ub9b0\uc774\ubb38\ud654\uc6d0)",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c 38, \uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9 (\uad11\uc0b0\ub3d9)",
+            "lat": 35.1470573,
+            "lon": 126.9200314,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 09:00~20:00",
+            "wheelchair": true,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 09:00~20:00 \u00b7 \uc7a5\uc560\uc778 \ud654\uc7a5\uc2e4 \u00b7 \uae30\uc800\uadc0 \uad50\ud658\ub300"
+        },
+        {
+            "id": 881542,
+            "kind": "store",
+            "sub": "\ud3b8\uc758\uc810",
+            "name": "\ube44\uc9c0\uc5d0\ud504\ub9ac\ud14c\uc77c\uad6d\ub9bd\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9\uc810",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c 38",
+            "lat": 35.1467904,
+            "lon": 126.9202742,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\ud3b8\uc758\uc810"
+        },
+        {
+            "id": 879492,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c 38",
+            "lat": 35.146277,
+            "lon": 126.918947,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 3,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 3\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 879493,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \uc11c\uc11d\ub85c 47-1",
+            "lat": 35.146875,
+            "lon": 126.91871,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 1\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 895858,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1466596,
+            "lon": 126.9186647,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895859,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1467758,
+            "lon": 126.9186347,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 891532,
+            "kind": "subway_entrance",
+            "sub": "\uc9c0\ud558\ucca0 \ucd9c\uc785\uad6c",
+            "name": "\ubb38\ud654\uc804\ub2f9\uc5ed 6\ubc88 \ucd9c\uad6c",
+            "address": null,
+            "lat": 35.1461242,
+            "lon": 126.9202689,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": false,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\uc9c0\ud558\ucca0 \ucd9c\uc785\uad6c \u00b7 \uc5d8\ub9ac\ubca0\uc774\ud130 \uc5c6\uc74c"
+        },
+        {
+            "id": 895861,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1467506,
+            "lon": 126.9184121,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895852,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1458199,
+            "lon": 126.9190643,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 891488,
+            "kind": "subway_entrance",
+            "sub": "\uc9c0\ud558\ucca0 \ucd9c\uc785\uad6c",
+            "name": "\ubb38\ud654\uc804\ub2f9\uc5ed 1\ubc88 \ucd9c\uad6c",
+            "address": null,
+            "lat": 35.1458101,
+            "lon": 126.9201859,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": false,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\uc9c0\ud558\ucca0 \ucd9c\uc785\uad6c \u00b7 \uc5d8\ub9ac\ubca0\uc774\ud130 \uc5c6\uc74c"
+        },
+        {
+            "id": 884500,
+            "kind": "shelter",
+            "sub": "\ud55c\ud30c\uc27c\ud130",
+            "name": "\uad11\uc8fc\uc740\ud589\ubb38\ud654\uc804\ub2f9\uc810",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \uc11c\uc11d\ub85c 42",
+            "lat": 35.146423,
+            "lon": 126.918199,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uc27c\ud130 \uc6b4\uc601 \uc2dc\uac04 \ud3c9\uc77c 09:00~16:00",
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "senior"
+            ],
+            "detail": "\ud55c\ud30c\uc27c\ud130 \u00b7 11.15~3.15 \uc6b4\uc601 \u00b7 \ud3c9\uc77c 09:00~16:00"
+        },
+        {
+            "id": 883116,
+            "kind": "shelter",
+            "sub": "\ubb34\ub354\uc704\uc27c\ud130",
+            "name": "\uad11\uc8fc\uc740\ud589\ubb38\ud654\uc804\ub2f9\uc810",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \uc11c\uc11d\ub85c 42",
+            "lat": 35.1464226,
+            "lon": 126.918199,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uc27c\ud130 \uae30\uac04\uc740 \uc544\ub2c8\uc9c0\ub9cc \uc740\ud589 \uc77c\ubc18 \uc5c5\ubb34 \uc2dc\uac04(\ud3c9\uc77c 09:00~16:00) \uae30\uc900",
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "senior"
+            ],
+            "detail": "\ubb34\ub354\uc704\uc27c\ud130 \u00b7 5.20~9.30 \uc6b4\uc601"
+        },
+        {
+            "id": 895853,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1457076,
+            "lon": 126.918991,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 879491,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \uae08\ub0a8\ub85c1\uac00 41",
+            "lat": 35.147788,
+            "lon": 126.918951,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 4,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 4\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 895857,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1477075,
+            "lon": 126.9187632,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 891489,
+            "kind": "subway_entrance",
+            "sub": "\uc9c0\ud558\ucca0 \ucd9c\uc785\uad6c",
+            "name": "\ubb38\ud654\uc804\ub2f9\uc5ed 2\ubc88 \ucd9c\uad6c",
+            "address": null,
+            "lat": 35.1458659,
+            "lon": 126.9203866,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": true,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\uc9c0\ud558\ucca0 \ucd9c\uc785\uad6c \u00b7 \uc5d8\ub9ac\ubca0\uc774\ud130 \uc788\uc74c"
+        },
+        {
+            "id": 879494,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \uae08\ub0a8\ub85c 250-8",
+            "lat": 35.147432,
+            "lon": 126.918353,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 3,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 3\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 899651,
+            "kind": "stairs",
+            "sub": "\uacc4\ub2e8",
+            "name": "\uacc4\ub2e8",
+            "address": null,
+            "lat": 35.1474611,
+            "lon": 126.9206203,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": false,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uacc4\ub2e8 \u00b7 \uae38\uc774 39m \u00b7 \uacbd\uc0ac\ub85c \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 886056,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uae08\ub0a8\uc9c0\ud558\uc0c1\uac00(\uae08\ub0a8\uacf5\uc6d0 \ubc11)",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \uc11c\uc11d\ub85c \uc9c0\ud55856, \uae08\ub0a8\uc9c0\ud558\uc0c1\uac00 (\uae08\ub0a8\ub85c1\uac00)",
+            "lat": 35.1478384,
+            "lon": 126.9200218,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 06:00~16:00",
+            "wheelchair": true,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 06:00~16:00 \u00b7 \uc7a5\uc560\uc778 \ud654\uc7a5\uc2e4"
+        },
+        {
+            "id": 881550,
+            "kind": "store",
+            "sub": "\ud3b8\uc758\uc810",
+            "name": "\uc9c0\uc5d0\uc2a425\uc18c\ub140\uac10\uc131\uc810",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c 35",
+            "lat": 35.1456268,
+            "lon": 126.9189694,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\ud3b8\uc758\uc810"
+        },
+        {
+            "id": 899650,
+            "kind": "stairs",
+            "sub": "\uacc4\ub2e8",
+            "name": "\uacc4\ub2e8",
+            "address": null,
+            "lat": 35.1455322,
+            "lon": 126.9200555,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": false,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uacc4\ub2e8 \u00b7 \uae38\uc774 26m \u00b7 \uacbd\uc0ac\ub85c \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 881614,
+            "kind": "store",
+            "sub": "\ud3b8\uc758\uc810",
+            "name": "\ucc9c\ud558\ub808\ud3ec\uce20\uc8fc",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \uae08\ub0a8\ub85c 248",
+            "lat": 35.1477717,
+            "lon": 126.9184955,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\ud3b8\uc758\uc810"
+        },
+        {
+            "id": 895856,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1480149,
+            "lon": 126.9188824,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 879609,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c35\ubc88\uae38 3-2",
+            "lat": 35.145569,
+            "lon": 126.918618,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 3,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 3\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 899137,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \ubaa8\ub984",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1464087,
+            "lon": 126.9178479,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \ubaa8\ub984 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 896212,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1482967,
+            "lon": 126.9191897,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 879318,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \uae08\ub0a8\ub85c 246",
+            "lat": 35.148086,
+            "lon": 126.918492,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 2,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 2\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 899136,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \ubaa8\ub984",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1464578,
+            "lon": 126.9175897,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \ubaa8\ub984 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 895875,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1463222,
+            "lon": 126.9175076,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 886070,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uc804\uc77c\ube4c\ub529245 10\uce35",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \uae08\ub0a8\ub85c 245",
+            "lat": 35.1483386,
+            "lon": 126.9187374,
+            "distanceM": null,
+            "nowStatus": "\ud655\uc778 \uc548 \ub428",
+            "nowNote": "\uc5ec\ub294 \uc2dc\uac04 \uc815\ubcf4 \uc5c6\uc74c",
+            "wheelchair": true,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 \uac1c\ubc29 \uc548 \ud568 \u00b7 \uc7a5\uc560\uc778 \ud654\uc7a5\uc2e4 \u00b7 \ube44\uc0c1\ubca8 \u00b7 \uae30\uc800\uadc0 \uad50\ud658\ub300"
+        },
+        {
+            "id": 895842,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1450362,
+            "lon": 126.9197842,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895848,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1450181,
+            "lon": 126.9193978,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895828,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1453556,
+            "lon": 126.9208095,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 879606,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c 38",
+            "lat": 35.144973,
+            "lon": 126.919518,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 4,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 4\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 895840,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1449515,
+            "lon": 126.9198542,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895844,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1485841,
+            "lon": 126.9197303,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895829,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1451986,
+            "lon": 126.9207294,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895839,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1485818,
+            "lon": 126.9198631,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 899723,
+            "kind": "stairs",
+            "sub": "\uacc4\ub2e8",
+            "name": "\uacc4\ub2e8",
+            "address": null,
+            "lat": 35.1480951,
+            "lon": 126.9211056,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": false,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uacc4\ub2e8 \u00b7 \uae38\uc774 32m \u00b7 \uacbd\uc0ac\ub85c \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 899135,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \ubaa8\ub984",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1461631,
+            "lon": 126.9173136,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \ubaa8\ub984 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 896216,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1482572,
+            "lon": 126.9180317,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 896213,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1484187,
+            "lon": 126.9182479,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895843,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1487111,
+            "lon": 126.9197787,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 879321,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \uae08\ub0a8\ub85c 238",
+            "lat": 35.148344,
+            "lon": 126.91803,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 3,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 3\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 895815,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1472724,
+            "lon": 126.9218904,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895838,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.148761,
+            "lon": 126.9199088,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895818,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1457111,
+            "lon": 126.9216489,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895846,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1446983,
+            "lon": 126.9194738,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 879611,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \ubc31\uc11c\ub85c137\ubc88\uae38 37",
+            "lat": 35.145256,
+            "lon": 126.917773,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 3,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 3\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 879495,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \ucda9\uc7a5\ub85c 94",
+            "lat": 35.147593,
+            "lon": 126.917181,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 4,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 4\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 899126,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \ubaa8\ub984",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.147142,
+            "lon": 126.9220185,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \ubaa8\ub984 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 886042,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uad11\uc8fc\ub300\ud56d\uc678\uacfc\uc758\uc6d0(2\uce35)",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c26\ubc88\uae38 18 (\uc11c\uc11d\ub3d9)",
+            "lat": 35.1454128,
+            "lon": 126.9214838,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 09:00~18:00",
+            "wheelchair": false,
+            "count": 1,
+            "modes": [
+                "senior"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 09:00~18:00"
+        },
+        {
+            "id": 895813,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1459639,
+            "lon": 126.9219021,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895819,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1455362,
+            "lon": 126.9216234,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 881549,
+            "kind": "store",
+            "sub": "\ud3b8\uc758\uc810",
+            "name": "\uad11\uc8fc",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \uc911\uc559\ub85c196\ubc88\uae38 31-10",
+            "lat": 35.1488808,
+            "lon": 126.9191748,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\ud3b8\uc758\uc810"
+        },
+        {
+            "id": 881531,
+            "kind": "store",
+            "sub": "\ud3b8\uc758\uc810",
+            "name": "\uc528\uc720\ubb38\ud654\uc804\ub2f9\uc810",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \uc81c\ubd09\ub85c 98",
+            "lat": 35.1471882,
+            "lon": 126.9221175,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\ud3b8\uc758\uc810"
+        },
+        {
+            "id": 886140,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\ud669\uae08\uc8fc\ucc28\ube4c\ub529",
+            "address": "\uc11c\uc11d\ub85c 29-2 (\ud669\uae08\ub3d9)",
+            "lat": 35.1463925,
+            "lon": 126.9168187,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 09:00~18:00",
+            "wheelchair": false,
+            "count": 1,
+            "modes": [
+                "senior"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 09:00~18:00"
+        },
+        {
+            "id": 898591,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \ubaa8\ub984",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.146123,
+            "lon": 126.9168811,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \ubaa8\ub984 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 886033,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uad11\uc8fc\ub300\uc131\ud559\uc6d0",
+            "address": "\uc81c\ubd09\ub85c 92 (\uc11c\uc11d\ub3d9)",
+            "lat": 35.1465785,
+            "lon": 126.922231,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 08:00~22:00",
+            "wheelchair": true,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 08:00~22:00 \u00b7 \uc7a5\uc560\uc778 \ud654\uc7a5\uc2e4"
+        },
+        {
+            "id": 879608,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c23\ubc88\uae38 6-4",
+            "lat": 35.144548,
+            "lon": 126.918993,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 4,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 4\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 881625,
+            "kind": "store",
+            "sub": "\ud3b8\uc758\uc810",
+            "name": "\uc528\uc720",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ucda9\uc7a5\ub85c 93-5",
+            "lat": 35.1480864,
+            "lon": 126.9172989,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\ud3b8\uc758\uc810"
+        },
+        {
+            "id": 886135,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\ucda9\uc7a5\ube4c\ub529",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ucda9\uc7a5\ub85c 93-5 (\uae08\ub0a8\ub85c2\uac00, \ubb34\ub4f1\ub9e8\uc158)",
+            "lat": 35.1480729,
+            "lon": 126.9172786,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 09\uc2dc~20\uc2dc",
+            "wheelchair": false,
+            "count": 1,
+            "modes": [
+                "senior"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 09\uc2dc~20\uc2dc"
+        },
+        {
+            "id": 884501,
+            "kind": "shelter",
+            "sub": "\ud55c\ud30c\uc27c\ud130",
+            "name": "\uae08\ub0a8\uacbd\ub85c\ub2f9",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c  \ubc31\uc11c\ub85c125\ubc88\uae38  32-7  (\uae08\ub3d9)",
+            "lat": 35.1448235,
+            "lon": 126.918051,
+            "distanceM": null,
+            "nowStatus": "\ud655\uc778 \uc548 \ub428",
+            "nowNote": "\uc5ec\ub294 \uc2dc\uac04 \uc815\ubcf4 \uc5c6\uc74c",
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "senior"
+            ],
+            "detail": "\ud55c\ud30c\uc27c\ud130 \u00b7 11.15~3.15 \uc6b4\uc601"
+        },
+        {
+            "id": 883117,
+            "kind": "shelter",
+            "sub": "\ubb34\ub354\uc704\uc27c\ud130",
+            "name": "\uae08\ub0a8\uacbd\ub85c\ub2f9",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c  \ubc31\uc11c\ub85c125\ubc88\uae38  32-7  (\uae08\ub3d9)",
+            "lat": 35.1448235,
+            "lon": 126.918051,
+            "distanceM": null,
+            "nowStatus": "\uc6b4\uc601 \uae30\uac04 \uc544\ub2d8",
+            "nowNote": "\ubb34\ub354\uc704\uc27c\ud130 \uc6b4\uc601 \uae30\uac04 \uc544\ub2d8 (05-20~09-30)",
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "senior"
+            ],
+            "detail": "\ubb34\ub354\uc704\uc27c\ud130 \u00b7 5.20~9.30 \uc6b4\uc601 \u00b7 \ud3c9\uc77c 09:00~18:00 (\uc77c\ubc18 \uc6b4\uc601 \uc2dc\uac04)"
+        },
+        {
+            "id": 895816,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1455325,
+            "lon": 126.921843,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 886032,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uad11\uc8fc\uc601\uc0c1\ubcf5\ud569\ubb38\ud654\uad00",
+            "address": "\uc81c\ubd09\ub85c 96 (\uc11c\uc11d\ub3d9)",
+            "lat": 35.1469227,
+            "lon": 126.9222738,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 09:00~18:00",
+            "wheelchair": true,
+            "count": 1,
+            "modes": [
+                "senior",
+                "wheelchair"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 09:00~18:00 \u00b7 \uc7a5\uc560\uc778 \ud654\uc7a5\uc2e4"
+        },
+        {
+            "id": 879496,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \uc11c\uc11d\ub85c 7",
+            "lat": 35.146014,
+            "lon": 126.9168625,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 2,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 2\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 879613,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c35\ubc88\uae38 15",
+            "lat": 35.145241,
+            "lon": 126.917316,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 3,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 3\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 879497,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \uc911\uc559\ub85c160\ubc88\uae38 31-37",
+            "lat": 35.147415,
+            "lon": 126.916734,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 2,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 2\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 895805,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1458823,
+            "lon": 126.9221936,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895814,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1481888,
+            "lon": 126.9218793,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 881630,
+            "kind": "store",
+            "sub": "\ud3b8\uc758\uc810",
+            "name": "\ubbf8\ub2c8\uc2a4\ud1b1\uadf8\ub79c\ub4dc\uc810",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \uc11c\uc11d\ub85c 26",
+            "lat": 35.1457965,
+            "lon": 126.9167746,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\ud3b8\uc758\uc810"
+        },
+        {
+            "id": 879322,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \uae08\ub0a8\ub85c 236",
+            "lat": 35.148662,
+            "lon": 126.917636,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 2,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 2\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 881619,
+            "kind": "store",
+            "sub": "\ud3b8\uc758\uc810",
+            "name": "\uc9c0\uc5d0\uc2a425\uae08\ub0a8",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \uae08\ub0a8\ub85c 237",
+            "lat": 35.1488891,
+            "lon": 126.9180224,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\ud3b8\uc758\uc810"
+        },
+        {
+            "id": 881209,
+            "kind": "police",
+            "sub": "\uacbd\ucc30\uc11c",
+            "name": "\uad11\uc8fc\ub3d9\ubd80\uacbd\ucc30\uc11c",
+            "address": "\uad11\uc8fc \ub3d9\uad6c \uc608\uc220\uae38 33",
+            "lat": 35.1492006,
+            "lon": 126.9198932,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "24\uc2dc\uac04 \uadfc\ubb34",
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\uacbd\ucc30\uc11c"
+        },
+        {
+            "id": 895806,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1456141,
+            "lon": 126.9221868,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 881626,
+            "kind": "store",
+            "sub": "\ud3b8\uc758\uc810",
+            "name": "\uc9c0\uc5d0\uc2a4GS25\uad11\uc8fcGS\uc810",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c35\ubc88\uae38 17",
+            "lat": 35.1451208,
+            "lon": 126.9172032,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\ud3b8\uc758\uc810"
+        },
+        {
+            "id": 899133,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \ubaa8\ub984",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1458503,
+            "lon": 126.9166329,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \ubaa8\ub984 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 879602,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c16\ubc88\uae38 5",
+            "lat": 35.14435,
+            "lon": 126.920428,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 3,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 3\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 895812,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1483502,
+            "lon": 126.9218981,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895809,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.148265,
+            "lon": 126.9219973,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 879601,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \ub0a8\ub3d9 59",
+            "lat": 35.144678,
+            "lon": 126.921311,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 4,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 4\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 899146,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \ubaa8\ub984",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1446826,
+            "lon": 126.9213284,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \ubaa8\ub984 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 899134,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \ubaa8\ub984",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1459568,
+            "lon": 126.9165232,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \ubaa8\ub984 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 899127,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \ubaa8\ub984",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1461866,
+            "lon": 126.9225907,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \ubaa8\ub984 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 899145,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \ubaa8\ub984",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1445864,
+            "lon": 126.9212839,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \ubaa8\ub984 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 879614,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \uc11c\uc11d\ub85c 24",
+            "lat": 35.145324,
+            "lon": 126.916803,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 3,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 3\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 899147,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1441242,
+            "lon": 126.9198102,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 886065,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uae08\ub0a8\uc9c0\uad6c\ub300",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \uc608\uc220\uae38 31-5, \uae08\ub0a8\uc9c0\uad6c\ub300 (\ub300\uc758\ub3d9)",
+            "lat": 35.1493884,
+            "lon": 126.9193545,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 09:00~18:00",
+            "wheelchair": false,
+            "count": 1,
+            "modes": [
+                "senior"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 09:00~18:00"
+        },
+        {
+            "id": 895800,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1464158,
+            "lon": 126.9227193,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895891,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1458261,
+            "lon": 126.9164477,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 879323,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \uae08\ub0a8\ub85c 231",
+            "lat": 35.148854,
+            "lon": 126.917479,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 2,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 2\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 881540,
+            "kind": "store",
+            "sub": "\ud3b8\uc758\uc810",
+            "name": "\uc138\ube10\uc77c\ub808\ube10\uad11\uc8fc\ud558\ub298\ub9c8\ub2f9\uc810",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \uc11c\uc11d\ub85c85\ubc88\uae38 1",
+            "lat": 35.1493774,
+            "lon": 126.9204802,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\ud3b8\uc758\uc810"
+        },
+        {
+            "id": 886071,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uc6d0\ubd88\uad50\uad11\uc8fc\uad50\ub2f9",
+            "address": "\uc608\uc220\uae38 26(\uad81\ub3d9)",
+            "lat": 35.1494183,
+            "lon": 126.9186793,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 06:00~04:00",
+            "wheelchair": false,
+            "count": 1,
+            "modes": [
+                "senior"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 06:00~04:00"
+        },
+        {
+            "id": 886130,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uae08\ub0a8\ube4c\ub529(2\uce35)",
+            "address": "\uae08\ub0a8\ub85c 231 (\uae08\ub0a8\ub85c2\uac00)",
+            "lat": 35.149044,
+            "lon": 126.9176282,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uac1c\ubc29 \uc2dc\uac04 09:00~16:00",
+            "wheelchair": false,
+            "count": 1,
+            "modes": [
+                "senior"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 09:00~16:00"
+        },
+        {
+            "id": 895803,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1482908,
+            "lon": 126.9223266,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895795,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1467162,
+            "lon": 126.9229165,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 884480,
+            "kind": "shelter",
+            "sub": "\ud55c\ud30c\uc27c\ud130",
+            "name": "\uad11\uc8fc\uc740\ud589\ub3d9\uad6c\uccad(\ucd9c)",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \uc11c\ub0a8\ub85c 1",
+            "lat": 35.146281,
+            "lon": 126.922869,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uc27c\ud130 \uc6b4\uc601 \uc2dc\uac04 \ud3c9\uc77c 09:00~16:00",
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "senior"
+            ],
+            "detail": "\ud55c\ud30c\uc27c\ud130 \u00b7 11.15~3.15 \uc6b4\uc601 \u00b7 \ud3c9\uc77c 09:00~16:00"
+        },
+        {
+            "id": 883073,
+            "kind": "shelter",
+            "sub": "\ubb34\ub354\uc704\uc27c\ud130",
+            "name": "\uad11\uc8fc\uc740\ud589\ub3d9\uad6c\uccad(\ucd9c)",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \uc11c\ub0a8\ub85c 1",
+            "lat": 35.1462807,
+            "lon": 126.9228691,
+            "distanceM": null,
+            "nowStatus": "\uc774\uc6a9 \uac00\ub2a5",
+            "nowNote": "\uc27c\ud130 \uae30\uac04\uc740 \uc544\ub2c8\uc9c0\ub9cc \uc740\ud589 \uc77c\ubc18 \uc5c5\ubb34 \uc2dc\uac04(\ud3c9\uc77c 09:00~16:00) \uae30\uc900",
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "senior"
+            ],
+            "detail": "\ubb34\ub354\uc704\uc27c\ud130 \u00b7 5.20~9.30 \uc6b4\uc601"
+        },
+        {
+            "id": 895830,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1493973,
+            "lon": 126.9206827,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895822,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1443553,
+            "lon": 126.9213314,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 899154,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1455182,
+            "lon": 126.9226622,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 899149,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \ubaa8\ub984",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1453748,
+            "lon": 126.9225736,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \ubaa8\ub984 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984 (OSM)"
+        },
+        {
+            "id": 895826,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1494174,
+            "lon": 126.9208369,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 879615,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c35\ubc88\uae38 24",
+            "lat": 35.144942,
+            "lon": 126.916714,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 3,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 3\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 881617,
+            "kind": "store",
+            "sub": "\ud3b8\uc758\uc810",
+            "name": "\uc528\uc720\uae08\ub3d9\uc810",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubc31\uc11c\ub85c125\ubc88\uae38 26",
+            "lat": 35.1440127,
+            "lon": 126.9181042,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\ud3b8\uc758\uc810"
+        },
+        {
+            "id": 895802,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1484371,
+            "lon": 126.9226635,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 881632,
+            "kind": "store",
+            "sub": "\ud3b8\uc758\uc810",
+            "name": "\uc138\ube10\uad11\uc8fc\uc5d8\ud06c\ub8e8\uc810",
+            "address": "\uc804\ub0a8\uad11\uc8fc\ud1b5\ud569\ud2b9\ubcc4\uc2dc \ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c35\ubc88\uae38 25",
+            "lat": 35.1447328,
+            "lon": 126.9165672,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "common"
+            ],
+            "detail": "\ud3b8\uc758\uc810"
+        },
+        {
+            "id": 886142,
+            "kind": "toilet",
+            "sub": "\uac1c\ubc29\ud654\uc7a5\uc2e4",
+            "name": "\uc6b0\ub9ac\uc740\ud589\uae08\ub0a8\ub85c\uc9c0\uc810",
+            "address": "\uae08\ub0a8\ub85c 226 (\uae08\ub0a8\ub85c2\uac00)",
+            "lat": 35.1489361,
+            "lon": 126.9167503,
+            "distanceM": null,
+            "nowStatus": "\ud655\uc778 \uc548 \ub428",
+            "nowNote": "\uc5ec\ub294 \uc2dc\uac04 \uc815\ubcf4 \uc5c6\uc74c",
+            "wheelchair": false,
+            "count": 1,
+            "modes": [
+                "senior"
+            ],
+            "detail": "\uac1c\ubc29\ud654\uc7a5\uc2e4 \u00b7 \uac1c\ubc29 \uac1c\ubc29 \uc548 \ud568"
+        },
+        {
+            "id": 879612,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \ubb38\ud654\uc804\ub2f9\ub85c23\ubc88\uae38 22",
+            "lat": 35.144037,
+            "lon": 126.917537,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 2,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 2\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 895799,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1485506,
+            "lon": 126.922734,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 879313,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \uc7a5\ub3d9\ub85c 4-3",
+            "lat": 35.148973,
+            "lon": 126.922361,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 2,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 2\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 896224,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1491507,
+            "lon": 126.916678,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 895808,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638\ub4f1",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1493238,
+            "lon": 126.9221017,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638\ub4f1 \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 879324,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \uae08\ub0a8\ub85c 221",
+            "lat": 35.149275,
+            "lon": 126.91682,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 4,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 4\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 896222,
+            "kind": "crosswalk",
+            "sub": "\uc2e0\ud638 \uc5c6\uc74c",
+            "name": "\ud6a1\ub2e8\ubcf4\ub3c4",
+            "address": null,
+            "lat": 35.1493241,
+            "lon": 126.9168772,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 1,
+            "modes": [
+                "wheelchair"
+            ],
+            "detail": "\ud6a1\ub2e8\ubcf4\ub3c4 \u00b7 \uc2e0\ud638 \uc5c6\uc74c \u00b7 \ubcf4\ub3c4\ud131 \ubaa8\ub984"
+        },
+        {
+            "id": 879325,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \uae08\ub0a8\ub85c 224",
+            "lat": 35.149416,
+            "lon": 126.916438,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 2,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 2\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        },
+        {
+            "id": 879598,
+            "kind": "cctv",
+            "sub": "\ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)",
+            "name": "CCTV",
+            "address": "\ub3d9\uad6c \uc81c\ubd09\ub85c98\ubc88\uae38 8",
+            "lat": 35.144036,
+            "lon": 126.922965,
+            "distanceM": null,
+            "nowStatus": null,
+            "nowNote": null,
+            "wheelchair": null,
+            "count": 4,
+            "modes": [
+                "common"
+            ],
+            "detail": "CCTV 4\ub300 \u00b7 \ud1b5\ud569\uad00\uc81c(\ubc29\ubc94)"
+        }
+    ],
+    "truncated": false
+}

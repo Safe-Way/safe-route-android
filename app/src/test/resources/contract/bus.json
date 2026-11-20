@@ -1,0 +1,181 @@
+{
+    "stops": [
+        {
+            "id": 1325,
+            "name": "\ubb38\ud654\uc804\ub2f9\uc5ed",
+            "nextStop": null,
+            "lat": 35.14647574,
+            "lon": 126.91989151,
+            "distanceM": 36,
+            "available": true,
+            "arrivals": []
+        },
+        {
+            "id": 3908,
+            "name": "\ubb38\ud654\uc804\ub2f9\uc5ed",
+            "nextStop": "\uad6d\ub9bd\uc544\uc2dc\uc544\ubb38\ud654\uc804\ub2f9",
+            "lat": 35.14624502,
+            "lon": 126.91895949,
+            "distanceM": 77,
+            "available": true,
+            "arrivals": [
+                {
+                    "lineId": 153,
+                    "lineName": "36",
+                    "remainMin": 3,
+                    "remainStop": 1,
+                    "lowFloor": false,
+                    "direction": "\uc11c\uad11\uc8fc\uc5ed",
+                    "nowAt": "\uc11c\ub0a8\ub3d9\ud589\uc815\ubcf5\uc9c0\uc13c\ud130"
+                },
+                {
+                    "lineId": 192,
+                    "lineName": "76",
+                    "remainMin": 4,
+                    "remainStop": 1,
+                    "lowFloor": false,
+                    "direction": "\uc0b0\uc218\ub3d9\uc885\uc810",
+                    "nowAt": "\uc804\ub0a8\ub300\ubcd1\uc6d0.\ub0a8\uad11\uc8fc\uc2dc\uc7a5"
+                },
+                {
+                    "lineId": 171,
+                    "lineName": "55",
+                    "remainMin": 5,
+                    "remainStop": 3,
+                    "lowFloor": false,
+                    "direction": "\ub355\ub0a8\ub9c8\uc744\uc785\uad6c",
+                    "nowAt": "\uc0b4\ub808\uc2dc\uc624\uc5ec\uace0"
+                },
+                {
+                    "lineId": 167,
+                    "lineName": "51",
+                    "remainMin": 6,
+                    "remainStop": 3,
+                    "lowFloor": false,
+                    "direction": "\ucca8\ub2e8\uacf5\uc601\ucc28\uace0\uc9c0",
+                    "nowAt": "\ubc29\ub9bc\uc5ed2\ubc88\ucd9c\uad6c"
+                },
+                {
+                    "lineId": 244,
+                    "lineName": "98",
+                    "remainMin": 6,
+                    "remainStop": 2,
+                    "lowFloor": true,
+                    "direction": "\ub3c4\uc0b0\ub3d9",
+                    "nowAt": "\uc870\uc120\ub300\uacf5\uacfc\ub300\ud559"
+                },
+                {
+                    "lineId": 236,
+                    "lineName": "228",
+                    "remainMin": 6,
+                    "remainStop": 3,
+                    "lowFloor": false,
+                    "direction": "\ub3d9\ub9bc\uc0bc\uc775\uc544\ud30c\ud2b8(\ubd81)",
+                    "nowAt": "\ud559\ub3d9\uc99d\uc2ec\uc0ac\uc785\uad6c\uc5ed3\ubc88\ucd9c\uad6c"
+                },
+                {
+                    "lineId": 110,
+                    "lineName": "12",
+                    "remainMin": 10,
+                    "remainStop": 6,
+                    "lowFloor": false,
+                    "direction": "\ud558\ub0a8\uace0\ub4f1\ud559\uad50",
+                    "nowAt": "\uad11\uc8fc\ub0a8\ucd08\uad50"
+                },
+                {
+                    "lineId": 242,
+                    "lineName": "1003",
+                    "remainMin": 10,
+                    "remainStop": 5,
+                    "lowFloor": true,
+                    "direction": "\uc138\ud558\ub3d9",
+                    "nowAt": "\uc18c\ud0dc\uc5ed4\ubc88\ucd9c\uad6c"
+                },
+                {
+                    "lineId": 89,
+                    "lineName": "09",
+                    "remainMin": 12,
+                    "remainStop": 7,
+                    "lowFloor": true,
+                    "direction": "\ucca8\ub2e8\uacf5\uc601\ucc28\uace0\uc9c0",
+                    "nowAt": "\uc6b4\ub9bc\uc911"
+                },
+                {
+                    "lineId": 107,
+                    "lineName": "11",
+                    "remainMin": 17,
+                    "remainStop": 11,
+                    "lowFloor": true,
+                    "direction": "\uc138\ud558\ub3d9",
+                    "nowAt": "\uc8fc\ub0a8"
+                },
+                {
+                    "lineId": 53,
+                    "lineName": "\uae09\ud58905",
+                    "remainMin": 18,
+                    "remainStop": 7,
+                    "lowFloor": true,
+                    "direction": "\ucca8\ub2e8\uacf5\uc601\ucc28\uace0\uc9c0",
+                    "nowAt": "\ub300\uad11\uc5ec\uace0"
+                },
+                {
+                    "lineId": 209,
+                    "lineName": "\ub9c8\uc744715",
+                    "remainMin": 25,
+                    "remainStop": 13,
+                    "lowFloor": false,
+                    "direction": "\uc608\uc220\uc758\uac70\ub9ac\uc785\uad6c",
+                    "nowAt": "\ub300\uad11\uc5ec\uace0"
+                },
+                {
+                    "lineId": 46,
+                    "lineName": "05",
+                    "remainMin": 30,
+                    "remainStop": 15,
+                    "lowFloor": true,
+                    "direction": "\ucca8\ub2e8\uacf5\uc601\ucc28\uace0\uc9c0",
+                    "nowAt": "\uc1a1\ud654\ub9c8\uc7444\ub2e8\uc9c0"
+                },
+                {
+                    "lineId": 238,
+                    "lineName": "518",
+                    "remainMin": 46,
+                    "remainStop": 25,
+                    "lowFloor": false,
+                    "direction": "\uc0c1\ubb34\uc9c0\uad6c",
+                    "nowAt": "\uc8fc\ub8e1"
+                }
+            ]
+        },
+        {
+            "id": 339,
+            "name": "\ubb38\ud654\uc804\ub2f9\uc5ed(\ub3d9)",
+            "nextStop": null,
+            "lat": 35.14738333,
+            "lon": 126.918875,
+            "distanceM": 101,
+            "available": true,
+            "arrivals": []
+        },
+        {
+            "id": 338,
+            "name": "\ubb38\ud654\uc804\ub2f9\uc5ed(\uc885\uac01)",
+            "nextStop": null,
+            "lat": 35.14768333,
+            "lon": 126.91980556,
+            "distanceM": 111,
+            "available": true,
+            "arrivals": []
+        },
+        {
+            "id": 336,
+            "name": "\ubb38\ud654\uc804\ub2f9\uc5ed(\ub3d9)",
+            "nextStop": null,
+            "lat": 35.14776111,
+            "lon": 126.91907222,
+            "distanceM": 127,
+            "available": true,
+            "arrivals": []
+        }
+    ]
+}

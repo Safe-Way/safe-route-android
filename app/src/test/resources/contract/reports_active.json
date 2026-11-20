@@ -1,0 +1,27 @@
+{
+    "spots": [
+        {
+            "spotId": 9,
+            "reportType": "steep",
+            "lat": 35.1441984753512,
+            "lon": 126.925580181286,
+            "startsOn": "2026-11-13",
+            "endsOn": "2026-12-12",
+            "reportCount": 2,
+            "reporterCount": 2,
+            "photoCount": 0,
+            "confirmed": true,
+            "avoidModes": [
+                "senior",
+                "wheelchair"
+            ],
+            "costModes": [
+                "adult",
+                "child"
+            ],
+            "lastAt": "2026-11-13T12:33",
+            "lastMemo": "\ud604\uc7a5 \uc2dc\ud5d8(11-13) \ub178\uc778 \ubaa8\ub4dc \uac77\uae30\uc5d0\uc11c\ub3c4 \ud655\uc778: \uc11c\uc11d\ub3d9 435-3 \uc55e \uacbd\uc0ac\ub85c\uac00 \uc57d 40\u00b0\ub85c \uac00\ud314\ub77c \ub178\uc778\u00b7\ud720\uccb4\uc5b4\uac00 \uc9c0\ub098\uae30 \uc5b4\ub824\uc6c0"
+        }
+    ],
+    "truncated": false
+}

@@ -1,0 +1,1100 @@
+{
+    "conditions": {
+        "night": false,
+        "nightSource": "auto",
+        "sunset": "17:24",
+        "roof": false,
+        "roofSource": "auto",
+        "rain": false,
+        "heat": false,
+        "cold": false,
+        "tempC": 0.8,
+        "weatherAvailable": true,
+        "dustBad": false,
+        "dustAvailable": true
+    },
+    "routes": [
+        {
+            "kind": "safe",
+            "distanceM": 800,
+            "durationMin": 16,
+            "geometry": [
+                [
+                    126.9203,
+                    35.1491
+                ],
+                [
+                    126.920331245041,
+                    35.149072599301235
+                ],
+                [
+                    126.919877,
+                    35.1487263
+                ],
+                [
+                    126.9197994,
+                    35.1486671
+                ],
+                [
+                    126.9193462,
+                    35.1483384
+                ],
+                [
+                    126.9192177,
+                    35.1482476
+                ],
+                [
+                    126.9188491,
+                    35.1479852
+                ],
+                [
+                    126.9187759,
+                    35.1479184
+                ],
+                [
+                    126.9188774,
+                    35.1477732
+                ],
+                [
+                    126.9189239,
+                    35.1477093
+                ],
+                [
+                    126.918947,
+                    35.147657
+                ],
+                [
+                    126.9189625,
+                    35.1476078
+                ],
+                [
+                    126.9189808,
+                    35.1475457
+                ],
+                [
+                    126.9189936,
+                    35.1474774
+                ],
+                [
+                    126.9189945,
+                    35.1473969
+                ],
+                [
+                    126.9189866,
+                    35.1473337
+                ],
+                [
+                    126.9189665,
+                    35.1472421
+                ],
+                [
+                    126.9189377,
+                    35.1471582
+                ],
+                [
+                    126.9188781,
+                    35.147058
+                ],
+                [
+                    126.9187856,
+                    35.1469353
+                ],
+                [
+                    126.9187137,
+                    35.1468545
+                ],
+                [
+                    126.9186364,
+                    35.1467817
+                ],
+                [
+                    126.9186169,
+                    35.1467634
+                ],
+                [
+                    126.9186547,
+                    35.1467268
+                ],
+                [
+                    126.9186813,
+                    35.146685
+                ],
+                [
+                    126.9189918,
+                    35.146016
+                ],
+                [
+                    126.9190761,
+                    35.1458345
+                ],
+                [
+                    126.9191337,
+                    35.145851
+                ],
+                [
+                    126.9191999,
+                    35.1458715
+                ],
+                [
+                    126.9195379,
+                    35.1451103
+                ],
+                [
+                    126.919562,
+                    35.1450774
+                ],
+                [
+                    126.9195969,
+                    35.1450562
+                ],
+                [
+                    126.9196452,
+                    35.1450474
+                ],
+                [
+                    126.9197122,
+                    35.1450613
+                ],
+                [
+                    126.9202066,
+                    35.1452603
+                ],
+                [
+                    126.9200766,
+                    35.1454977
+                ],
+                [
+                    126.9200212,
+                    35.1454784
+                ],
+                [
+                    126.9196164,
+                    35.1462266
+                ],
+                [
+                    126.9195281,
+                    35.1463898
+                ],
+                [
+                    126.9196,
+                    35.1467
+                ]
+            ],
+            "counts": {
+                "light": 45,
+                "cctv": 14,
+                "bell": 0,
+                "help": 4,
+                "rest": 7,
+                "school": 2
+            },
+            "covered": {},
+            "sidewalks": [
+                {
+                    "from": 1,
+                    "to": 3,
+                    "side": "both",
+                    "highway": "tertiary",
+                    "lanes": null,
+                    "oneway": null,
+                    "widthM": null,
+                    "offsetM": 8.0,
+                    "sidewalkWidthM": 7.5
+                },
+                {
+                    "from": 3,
+                    "to": 4,
+                    "side": "left",
+                    "highway": "tertiary",
+                    "lanes": null,
+                    "oneway": null,
+                    "widthM": null,
+                    "offsetM": 8.0,
+                    "sidewalkWidthM": 7.0
+                },
+                {
+                    "from": 4,
+                    "to": 5,
+                    "side": "both",
+                    "highway": "tertiary",
+                    "lanes": null,
+                    "oneway": null,
+                    "widthM": null,
+                    "offsetM": 8.0,
+                    "sidewalkWidthM": null
+                },
+                {
+                    "from": 5,
+                    "to": 7,
+                    "side": "both",
+                    "highway": "tertiary",
+                    "lanes": null,
+                    "oneway": null,
+                    "widthM": null,
+                    "offsetM": 8.0,
+                    "sidewalkWidthM": 7.0
+                },
+                {
+                    "from": 7,
+                    "to": 8,
+                    "side": "both",
+                    "highway": "tertiary",
+                    "lanes": null,
+                    "oneway": null,
+                    "widthM": null,
+                    "offsetM": 8.0,
+                    "sidewalkWidthM": null
+                },
+                {
+                    "from": 21,
+                    "to": 24,
+                    "side": "both",
+                    "highway": "tertiary",
+                    "lanes": null,
+                    "oneway": null,
+                    "widthM": null,
+                    "offsetM": 8.0,
+                    "sidewalkWidthM": null
+                },
+                {
+                    "from": 24,
+                    "to": 26,
+                    "side": "left",
+                    "highway": "tertiary",
+                    "lanes": null,
+                    "oneway": null,
+                    "widthM": null,
+                    "offsetM": 8.0,
+                    "sidewalkWidthM": 7.0
+                }
+            ],
+            "dark": [],
+            "turns": [
+                {
+                    "atM": 195,
+                    "direction": "left",
+                    "angle": 74,
+                    "crossing": false,
+                    "thenM": null
+                },
+                {
+                    "atM": 338,
+                    "direction": "left",
+                    "angle": 70,
+                    "crossing": false,
+                    "thenM": null
+                },
+                {
+                    "atM": 449,
+                    "direction": "left",
+                    "angle": 75,
+                    "crossing": true,
+                    "thenM": 12
+                },
+                {
+                    "atM": 461,
+                    "direction": "right",
+                    "angle": 76,
+                    "crossing": false,
+                    "thenM": null
+                },
+                {
+                    "atM": 560,
+                    "direction": "left",
+                    "angle": 68,
+                    "crossing": false,
+                    "thenM": null
+                },
+                {
+                    "atM": 621,
+                    "direction": "left",
+                    "angle": 88,
+                    "crossing": false,
+                    "thenM": null
+                }
+            ],
+            "crossings": [
+                {
+                    "fromM": 449,
+                    "toM": 454
+                }
+            ],
+            "stairs": [],
+            "events": [],
+            "unpavedM": 0,
+            "surfaceUnknownM": 0,
+            "stops": [],
+            "crossAt": [],
+            "alleys": [],
+            "alleyM": 0,
+            "narrows": [],
+            "narrowM": 0
+        }
+    ],
+    "explanation": {
+        "text": "\ud720\uccb4\uc5b4\ub85c \uc9c0\ub0a0 \uc218 \uc788\ub294 \uae38 \uc911 \uac00\uc7a5 \uc9e7\uc740 \uae38\uc785\ub2c8\ub2e4",
+        "summary": "\ud720\uccb4\uc5b4\ub85c \uc9c0\ub0a0 \uc218 \uc788\ub294 \uae38 \uc911 \uac00\uc7a5 \uc9e7\uc740 \uae38\uc785\ub2c8\ub2e4",
+        "notes": [],
+        "extraM": 0,
+        "extraMin": 0,
+        "diff": {
+            "light": 0,
+            "cctv": 0,
+            "bell": 0,
+            "help": 0,
+            "rest": 0,
+            "school": 0
+        }
+    },
+    "facilities": [
+        {
+            "type": "POLICE",
+            "lat": 35.1492006,
+            "lon": 126.9198932,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 24,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "CONVENIENCE_STORE",
+            "lat": 35.1493774,
+            "lon": 126.9204802,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 0,
+                    "side": "left"
+                }
+            }
+        },
+        {
+            "type": "CONVENIENCE_STORE",
+            "lat": 35.1456268,
+            "lon": 126.9189694,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 449,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "CONVENIENCE_STORE",
+            "lat": 35.1477717,
+            "lon": 126.9184955,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 197,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "CCTV",
+            "lat": 35.148086,
+            "lon": 126.918492,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 195,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "CCTV",
+            "lat": 35.147788,
+            "lon": 126.918951,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 216,
+                    "side": "left"
+                }
+            }
+        },
+        {
+            "type": "CCTV",
+            "lat": 35.146277,
+            "lon": 126.918947,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 399,
+                    "side": "left"
+                }
+            }
+        },
+        {
+            "type": "CCTV",
+            "lat": 35.146875,
+            "lon": 126.91871,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 323,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "CCTV",
+            "lat": 35.144973,
+            "lon": 126.919518,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 559,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "SHELTER",
+            "lat": 35.1464226,
+            "lon": 126.918199,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 360,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "SHELTER",
+            "lat": 35.146423,
+            "lon": 126.918199,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 360,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "TOILET",
+            "lat": 35.1454128,
+            "lon": 126.9214838,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 621,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "TOILET",
+            "lat": 35.1470573,
+            "lon": 126.9200314,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 801,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "TOILET",
+            "lat": 35.1478384,
+            "lon": 126.9200218,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 116,
+                    "side": "left"
+                }
+            }
+        },
+        {
+            "type": "TOILET",
+            "lat": 35.1465467,
+            "lon": 126.919856,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 788,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "TOILET",
+            "lat": 35.1493884,
+            "lon": 126.9193545,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 45,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "SCHOOL_ZONE",
+            "lat": 35.1444776,
+            "lon": 126.9204542,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 602,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "SCHOOL_ZONE",
+            "lat": 35.1509302,
+            "lon": 126.9186394,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 0,
+                    "side": "left"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1451319,
+            "lon": 126.920454,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 621,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1449903,
+            "lon": 126.9200975,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 598,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1451632,
+            "lon": 126.9200063,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 599,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1448739,
+            "lon": 126.9198012,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 570,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1450384,
+            "lon": 126.9196879,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 568,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1450971,
+            "lon": 126.9194973,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 551,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1449573,
+            "lon": 126.9193575,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 556,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1456159,
+            "lon": 126.9189651,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 449,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1492295,
+            "lon": 126.9204818,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 1,
+                    "side": "left"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1452932,
+            "lon": 126.9203368,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 621,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1489519,
+            "lon": 126.9202989,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 15,
+                    "side": "left"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1488277,
+            "lon": 126.9199525,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 48,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.148627,
+            "lon": 126.9196776,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 82,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1465501,
+            "lon": 126.9194426,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 782,
+                    "side": "left"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1452981,
+            "lon": 126.9194277,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 528,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1455964,
+            "lon": 126.919307,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 493,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1452348,
+            "lon": 126.9192318,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 529,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1458212,
+            "lon": 126.9191767,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 466,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1455408,
+            "lon": 126.9190901,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 493,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1461254,
+            "lon": 126.9190478,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 418,
+                    "side": "left"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1458528,
+            "lon": 126.9189512,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 443,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1463993,
+            "lon": 126.9189435,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 386,
+                    "side": "left"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1461459,
+            "lon": 126.9188987,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 411,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1460478,
+            "lon": 126.9188624,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 420,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.146326,
+            "lon": 126.9187369,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 387,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1465816,
+            "lon": 126.9186216,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 357,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1467083,
+            "lon": 126.9185079,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 338,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1485352,
+            "lon": 126.9197436,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 84,
+                    "side": "left"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1483387,
+            "lon": 126.9192801,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 130,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1481194,
+            "lon": 126.9191549,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 154,
+                    "side": "left"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1474672,
+            "lon": 126.9189044,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 250,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1473385,
+            "lon": 126.9189034,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 266,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1480624,
+            "lon": 126.9188746,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 178,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1472145,
+            "lon": 126.918869,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 280,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1476234,
+            "lon": 126.9188558,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 230,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1470604,
+            "lon": 126.9187811,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 302,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.147786,
+            "lon": 126.9187509,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 207,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.146938,
+            "lon": 126.918661,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 320,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1481199,
+            "lon": 126.9186209,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 188,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1479227,
+            "lon": 126.9185886,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 195,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "STREETLIGHT",
+            "lat": 35.1468404,
+            "lon": 126.918542,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 336,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "SECURITY_LIGHT",
+            "lat": 35.1483345,
+            "lon": 126.9192123,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 135,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "SECURITY_LIGHT",
+            "lat": 35.145876,
+            "lon": 126.9187313,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 434,
+                    "side": "right"
+                }
+            }
+        },
+        {
+            "type": "SECURITY_LIGHT",
+            "lat": 35.146122,
+            "lon": 126.9186172,
+            "on": "safe",
+            "along": {
+                "safe": {
+                    "atM": 405,
+                    "side": "right"
+                }
+            }
+        }
+    ],
+    "dataQuality": {
+        "status": "OK",
+        "message": null,
+        "dataDate": "2026-11-19"
+    }
+}

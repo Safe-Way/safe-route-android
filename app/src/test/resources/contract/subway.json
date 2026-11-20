@@ -1,0 +1,189 @@
+{
+    "basis": "timetable",
+    "dayType": "\ud3c9\uc77c",
+    "stations": [
+        {
+            "id": 16,
+            "name": "\ubb38\ud654\uc804\ub2f9",
+            "lat": 35.1466782,
+            "lon": 126.9198143,
+            "distanceM": 20,
+            "elevator": {
+                "total": 5,
+                "available": 5
+            },
+            "wheelchairLift": {
+                "total": 0,
+                "available": 0
+            },
+            "accessibleToilet": {
+                "total": 2,
+                "available": 2
+            },
+            "elevatorBrokenGates": null,
+            "trains": [
+                {
+                    "direction": "\ud3c9\ub3d9\ud589",
+                    "endStation": "\ud3c9\ub3d9",
+                    "arriveTime": "09:35",
+                    "inMin": 3,
+                    "nowNear": "\ud559\ub3d9\uc99d\uc2ec\uc0ac\uc785\uad6c",
+                    "stopsAway": 2
+                },
+                {
+                    "direction": "\ub179\ub3d9\ud589",
+                    "endStation": "\uc18c\ud0dc",
+                    "arriveTime": "09:36",
+                    "inMin": 4,
+                    "nowNear": "\uc591\ub3d9\uc2dc\uc7a5",
+                    "stopsAway": 3
+                },
+                {
+                    "direction": "\ub179\ub3d9\ud589",
+                    "endStation": "\uc18c\ud0dc",
+                    "arriveTime": "09:44",
+                    "inMin": 12,
+                    "nowNear": "\uc30d\ucd0c",
+                    "stopsAway": 7
+                },
+                {
+                    "direction": "\ud3c9\ub3d9\ud589",
+                    "endStation": "\ud3c9\ub3d9",
+                    "arriveTime": "09:45",
+                    "inMin": 13,
+                    "nowNear": null,
+                    "stopsAway": null
+                }
+            ],
+            "elevatorExits": {
+                "count": 3,
+                "exitNos": "2,3,4",
+                "unknown": 0,
+                "total": 6,
+                "wheelchairEntry": true
+            }
+        },
+        {
+            "id": 15,
+            "name": "\uae08\ub0a8\ub85c4\uac00",
+            "lat": 35.1507055,
+            "lon": 126.9145807,
+            "distanceM": 638,
+            "elevator": {
+                "total": 2,
+                "available": 2
+            },
+            "wheelchairLift": {
+                "total": 0,
+                "available": 0
+            },
+            "accessibleToilet": {
+                "total": 4,
+                "available": 4
+            },
+            "elevatorBrokenGates": null,
+            "trains": [
+                {
+                    "direction": "\ub179\ub3d9\ud589",
+                    "endStation": "\uc18c\ud0dc",
+                    "arriveTime": "09:34",
+                    "inMin": 2,
+                    "nowNear": "\uc591\ub3d9\uc2dc\uc7a5",
+                    "stopsAway": 2
+                },
+                {
+                    "direction": "\ud3c9\ub3d9\ud589",
+                    "endStation": "\ud3c9\ub3d9",
+                    "arriveTime": "09:37",
+                    "inMin": 5,
+                    "nowNear": "\ud559\ub3d9\uc99d\uc2ec\uc0ac\uc785\uad6c",
+                    "stopsAway": 3
+                },
+                {
+                    "direction": "\ub179\ub3d9\ud589",
+                    "endStation": "\uc18c\ud0dc",
+                    "arriveTime": "09:42",
+                    "inMin": 10,
+                    "nowNear": "\uc30d\ucd0c",
+                    "stopsAway": 6
+                },
+                {
+                    "direction": "\ud3c9\ub3d9\ud589",
+                    "endStation": "\ud3c9\ub3d9",
+                    "arriveTime": "09:47",
+                    "inMin": 15,
+                    "nowNear": null,
+                    "stopsAway": null
+                }
+            ],
+            "elevatorExits": {
+                "count": 2,
+                "exitNos": "1,2",
+                "unknown": 0,
+                "total": 4,
+                "wheelchairEntry": true
+            }
+        },
+        {
+            "id": 17,
+            "name": "\ub0a8\uad11\uc8fc",
+            "lat": 35.1394416,
+            "lon": 126.9227716,
+            "distanceM": 857,
+            "elevator": {
+                "total": 3,
+                "available": 3
+            },
+            "wheelchairLift": {
+                "total": 0,
+                "available": 0
+            },
+            "accessibleToilet": {
+                "total": 2,
+                "available": 2
+            },
+            "elevatorBrokenGates": null,
+            "trains": [
+                {
+                    "direction": "\ud3c9\ub3d9\ud589",
+                    "endStation": "\ud3c9\ub3d9",
+                    "arriveTime": "09:33",
+                    "inMin": 1,
+                    "nowNear": "\ud559\ub3d9\uc99d\uc2ec\uc0ac\uc785\uad6c",
+                    "stopsAway": 1
+                },
+                {
+                    "direction": "\ub179\ub3d9\ud589",
+                    "endStation": "\uc18c\ud0dc",
+                    "arriveTime": "09:37",
+                    "inMin": 5,
+                    "nowNear": "\uc591\ub3d9\uc2dc\uc7a5",
+                    "stopsAway": 4
+                },
+                {
+                    "direction": "\ud3c9\ub3d9\ud589",
+                    "endStation": "\ud3c9\ub3d9",
+                    "arriveTime": "09:43",
+                    "inMin": 11,
+                    "nowNear": null,
+                    "stopsAway": null
+                },
+                {
+                    "direction": "\ub179\ub3d9\ud589",
+                    "endStation": "\uc18c\ud0dc",
+                    "arriveTime": "09:45",
+                    "inMin": 13,
+                    "nowNear": "\uc30d\ucd0c",
+                    "stopsAway": 8
+                }
+            ],
+            "elevatorExits": {
+                "count": 2,
+                "exitNos": "3,4",
+                "unknown": 0,
+                "total": 6,
+                "wheelchairEntry": true
+            }
+        }
+    ]
+}
