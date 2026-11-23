@@ -1,4 +1,6 @@
-# 앱 CI/CD: PR과 main에 올라올 때마다 빌드·단위 시험, main이면 시험용 APK를 남긴다.
+# 앱 CI/CD: PR마다 빌드·단위 시험, main에 올라오면(PR 머지) 시험용 APK만 만들어 남긴다.
+# main 푸시 때는 단위 시험을 건너뛴다: 같은 변경을 PR에서 이미 시험함. APK는 3일만 남긴다(최신 것만 필요).
+#   비공개 저장소 Actions 무료 시간(조직 합쳐 월 2,000분)·저장 공간(0.5GB)을 11월에 다 써서 줄임 (2026-11-23, APK 36MB × 70개 = 2.6GB)
 # 키는 저장소에 넣지 않는다. local.properties는 여기서 만들고, 카카오 키는 Secrets에 있을 때만 넣는다.
 # 제미나이 키는 앱에 넣지 않는다 (서버 /api/ai/* 를 부름, 서버 #119·앱 #97).
 name: 앱 CI
@@ -56,6 +58,7 @@ jobs:
           exit 1
 
       - name: 단위 시험
+        if: github.event_name != 'push'
         run: ./gradlew --no-daemon testDebugUnitTest
 
       - name: 시험용 APK 만들기
@@ -75,4 +78,4 @@ jobs:
         with:
           name: app-debug-${{ github.sha }}
           path: app/build/outputs/apk/debug/*.apk
-          retention-days: 14
+          retention-days: 3
