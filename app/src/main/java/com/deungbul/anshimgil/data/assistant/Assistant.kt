@@ -470,6 +470,8 @@ class ServerAppAssistant(
     private val local: AppAssistant,
     private val guestId: suspend () -> String?,
     private val favorites: suspend () -> List<Pair<String, LatLon>>,
+    /** How the request reaches the server; tests pass a fake to count calls. */
+    private val post: suspend (path: String, body: JSONObject) -> JSONObject = { path, body -> ServerApi.post(path, body) },
 ) : AppAssistant {
     private var conversationId: String? = null
     private var offered: Map<String, String> = emptyMap()
@@ -499,7 +501,7 @@ class ServerAppAssistant(
         // The phone's reading of a trip with a start or stops, else the phone's own assistant.
         suspend fun fallback() = if (rule is AssistantAction.GoTrip) rule else local.reply(history, context)
         val json = try {
-            ServerApi.post("/api/assistant", body)
+            post("/api/assistant", body)
         } catch (e: ApiException) {
             return fallback()
         } catch (e: IOException) {

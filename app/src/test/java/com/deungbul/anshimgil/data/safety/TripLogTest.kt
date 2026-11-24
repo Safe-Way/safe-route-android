@@ -78,4 +78,23 @@ class TripLogTest {
         assertEquals("clear", tripWeather(base))
         assertEquals("clear", tripWeather(null))
     }
+
+
+    /** 역할: 좌표 반올림이 소수점 셋째 자리(약 100m)로 되고, 원래 자리에서 반 칸(0.0005도, 약 55m) 넘게 움직이지 않는지 확인한다. 남쪽·서쪽(음수) 좌표도 같다. */
+    @Test
+    fun roundingStaysWithinHalfAStep() {
+        assertEquals(35.140, roundTo100m(35.14049), 0.0)     // 0.00049는 버림
+        assertEquals(35.141, roundTo100m(35.14051), 0.0)     // 0.00051은 올림
+        assertEquals(-0.001, roundTo100m(-0.0006), 0.0)      // 음수도 가까운 쪽으로
+        for (v in listOf(35.1404, 126.93189, 35.0, 126.9999)) {
+            assertFalse("$v", kotlin.math.abs(roundTo100m(v) - v) > 0.0005 + 1e-9)  // 반 칸 넘게 움직이면 실패
+        }
+    }
+
+    /** 역할: 서버가 한파라고 하면 기록의 날씨 낱말이 "cold"가 되는지 확인한다(비·폭염은 weatherWord에서 봄). */
+    @Test
+    fun coldWeatherWord() {
+        val base = RouteResult(emptyList(), emptyList(), Explanation("", emptyList()), emptyList(), DataQuality(true, null))
+        assertEquals("cold", tripWeather(base.copy(weather = listOf("한파", "-12°C"))))
+    }
 }

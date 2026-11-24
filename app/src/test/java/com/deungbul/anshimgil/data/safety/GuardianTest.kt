@@ -6,6 +6,8 @@ import org.junit.Assert.assertNull      // assertNull(값): 값이 null(없음)�
 import org.junit.Assert.assertTrue      // assertTrue(조건): 조건이 참이어야 통과
 import org.junit.Test                   // @Test가 붙은 함수 하나하나가 시험 하나
 import com.deungbul.anshimgil.data.route.LatLon
+import org.junit.Assert.assertFalse     // assertFalse(조건): 조건이 거짓이어야 통과
+import java.util.Locale
 
 /**
  * 귀가 지킴이(보호자 알림) 시험.
@@ -52,5 +54,49 @@ class GuardianTest {
         assertTrue(text.contains("https://map.kakao.com/link/map/지금위치,35.140400,126.931800"))
         // 길 벗어남 문자를 위치 없이(null) 만들어도 "정한 길에서 벗어났어요" 문장은 들어가야 한다.
         assertTrue(guardianMessage(GuardianAlert.OFF_ROUTE, null).contains("정한 길에서 벗어났어요"))
+    }
+
+
+    /** 역할: 보호자 이름에 저장 구분 글자 '|'가 들어가도, 저장했다 다시 읽을 때 전화번호가 깨지지 않는지 확인한다. */
+    @Test
+    fun aBarInTheNameDoesNotBreakTheNumber() {
+        val g = Guardian("엄|마", "01012345678")            // 이름에 '|'가 들어간 보호자
+        val back = Guardian.decode(g.encode())!!            // 저장 글자로 바꿨다가 다시 읽기
+        assertEquals("01012345678", back.phone)             // 전화번호는 그대로
+        assertEquals("엄 마", back.name)                     // '|'는 빈칸으로 바뀌어 저장된다
+    }
+
+    /** 역할: 저장된 글자가 깨져 이름이나 번호가 비어 있으면, 그 보호자를 버리고(null) 엉뚱한 번호로 문자가 가지 않는지 확인한다. */
+    @Test
+    fun brokenSavedTextIsSkipped() {
+        assertNull(Guardian.decode(""))              // 아무것도 없음
+        assertNull(Guardian.decode("|01012345678"))  // 이름 없음
+        assertNull(Guardian.decode("엄마|"))          // 번호 없음
+        assertNull(Guardian.decode("엄마|   "))       // 번호가 빈칸뿐
+    }
+
+    /** 역할: 위치를 모를 때 SOS 문자는 링크 없이 "지금 위치는 찾지 못했어요."라고 솔직하게 적는지 확인한다. */
+    @Test
+    fun withoutAFixTheTextSaysSoAndHasNoLink() {
+        val text = guardianMessage(GuardianAlert.SOS, null)
+        assertTrue(text.startsWith("[세잎지도] 도움이 필요해요!"))   // 무슨 일인지는 그대로 알린다
+        assertTrue(text.contains("지금 위치는 찾지 못했어요."))      // 위치를 모른다고 적는다
+        assertFalse(text.contains("map.kakao.com"))                 // 엉뚱한 곳을 가리키는 링크는 없다
+    }
+
+    /**
+     * 역할: 폰 언어가 독일어처럼 소수점을 쉼표로 쓰는 나라여도, 지도 링크의 좌표는 점(35.140400)으로 적히는지 확인한다.
+     * 쉼표로 적히면 "35,140400,126,931800"이 되어 링크가 엉뚱한 곳을 가리킨다.
+     */
+    @Test
+    fun theMapLinkUsesDotsWhateverThePhoneLanguage() {
+        val before = Locale.getDefault()             // 원래 언어 설정 기억
+        try {
+            Locale.setDefault(Locale.GERMANY)        // 소수점을 쉼표로 쓰는 언어로 바꿈
+            val text = guardianMessage(GuardianAlert.SOS, LatLon(35.1404, 126.9318))
+            assertTrue(text, text.contains("지금위치,35.140400,126.931800"))
+        } finally {
+            Locale.setDefault(before)                // 다른 시험에 영향이 없게 되돌림
+        }
     }
 }
