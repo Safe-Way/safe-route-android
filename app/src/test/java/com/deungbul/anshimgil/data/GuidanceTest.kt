@@ -11,6 +11,10 @@ class GuidanceTest {
     private val end = LatLon(35.1394, 126.9306)
     private val path = listOf(start, corner, end)
 
+    /**
+     * 역할: 출발점에서 다음 회전 방향(왼쪽)과 모퉁이까지 남은 거리(약 110m)를 맞게 알려 주는지 확인한다.
+     * 길안내의 가장 기본이라, 여기가 틀리면 나머지 안내도 다 틀린다.
+     */
     @Test
     fun atStart_nextTurnIsLeftAtCorner() {
         val g = Guidance(path, emptyList()).update(start)

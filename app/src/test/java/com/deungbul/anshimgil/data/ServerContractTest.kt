@@ -50,6 +50,10 @@ class ServerContractTest {
         return current
     }
 
+    /**
+     * 역할: 운영 서버에서 받아 둔 실제 답(test/resources/contract 폴더의 json 파일)에 앱이 읽는 이름이 모두 있는지 확인한다.
+     * 앱은 없는 이름을 빈 글자·0으로 조용히 읽기 때문에, 서버가 이름을 바꾸면 이 시험이 먼저 알려 준다.
+     */
     @Test
     fun everyNameTheAppReadsIsInTheServerAnswers() {
         val problems = mutableListOf<String>()

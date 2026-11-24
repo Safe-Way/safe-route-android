@@ -20,6 +20,10 @@ class BusTest {
         assertEquals(3, stop.buses.size)
     }
 
+    /**
+     * 역할: 휠체어·노인 사용자에게는 더 빨리 오는 일반 버스보다 저상 버스를 먼저 보여 주는지 확인한다.
+     * 일반 사용자는 도착 순서 그대로 본다.
+     */
     @Test
     fun lowFloorBusesComeFirstForWheelchairAndSenior() {
         val buses = parseBusNearby(json).single().buses

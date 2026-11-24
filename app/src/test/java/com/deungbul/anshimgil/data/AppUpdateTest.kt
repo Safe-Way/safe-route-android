@@ -29,6 +29,10 @@ class AppUpdateTest {
         assertNull(parseAppUpdate(answer("none")))
     }
 
+    /**
+     * 역할: 비었거나 약속에 없는 값, 주소가 없거나 http(s)가 아닌 주소가 오면 업데이트 창을 띄우지 않는지 확인한다.
+     * 닫을 수 없는 '꼭 업데이트' 창에 갇히거나, 버튼이 엉뚱한 앱을 여는 것을 막는다.
+     */
     @Test fun oddAnswersShowNothing() {
         assertNull(parseAppUpdate(JSONObject()))
         assertNull(parseAppUpdate(answer("REQUIRED")))

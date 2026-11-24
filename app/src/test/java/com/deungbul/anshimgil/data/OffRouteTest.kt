@@ -17,6 +17,10 @@ class OffRouteTest {
         assertEquals(25, offRouteLimitM(atCrossing = false))
     }
 
+    /**
+     * 역할: GPS가 한 번 튄 것은 '길 벗어남'으로 보지 않고, 두 번 연속 벗어나야 벗어난 것으로 보는지 확인한다.
+     * 횡단보도처럼 넓은 곳은 허용 거리가 더 크다. 잘못 판단하면 경로 재탐색과 보호자 알림이 엉뚱하게 나간다.
+     */
     @Test
     fun oneJumpIsNotLeavingTwoInARowIs() {
         val c = OffRouteCounter()

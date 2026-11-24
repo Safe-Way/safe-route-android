@@ -21,6 +21,10 @@ class MotionTest {
         assertEquals(0f, m.courseDeg!!, 2f) // going north
     }
 
+    /**
+     * 역할: 차(버스)를 탔는지를 몇 초가 아니라 한동안 지켜보고 판단하는지 확인한다.
+     * 내린 뒤에도 잠시 '차'로 유지해서, 버스가 빨간불에 설 때마다 걸음 안내가 켜졌다 꺼졌다 하지 않게 한다.
+     */
     @Test
     fun aCarIsNoticedAfterAWhileAndWalkingAgainLater() {
         val m = MotionTracker()
