@@ -1,29 +1,11 @@
 package com.deungbul.anshimgil.map
 
-import com.deungbul.anshimgil.data.elevatorExitName
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
-import com.deungbul.anshimgil.data.Facility
-import com.deungbul.anshimgil.data.drawnPath
-import com.deungbul.anshimgil.data.RouteOption
-import com.deungbul.anshimgil.data.BothSide
-import com.deungbul.anshimgil.data.FacilityKind
-import com.deungbul.anshimgil.data.FacilityLook
-import com.deungbul.anshimgil.data.HELP_KINDS
-import com.deungbul.anshimgil.data.LatLon
-import com.deungbul.anshimgil.data.MapLayers
-import com.deungbul.anshimgil.data.RouteResult
-import com.deungbul.anshimgil.data.RouteType
-import com.deungbul.anshimgil.data.distanceMeters
-import com.deungbul.anshimgil.data.schoolZoneCircle
-import com.deungbul.anshimgil.data.TurnMark
-import com.deungbul.anshimgil.data.TransitRoute
-import com.deungbul.anshimgil.data.TransitLeg
-import com.deungbul.anshimgil.data.LegType
 import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.LatLng
 import com.kakao.vectormap.camera.CameraUpdateFactory
@@ -40,6 +22,26 @@ import com.kakao.vectormap.label.LabelStyles
 import com.kakao.vectormap.shape.MapPoints
 import com.kakao.vectormap.shape.PolygonOptions
 import com.kakao.vectormap.shape.PolygonStyles
+import com.deungbul.anshimgil.data.guide.TurnMark
+import com.deungbul.anshimgil.data.place.Facility
+import com.deungbul.anshimgil.data.place.FacilityKind
+import com.deungbul.anshimgil.data.place.FacilityLook
+import com.deungbul.anshimgil.data.place.HELP_KINDS
+import com.deungbul.anshimgil.data.place.MapLayers
+import com.deungbul.anshimgil.data.place.ReportSpot
+import com.deungbul.anshimgil.data.place.distanceMeters
+import com.deungbul.anshimgil.data.place.reportSpotTag
+import com.deungbul.anshimgil.data.place.schoolZoneCircle
+import com.deungbul.anshimgil.data.route.BothSide
+import com.deungbul.anshimgil.data.route.LatLon
+import com.deungbul.anshimgil.data.route.LegType
+import com.deungbul.anshimgil.data.route.RouteOption
+import com.deungbul.anshimgil.data.route.RouteResult
+import com.deungbul.anshimgil.data.route.RouteType
+import com.deungbul.anshimgil.data.route.TransitLeg
+import com.deungbul.anshimgil.data.route.TransitRoute
+import com.deungbul.anshimgil.data.route.drawnPath
+import com.deungbul.anshimgil.data.route.elevatorExitName
 
 /** Replaces everything on the map with [layers]: zones underneath, facility labels on top. */
 fun KakaoMap.showLayers(context: Context, layers: MapLayers) {
@@ -768,7 +770,7 @@ private const val REPORT_LAYER = "reportSpots"
  * 신고 쌓인 곳 (11/10): each spot as an orange tag ("공사 3") on a layer of its own above the facility tags, so it
  * is never hidden by them; tapping it gives the spot ([Label.getTag]). Replaces the spots drawn before.
  */
-fun KakaoMap.showReportSpots(context: Context, spots: List<com.deungbul.anshimgil.data.ReportSpot>) {
+fun KakaoMap.showReportSpots(context: Context, spots: List<com.deungbul.anshimgil.data.place.ReportSpot>) {
     val density = context.resources.displayMetrics.density
     val layer = labelManager?.let {
         it.getLayer(REPORT_LAYER) ?: it.addLayer(LabelLayerOptions.from(REPORT_LAYER).setCompetitionType(CompetitionType.None).setZOrder(5_000))
@@ -779,7 +781,7 @@ fun KakaoMap.showReportSpots(context: Context, spots: List<com.deungbul.anshimgi
         val color = if (spot.confirmed) 0xFF9A3412.toInt() else 0xFFD97706.toInt()
         // On a stem: the walker's arrow (about 33 dp across) stands on the spot itself, and the tag sat right under it
         // (11/10 phone check). The stem's foot marks the place; the tag stays readable above the arrow.
-        val bitmap = stemmed(pillBitmap("⚠ " + com.deungbul.anshimgil.data.reportSpotTag(spot), color, density), color, density)
+        val bitmap = stemmed(pillBitmap("⚠ " + com.deungbul.anshimgil.data.place.reportSpotTag(spot), color, density), color, density)
         layer.addLabel(
             LabelOptions.from(LatLng.from(spot.point.lat, spot.point.lon))
                 .setStyles(LabelStyles.from(LabelStyle.from(bitmap).setAnchorPoint(0.5f, 1f).setApplyDpScale(false)))

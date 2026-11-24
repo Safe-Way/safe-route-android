@@ -10,8 +10,8 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.deungbul.anshimgil.data.UserMode
 import com.deungbul.anshimgil.ui.mode.style
+import com.deungbul.anshimgil.data.user.UserMode
 
 /**
  * The mode as a small icon next to the clock while the app is open (team, 11/6): a quiet notification that

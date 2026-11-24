@@ -48,7 +48,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextAlign
-import com.deungbul.anshimgil.data.UserMode
+import com.deungbul.anshimgil.data.user.UserMode
 
 private val Ink = Color(0xFF17211B)
 private val Muted = Color(0xFF3B463F)

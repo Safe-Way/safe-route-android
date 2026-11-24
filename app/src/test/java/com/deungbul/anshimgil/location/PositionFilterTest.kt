@@ -1,8 +1,8 @@
 package com.deungbul.anshimgil.location
 
 // 시험에 쓰는 도구들
-import com.deungbul.anshimgil.data.LatLon          // 앱의 위치 한 점(위도, 경도)
-import com.deungbul.anshimgil.data.distanceMeters  // 앱의 두 점 사이 거리(m) 계산 함수
+import com.deungbul.anshimgil.data.route.LatLon          // 앱의 위치 한 점(위도, 경도)
+import com.deungbul.anshimgil.data.place.distanceMeters  // 앱의 두 점 사이 거리(m) 계산 함수
 import org.junit.Assert.assertNotNull              // assertNotNull(값): 값이 null이 아니어야(있어야) 통과
 import org.junit.Assert.assertNull                 // assertNull(값): 값이 null(없음)이어야 통과
 import org.junit.Assert.assertTrue                 // assertTrue(조건): 조건이 참이어야 통과

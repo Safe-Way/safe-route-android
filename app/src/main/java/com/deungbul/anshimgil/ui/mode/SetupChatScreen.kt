@@ -52,12 +52,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.deungbul.anshimgil.data.ChatLine
-import com.deungbul.anshimgil.data.SetupAssistant
-import com.deungbul.anshimgil.data.SetupPick
-import com.deungbul.anshimgil.data.SetupReply
-import com.deungbul.anshimgil.data.summaryLines
 import kotlinx.coroutines.launch
+import com.deungbul.anshimgil.data.user.ChatLine
+import com.deungbul.anshimgil.data.user.Press
+import com.deungbul.anshimgil.data.user.SetupAssistant
+import com.deungbul.anshimgil.data.user.SetupPick
+import com.deungbul.anshimgil.data.user.SetupReply
+import com.deungbul.anshimgil.data.user.summaryLines
 
 private val Ink = Color(0xFF17211B)
 private val Muted = Color(0xFF5E6A62)

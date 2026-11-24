@@ -37,26 +37,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.deungbul.anshimgil.data.ApiException
-import com.deungbul.anshimgil.data.CONSENT_BODY
-import com.deungbul.anshimgil.data.CONSENT_NO
-import com.deungbul.anshimgil.data.CONSENT_NO_REPLY
-import com.deungbul.anshimgil.data.CONSENT_TITLE
-import com.deungbul.anshimgil.data.CONSENT_YES
-import com.deungbul.anshimgil.data.DELETE_ALL_BODY
-import com.deungbul.anshimgil.data.DELETE_ALL_DONE
-import com.deungbul.anshimgil.data.DELETE_ALL_TITLE
-import com.deungbul.anshimgil.data.DETOUR_CHOICES
-import com.deungbul.anshimgil.data.MyInfo
-import com.deungbul.anshimgil.data.MyInfoRepository
-import com.deungbul.anshimgil.data.REST_CHOICES
-import com.deungbul.anshimgil.data.STAIRS_CHOICES
-import com.deungbul.anshimgil.data.TRANSIT_CHOICES
-import com.deungbul.anshimgil.data.UserMode
-import com.deungbul.anshimgil.data.nearestChoice
-import com.deungbul.anshimgil.data.spokenName
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import com.deungbul.anshimgil.data.server.ApiException
+import com.deungbul.anshimgil.data.user.CONSENT_BODY
+import com.deungbul.anshimgil.data.user.CONSENT_NO
+import com.deungbul.anshimgil.data.user.CONSENT_NO_REPLY
+import com.deungbul.anshimgil.data.user.CONSENT_TITLE
+import com.deungbul.anshimgil.data.user.CONSENT_YES
+import com.deungbul.anshimgil.data.user.DELETE_ALL_BODY
+import com.deungbul.anshimgil.data.user.DELETE_ALL_DONE
+import com.deungbul.anshimgil.data.user.DELETE_ALL_TITLE
+import com.deungbul.anshimgil.data.user.DETOUR_CHOICES
+import com.deungbul.anshimgil.data.user.MyInfo
+import com.deungbul.anshimgil.data.user.MyInfoRepository
+import com.deungbul.anshimgil.data.user.REST_CHOICES
+import com.deungbul.anshimgil.data.user.STAIRS_CHOICES
+import com.deungbul.anshimgil.data.user.TRANSIT_CHOICES
+import com.deungbul.anshimgil.data.user.UserMode
+import com.deungbul.anshimgil.data.user.nearestChoice
+import com.deungbul.anshimgil.data.user.spokenName
 
 private val Ink = Color(0xFF17211B)
 private val Muted = Color(0xFF5E6A62)

@@ -1,9 +1,6 @@
 package com.deungbul.anshimgil
 
-import com.deungbul.anshimgil.data.RouteRequest
 import androidx.compose.runtime.DisposableEffect
-import com.deungbul.anshimgil.data.SavedGuide
-import com.deungbul.anshimgil.data.GuideStore
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -26,22 +23,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import com.deungbul.anshimgil.data.AppSettings
-import com.deungbul.anshimgil.data.FacilityRepository
-import com.deungbul.anshimgil.data.ModeRepository
-import com.deungbul.anshimgil.data.Place
-import com.deungbul.anshimgil.data.PlaceRepository
-import com.deungbul.anshimgil.data.RouteRepository
-import com.deungbul.anshimgil.data.RouteResult
-import com.deungbul.anshimgil.data.RouteType
 import com.deungbul.anshimgil.ui.guide.GuideScreen
 import com.deungbul.anshimgil.ui.route.RouteScreen
-import com.deungbul.anshimgil.data.SavedPlacesRepository
-import com.deungbul.anshimgil.data.SettingsRepository
-import com.deungbul.anshimgil.data.TextSize
-import com.deungbul.anshimgil.data.UserMode
-import com.deungbul.anshimgil.data.WalkSpeedRepository
-import com.deungbul.anshimgil.data.personalSpeed
 import com.deungbul.anshimgil.ui.settings.SettingsScreen
 import com.deungbul.anshimgil.ui.report.ReportScreen
 import com.deungbul.anshimgil.ui.search.SearchScreen
@@ -49,40 +32,11 @@ import com.deungbul.anshimgil.ui.common.MapMessage
 import com.deungbul.anshimgil.ui.home.HomeScreen
 import com.deungbul.anshimgil.ui.mode.ModeSelectScreen
 import com.deungbul.anshimgil.ui.mode.SetupChatScreen
-import com.deungbul.anshimgil.data.SetupAssistant
-import com.deungbul.anshimgil.data.AppAssistant
-import com.deungbul.anshimgil.data.AssistantAction
 import androidx.compose.material.icons.filled.AutoAwesome
-import com.deungbul.anshimgil.data.AppOpenLog
-import com.deungbul.anshimgil.data.AssistantContext
 import com.deungbul.anshimgil.location.lastKnownLocation
-import com.deungbul.anshimgil.data.Adaptation
-import com.deungbul.anshimgil.data.adaptationToOffer
-import com.deungbul.anshimgil.data.preferredRoute
-import com.deungbul.anshimgil.data.ShownHints
-import com.deungbul.anshimgil.data.SETUP_UNDO_INDEX
-import com.deungbul.anshimgil.data.nextFeedbackStep
-import com.deungbul.anshimgil.data.feedbackFor
-import com.deungbul.anshimgil.data.FeedbackStep
-import com.deungbul.anshimgil.data.setupAnswerFromSpeech
-import com.deungbul.anshimgil.data.SetupStep
-import com.deungbul.anshimgil.data.SetupAnswers
-import com.deungbul.anshimgil.data.answerSetup
-import com.deungbul.anshimgil.data.setupQuestion
-import com.deungbul.anshimgil.data.calendarHint
-import com.deungbul.anshimgil.data.hasCalendarPermission
-import com.deungbul.anshimgil.data.Usage
-import com.deungbul.anshimgil.data.UsageRepository
-import com.deungbul.anshimgil.data.tripWeather
-import com.deungbul.anshimgil.data.TripConsent
-import com.deungbul.anshimgil.data.TripLogRepository
 import androidx.compose.ui.unit.dp
 import com.deungbul.anshimgil.ui.assistant.AssistantChat
 import com.deungbul.anshimgil.ui.guide.TransitGuideScreen
-import com.deungbul.anshimgil.data.TransitRoute
-import com.deungbul.anshimgil.data.EventRepository
-import com.deungbul.anshimgil.data.MapHintSource
-import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.location.currentLocation
 import kotlinx.coroutines.flow.first
 import androidx.compose.runtime.LaunchedEffect
@@ -93,6 +47,69 @@ import com.deungbul.anshimgil.ui.assistant.AssistantScreen
 import com.deungbul.anshimgil.ui.theme.SeipjidoTheme
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import com.deungbul.anshimgil.data.assistant.AppAssistant
+import com.deungbul.anshimgil.data.assistant.AssistantAction
+import com.deungbul.anshimgil.data.assistant.AssistantContext
+import com.deungbul.anshimgil.data.assistant.ChatStore
+import com.deungbul.anshimgil.data.assistant.favoriteIn
+import com.deungbul.anshimgil.data.guide.GuideStore
+import com.deungbul.anshimgil.data.guide.SavedGuide
+import com.deungbul.anshimgil.data.guide.WalkSpeedRepository
+import com.deungbul.anshimgil.data.guide.personalSpeed
+import com.deungbul.anshimgil.data.place.EventRepository
+import com.deungbul.anshimgil.data.place.FacilityRepository
+import com.deungbul.anshimgil.data.place.Place
+import com.deungbul.anshimgil.data.place.PlaceRepository
+import com.deungbul.anshimgil.data.place.SavedPlacesRepository
+import com.deungbul.anshimgil.data.route.LatLon
+import com.deungbul.anshimgil.data.route.RouteRepository
+import com.deungbul.anshimgil.data.route.RouteRequest
+import com.deungbul.anshimgil.data.route.RouteResult
+import com.deungbul.anshimgil.data.route.RouteType
+import com.deungbul.anshimgil.data.route.StopPlace
+import com.deungbul.anshimgil.data.route.TransitRoute
+import com.deungbul.anshimgil.data.route.night
+import com.deungbul.anshimgil.data.route.withStop
+import com.deungbul.anshimgil.data.safety.FeedbackStep
+import com.deungbul.anshimgil.data.safety.TripConsent
+import com.deungbul.anshimgil.data.safety.TripLogRepository
+import com.deungbul.anshimgil.data.safety.feedbackFor
+import com.deungbul.anshimgil.data.safety.nextFeedbackStep
+import com.deungbul.anshimgil.data.safety.tripWeather
+import com.deungbul.anshimgil.data.server.AppUpdateCheck
+import com.deungbul.anshimgil.data.server.ServerApi
+import com.deungbul.anshimgil.data.user.Adaptation
+import com.deungbul.anshimgil.data.user.AppOpenLog
+import com.deungbul.anshimgil.data.user.AppSettings
+import com.deungbul.anshimgil.data.user.CONSENT_NO_REPLY
+import com.deungbul.anshimgil.data.user.MapHintSource
+import com.deungbul.anshimgil.data.user.ModeRepository
+import com.deungbul.anshimgil.data.user.MyInfo
+import com.deungbul.anshimgil.data.user.MyInfoRepository
+import com.deungbul.anshimgil.data.user.SETUP_UNDO_INDEX
+import com.deungbul.anshimgil.data.user.SettingsRepository
+import com.deungbul.anshimgil.data.user.SetupAnswers
+import com.deungbul.anshimgil.data.user.SetupAssistant
+import com.deungbul.anshimgil.data.user.SetupStep
+import com.deungbul.anshimgil.data.user.ShownHints
+import com.deungbul.anshimgil.data.user.TempModeStore
+import com.deungbul.anshimgil.data.user.TempState
+import com.deungbul.anshimgil.data.user.TextSize
+import com.deungbul.anshimgil.data.user.Usage
+import com.deungbul.anshimgil.data.user.UsageRepository
+import com.deungbul.anshimgil.data.user.UserMode
+import com.deungbul.anshimgil.data.user.YES_NO
+import com.deungbul.anshimgil.data.user.adaptationToOffer
+import com.deungbul.anshimgil.data.user.aidProfileValue
+import com.deungbul.anshimgil.data.user.answerSetup
+import com.deungbul.anshimgil.data.user.calendarHint
+import com.deungbul.anshimgil.data.user.habits
+import com.deungbul.anshimgil.data.user.hasCalendarPermission
+import com.deungbul.anshimgil.data.user.preferredRoute
+import com.deungbul.anshimgil.data.user.setupAnswerFromSpeech
+import com.deungbul.anshimgil.data.user.setupQuestion
+import com.deungbul.anshimgil.data.user.tempEndQuestion
+import com.deungbul.anshimgil.data.route.eunNeun
 
 /** What was set before a change, to take it back ([mode] is null before one is picked). */
 data class SettingsSnapshot(val mode: UserMode?, val settings: AppSettings, val usage: Usage)
@@ -165,12 +182,12 @@ class MainActivity : ComponentActivity() {
         val walkSpeedRepository = WalkSpeedRepository(applicationContext)
         val routeRepository = RouteRepository.create(guestId = { walkSpeedRepository.guestId() })
         val tripLog = TripLogRepository(applicationContext, guestId = { walkSpeedRepository.guestId() })
-        val myInfoRepository = com.deungbul.anshimgil.data.MyInfoRepository(guestId = { walkSpeedRepository.guestId() })
+        val myInfoRepository = com.deungbul.anshimgil.data.user.MyInfoRepository(guestId = { walkSpeedRepository.guestId() })
         val usageRepository = UsageRepository(applicationContext)
         // Walks that could not be sent last time (offline, server not ready) go now.
         lifecycleScope.launch { runCatching { walkSpeedRepository.uploadPending() } }
         // 업데이트 안내: asked once a run; a failure or odd answer shows nothing.
-        lifecycleScope.launch { com.deungbul.anshimgil.data.AppUpdateCheck.checkOnce() }
+        lifecycleScope.launch { com.deungbul.anshimgil.data.server.AppUpdateCheck.checkOnce() }
         // The mode next to the clock while the app is in front; taken away in onStop.
         lifecycleScope.launch {
             repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
@@ -221,12 +238,12 @@ class MainActivity : ComponentActivity() {
                             onGuiding = ::setGuiding,
                         )
                     }
-                    val update by com.deungbul.anshimgil.data.AppUpdateCheck.update.collectAsStateWithLifecycle()
+                    val update by com.deungbul.anshimgil.data.server.AppUpdateCheck.update.collectAsStateWithLifecycle()
                     update?.let { u ->
                         com.deungbul.anshimgil.ui.common.AppUpdateDialog(
                             u,
                             onUpdate = { openDownload(u.downloadUrl) },
-                            onLater = com.deungbul.anshimgil.data.AppUpdateCheck::later,
+                            onLater = com.deungbul.anshimgil.data.server.AppUpdateCheck::later,
                         )
                     }
                 }
@@ -296,7 +313,7 @@ private sealed interface Screen {
         val transit: Boolean = false,
         val autoStart: Boolean = false,
         /** 들를 곳 on the way, in order (AI 비서 planned them). */
-        val stops: List<com.deungbul.anshimgil.data.StopPlace> = emptyList(),
+        val stops: List<com.deungbul.anshimgil.data.route.StopPlace> = emptyList(),
     ) : Screen
     /** [resumed]: taken up again after Android closed the app during it (이어서 안내). */
     data class Guide(val route: Route, val result: RouteResult, val type: RouteType, val arriveAt: String? = null, val resumed: Boolean = false) : Screen
@@ -316,7 +333,7 @@ fun AppRoot(
     walkSpeedRepository: WalkSpeedRepository,
     modifier: Modifier = Modifier,
     tripLog: TripLogRepository? = null,
-    myInfoRepository: com.deungbul.anshimgil.data.MyInfoRepository = com.deungbul.anshimgil.data.MyInfoRepository(guestId = { walkSpeedRepository.guestId() }),
+    myInfoRepository: com.deungbul.anshimgil.data.user.MyInfoRepository = com.deungbul.anshimgil.data.user.MyInfoRepository(guestId = { walkSpeedRepository.guestId() }),
     usageRepository: UsageRepository? = null,
     /** From the 출발 시간 알림 or a booked guidance: open the route there (place, by transit, start at once). */
     reminded: Triple<Place, Boolean, Boolean>? = null,
@@ -345,9 +362,9 @@ fun AppRoot(
     // The server's prefer_transit (0 walking, 1 either, 2 transit), read when the app opens.
     var serverPreferTransit by remember { mutableStateOf<Int?>(null) }
     val tempScope = rememberCoroutineScope()
-    fun tellServerTemp(st: com.deungbul.anshimgil.data.TempState?, usual: UserMode? = st?.usual) {
+    fun tellServerTemp(st: com.deungbul.anshimgil.data.user.TempState?, usual: UserMode? = st?.usual) {
         val u = usual ?: return
-        if (!com.deungbul.anshimgil.data.ServerApi.isConfigured) return
+        if (!com.deungbul.anshimgil.data.server.ServerApi.isConfigured) return
         tempScope.launch {
             runCatching {
                 val f = if (st == null) org.json.JSONObject().put("clearTemp", true)
@@ -356,10 +373,10 @@ fun AppRoot(
             }
         }
     }
-    suspend fun endTempMode(st: com.deungbul.anshimgil.data.TempState) {
+    suspend fun endTempMode(st: com.deungbul.anshimgil.data.user.TempState) {
         modeRepository.save(st.usual)
         if (st.temp == UserMode.DISABLED) listOf("toilet:wheelchair", "crosswalk:curb_low").forEach { settingsRepository.setExtraMapItem(it, false) }
-        com.deungbul.anshimgil.data.TempModeStore.clear(appContext)
+        com.deungbul.anshimgil.data.user.TempModeStore.clear(appContext)
         tellServerTemp(null, st.usual)
     }
     val setupAssistant = remember { SetupAssistant.create() }
@@ -378,10 +395,10 @@ fun AppRoot(
     // Opened from the map's microphone button, so it listens at once.
     var assistantListen by remember { mutableStateOf(false) }
     // AI 비서's conversation: kept on the phone, also after the app is closed, until the walker clears it (11/12).
-    val assistantChat = remember { AssistantChat(com.deungbul.anshimgil.data.ChatStore.load(appContext)) }
+    val assistantChat = remember { AssistantChat(com.deungbul.anshimgil.data.assistant.ChatStore.load(appContext)) }
     LaunchedEffect(assistantChat) {
         androidx.compose.runtime.snapshotFlow { assistantChat.lines.toList() }
-            .collect { com.deungbul.anshimgil.data.ChatStore.save(appContext, it) }
+            .collect { com.deungbul.anshimgil.data.assistant.ChatStore.save(appContext, it) }
     }
     val mapHints = remember {
         MapHintSource(
@@ -490,10 +507,10 @@ fun AppRoot(
             LaunchedEffect(mode) {
                 val m = mode ?: return@LaunchedEffect
                 // During a temporary change the server keeps the usual mode and the temporary one apart (temp_mode).
-                val usual = com.deungbul.anshimgil.data.TempModeStore.get(appContext)?.usual ?: m
-                if (com.deungbul.anshimgil.data.ServerApi.isConfigured) runCatching { myInfoRepository.syncMode(usual) }
+                val usual = com.deungbul.anshimgil.data.user.TempModeStore.get(appContext)?.usual ?: m
+                if (com.deungbul.anshimgil.data.server.ServerApi.isConfigured) runCatching { myInfoRepository.syncMode(usual) }
                 // Walking or transit first: the server learns it from the trip records (PreferenceLearner).
-                if (com.deungbul.anshimgil.data.ServerApi.isConfigured) runCatching { serverPreferTransit = myInfoRepository.load().preferTransit }
+                if (com.deungbul.anshimgil.data.server.ServerApi.isConfigured) runCatching { serverPreferTransit = myInfoRepository.load().preferTransit }
             }
             // 이어서 안내 (11/13): guidance left when Android closed the app goes on with the same route.
             LaunchedEffect(mode) {
@@ -507,9 +524,9 @@ fun AppRoot(
             }
             // 몸 상태가 잠깐 바뀜: past the end day the usual way of walking is back; on the end day, ask (team server rule).
             LaunchedEffect(Unit) {
-                val st = com.deungbul.anshimgil.data.TempModeStore.get(appContext) ?: return@LaunchedEffect
+                val st = com.deungbul.anshimgil.data.user.TempModeStore.get(appContext) ?: return@LaunchedEffect
                 val today = java.time.LocalDate.now()
-                if (today.isAfter(st.until)) endTempMode(st) else if (today == st.until) tempAsk = com.deungbul.anshimgil.data.tempEndQuestion(st)
+                if (today.isAfter(st.until)) endTempMode(st) else if (today == st.until) tempAsk = com.deungbul.anshimgil.data.user.tempEndQuestion(st)
             }
             // 불편 신고 laid over guidance (it keeps running), and how many were sent during it (진행표: 다시 찾을까요?).
             var reportOverGuide by remember(screen) { mutableStateOf(false) }
@@ -536,25 +553,25 @@ fun AppRoot(
                         listenAtStart = assistantListen,
                         chat = assistantChat,
                         assistant = appAssistant,
-                        context = AssistantContext(mode, settings, usage = usage, where = { currentLocation(appContext, 4_000) }, usualMode = com.deungbul.anshimgil.data.TempModeStore.get(appContext)?.usual ?: mode),
+                        context = AssistantContext(mode, settings, usage = usage, where = { currentLocation(appContext, 4_000) }, usualMode = com.deungbul.anshimgil.data.user.TempModeStore.get(appContext)?.usual ?: mode),
                         placeRepository = placeRepository,
-                        findSaved = { q -> com.deungbul.anshimgil.data.favoriteIn(q, savedPlaces.favorites.first())?.let { f -> f.place?.copy(name = f.name) } },
+                        findSaved = { q -> com.deungbul.anshimgil.data.assistant.favoriteIn(q, savedPlaces.favorites.first())?.let { f -> f.place?.copy(name = f.name) } },
                         onChangeSettings = { change ->
                             val before = SettingsSnapshot(mode, settings, usage)
-                            val tempBefore = com.deungbul.anshimgil.data.TempModeStore.get(appContext)
+                            val tempBefore = com.deungbul.anshimgil.data.user.TempModeStore.get(appContext)
                             change.tempUntil?.let { until ->
-                                val st = com.deungbul.anshimgil.data.TempState(tempBefore?.usual ?: mode, change.mode ?: mode, until, change.tempReason.orEmpty())
-                                com.deungbul.anshimgil.data.TempModeStore.save(appContext, st)
+                                val st = com.deungbul.anshimgil.data.user.TempState(tempBefore?.usual ?: mode, change.mode ?: mode, until, change.tempReason.orEmpty())
+                                com.deungbul.anshimgil.data.user.TempModeStore.save(appContext, st)
                                 tellServerTemp(st)
                             }
                             if (change.clearTemp) {
-                                com.deungbul.anshimgil.data.TempModeStore.clear(appContext)
+                                com.deungbul.anshimgil.data.user.TempModeStore.clear(appContext)
                                 tellServerTemp(null, tempBefore?.usual ?: change.mode ?: mode)
                             }
                             assistantUndo = {
                                 if (change.tempUntil != null || change.clearTemp) {
-                                    if (tempBefore != null) com.deungbul.anshimgil.data.TempModeStore.save(appContext, tempBefore)
-                                    else com.deungbul.anshimgil.data.TempModeStore.clear(appContext)
+                                    if (tempBefore != null) com.deungbul.anshimgil.data.user.TempModeStore.save(appContext, tempBefore)
+                                    else com.deungbul.anshimgil.data.user.TempModeStore.clear(appContext)
                                     tellServerTemp(tempBefore, tempBefore?.usual ?: before.mode)
                                 }
                                 if (change.mode != null) before.mode?.let { modeRepository.save(it) }
@@ -736,9 +753,9 @@ fun AppRoot(
                                 screen = when {
                                     startFor != null -> startFor.copy(start = place)
                                     // The same place twice is refused by the server (400): keep the list and say so.
-                                    stopFor != null -> com.deungbul.anshimgil.data.withStop(stopFor.stops, com.deungbul.anshimgil.data.StopPlace(place.name, LatLon(place.lat, place.lon)))
+                                    stopFor != null -> com.deungbul.anshimgil.data.route.withStop(stopFor.stops, com.deungbul.anshimgil.data.route.StopPlace(place.name, LatLon(place.lat, place.lon)))
                                         ?.let { stopFor.copy(stops = it) }
-                                        ?: stopFor.also { android.widget.Toast.makeText(appContext, "${com.deungbul.anshimgil.data.eunNeun(place.name)} 이미 들를 곳에 있어요", android.widget.Toast.LENGTH_SHORT).show() }
+                                        ?: stopFor.also { android.widget.Toast.makeText(appContext, "${com.deungbul.anshimgil.data.route.eunNeun(place.name)} 이미 들를 곳에 있어요", android.widget.Toast.LENGTH_SHORT).show() }
                                     destFor != null -> destFor.copy(destination = place)
                                     else -> Screen.Route(place)
                                 }
@@ -889,7 +906,7 @@ fun AppRoot(
                     askTripConsent = askTripConsent,
                     onTripConsent = { yes ->
                         askTripConsent = false
-                        if (!yes) assistantChat.note(false, com.deungbul.anshimgil.data.CONSENT_NO_REPLY)
+                        if (!yes) assistantChat.note(false, com.deungbul.anshimgil.data.user.CONSENT_NO_REPLY)
                         scope.launch { tripLog?.setConsent(if (yes) TripConsent.YES else TripConsent.NO, mode) }
                     },
                     usage = usage,
@@ -898,11 +915,11 @@ fun AppRoot(
                     setupFromSpeech = { said -> setupStep?.let { setupAnswerFromSpeech(it, said) } },
                     setupByVoice = setupAnswers.byVoice,
                     undoAsk = homeUndo?.first,
-                    feedbackAsk = tempAsk?.let { it to com.deungbul.anshimgil.data.YES_NO } ?: feedbackStep?.let { it.question to it.answers } ?: learnedSay?.let { it to listOf("알겠어요") },
+                    feedbackAsk = tempAsk?.let { it to com.deungbul.anshimgil.data.user.YES_NO } ?: feedbackStep?.let { it.question to it.answers } ?: learnedSay?.let { it to listOf("알겠어요") },
                     onFeedbackAnswer = feedback@{ i ->
                         if (tempAsk != null) {
                             tempAsk = null
-                            val st = com.deungbul.anshimgil.data.TempModeStore.get(appContext)
+                            val st = com.deungbul.anshimgil.data.user.TempModeStore.get(appContext)
                             if (i == 0 && st != null) scope.launch { endTempMode(st) }
                             return@feedback
                         }
@@ -952,12 +969,12 @@ fun AppRoot(
                             if (step == SetupStep.CONFIRM && answers.confirmed && answers.aid != null) scope.launch {
                                 runCatching {
                                     myInfoRepository.update(mode ?: UserMode.GENERAL, org.json.JSONObject()
-                                        .put("mobilityAid", com.deungbul.anshimgil.data.aidProfileValue(answers.aid) ?: org.json.JSONObject.NULL)
+                                        .put("mobilityAid", com.deungbul.anshimgil.data.user.aidProfileValue(answers.aid) ?: org.json.JSONObject.NULL)
                                         .put("stairsOk", answers.stairs ?: 2).put("setupDone", true))
                                 }
                             }
                             if (step == SetupStep.CONSENT) answers.consent?.let { yes ->
-                                if (!yes) assistantChat.note(false, com.deungbul.anshimgil.data.CONSENT_NO_REPLY)
+                                if (!yes) assistantChat.note(false, com.deungbul.anshimgil.data.user.CONSENT_NO_REPLY)
                                 scope.launch { tripLog?.setConsent(if (yes) TripConsent.YES else TripConsent.NO, mode ?: UserMode.GENERAL) }
                             }
                             if ((step == SetupStep.START || step == SetupStep.CHANGED) && next == null) {

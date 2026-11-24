@@ -12,10 +12,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import com.deungbul.anshimgil.data.LatLon
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import com.deungbul.anshimgil.data.route.LatLon
 
 /**
  * Which way the top of the phone points, in degrees clockwise from north, while the calling screen is shown.

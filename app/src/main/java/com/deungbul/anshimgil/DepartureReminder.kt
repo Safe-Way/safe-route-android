@@ -14,23 +14,23 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.deungbul.anshimgil.data.ModeRepository
-import com.deungbul.anshimgil.data.ServerApi
-import com.deungbul.anshimgil.data.TripConsent
-import com.deungbul.anshimgil.data.TripLogRepository
-import com.deungbul.anshimgil.data.UsageRepository
-import com.deungbul.anshimgil.data.WalkSpeedRepository
-import com.deungbul.anshimgil.data.STILL_THERE_M
-import com.deungbul.anshimgil.data.distanceMeters
-import com.deungbul.anshimgil.data.habitNow
-import com.deungbul.anshimgil.data.sayTime
 import com.deungbul.anshimgil.location.lastKnownLocation
-import com.deungbul.anshimgil.data.settingsDataStore
 import kotlinx.coroutines.flow.first
 import org.json.JSONObject
 import java.time.LocalTime
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
+import com.deungbul.anshimgil.data.guide.WalkSpeedRepository
+import com.deungbul.anshimgil.data.place.distanceMeters
+import com.deungbul.anshimgil.data.safety.TripConsent
+import com.deungbul.anshimgil.data.safety.TripLogRepository
+import com.deungbul.anshimgil.data.server.ServerApi
+import com.deungbul.anshimgil.data.user.ModeRepository
+import com.deungbul.anshimgil.data.user.STILL_THERE_M
+import com.deungbul.anshimgil.data.user.UsageRepository
+import com.deungbul.anshimgil.data.user.habitNow
+import com.deungbul.anshimgil.data.user.settingsDataStore
+import com.deungbul.anshimgil.data.user.sayTime
 
 /*
  * 출발 시간 알림 (11/8): every 15 minutes, also with the app closed, ask the server's today suggestion; when the

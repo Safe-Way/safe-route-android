@@ -18,12 +18,12 @@ import android.speech.tts.TextToSpeech
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
-import com.deungbul.anshimgil.data.Guidance
-import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.location.PositionFilter
 import com.deungbul.anshimgil.location.hasLocationPermission
 import com.deungbul.anshimgil.ui.guide.GuideAnnouncer
 import java.util.Locale
+import com.deungbul.anshimgil.data.guide.Guidance
+import com.deungbul.anshimgil.data.route.LatLon
 
 /*
  * 화면이 꺼져도 길안내 (11/13, 팀 요청 3번): while walking guidance is open, this foreground service keeps the

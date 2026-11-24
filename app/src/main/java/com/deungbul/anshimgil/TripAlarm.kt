@@ -10,11 +10,11 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.deungbul.anshimgil.data.TripBooking
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDateTime
 import java.time.ZoneId
+import com.deungbul.anshimgil.data.assistant.TripBooking
 
 /*
  * 길 안내 예약 (11/10): the booked guidances, kept on this phone only (SharedPreferences "trip_bookings"; nothing goes
