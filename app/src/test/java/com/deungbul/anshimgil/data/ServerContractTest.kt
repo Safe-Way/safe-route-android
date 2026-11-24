@@ -1,13 +1,14 @@
 package com.deungbul.anshimgil.data
 
-import org.json.JSONArray
-import org.json.JSONObject
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
-import org.junit.Test
+// 시험에 쓰는 도구들
+import org.json.JSONArray               // JSON의 목록([...])을 다룰 때 씀
+import org.json.JSONObject              // JSON의 객체({...})를 다룰 때 씀
+import org.junit.Assert.assertEquals    // assertEquals(기대값, 실제값): 둘이 같아야 통과
+import org.junit.Assert.assertFalse     // assertFalse(조건): 조건이 거짓이어야 통과
+import org.junit.Assert.assertNotNull   // assertNotNull(값): 값이 null이 아니어야(있어야) 통과
+import org.junit.Assert.assertTrue      // assertTrue(조건): 조건이 참이어야 통과
+import org.junit.Assert.fail            // fail(글): 부르는 순간 그 글을 보여 주며 시험 실패
+import org.junit.Test                   // @Test가 붙은 함수 하나하나가 시험 하나
 
 /**
  * 앱·서버 연결 검사: 실제 서버 응답(`src/test/resources/contract/`)을 앱의 진짜 읽기 코드로 읽어 본다.
@@ -20,18 +21,38 @@ import org.junit.Test
  * 응답 파일은 `scripts/capture_contract.sh` 가 운영 서버에서 받는다. 저장소의 파일은 앱 코드가 바뀔 때(PR) 보고,
  * `.github/workflows/contract.yml` 은 매일 아침 운영 서버에서 새로 받아 서버가 바뀌었는지 본다.
  * 서버가 일부러 이름을 바꿨다면: 앱 읽기 코드를 고치고, 이 표를 고치고, 스크립트로 응답 파일을 새로 받는다.
+ *
+ * (쉬운 설명) 앱은 경로, 대중교통, 버스, 지하철, 신고, 시설, 장소, 행사 정보를 서버에서 받아 화면에 그린다.
+ * 이 시험은 진짜 서버를 부르지 않는다. 미리 운영 서버에서 받아 저장해 둔 답(json 파일 11개)을
+ * fixture()로 열어서, 앱이 읽는 칸 이름이 다 있는지와 앱 읽기 함수(parseRouteResult(), parseTransit() 등)가
+ * 쓸 만한 값을 돌려주는지 본다. 읽기 함수들은 화면에 쓸 앱 데이터(경로 목록, 정류장 목록 등)를 돌려준다.
  */
 class ServerContractTest {
 
-    /** [path] 자리의 모든 객체에 [keys] 가 있어야 한다. [mustExist] 면 그 자리에 객체가 하나 이상 있어야 한다. */
+    /**
+     * [path] 자리의 모든 객체에 [keys] 가 있어야 한다. [mustExist] 면 그 자리에 객체가 하나 이상 있어야 한다.
+     *
+     * 규칙 한 줄. 예: Rule("stops[]", true, "name", "distanceM") 은
+     * "stops 목록의 정류장마다 name과 distanceM 칸이 있어야 하고, 정류장이 하나 이상 있어야 한다"는 뜻이다.
+     * path가 빈 글자("")면 답의 맨 위 객체를 뜻한다.
+     */
     private class Rule(val path: String, val mustExist: Boolean, vararg val keys: String)
 
+    /**
+     * 저장해 둔 서버 답 파일을 읽어 JSON 객체로 돌려주는 도우미 함수.
+     * 예: fixture("bus") 는 test/resources/contract 폴더의 bus.json 을 읽는다. 파일이 없으면 바로 오류를 낸다.
+     */
     private fun fixture(name: String): JSONObject {
         val url = javaClass.getResource("/contract/$name.json") ?: error("응답 파일 contract/$name.json 이 없어요")
         return JSONObject(url.readText())
     }
 
-    /** "routes[].sidewalks[]" 같은 자리에 있는 객체들. 값이 없거나 null 이면 빈 목록. */
+    /**
+     * "routes[].sidewalks[]" 같은 자리에 있는 객체들. 값이 없거나 null 이면 빈 목록.
+     *
+     * 길(path)은 점(.)으로 나눈 칸 이름을 차례로 따라간다. 이름 끝의 []는 "목록이니 안의 객체를 하나하나 다 본다"는 뜻이다.
+     * 예: "routes[].sidewalks[]" 는 모든 경로(routes)의 모든 보도 구간(sidewalks) 객체를 한 목록으로 모아 돌려준다.
+     */
     private fun objectsAt(root: JSONObject, path: String): List<JSONObject> {
         if (path.isEmpty()) return listOf(root)
         var current = listOf(root)
@@ -56,24 +77,36 @@ class ServerContractTest {
      */
     @Test
     fun everyNameTheAppReadsIsInTheServerAnswers() {
+        // 찾은 문제를 글로 모아 둘 빈 목록. 다 돌고 나서 한 번에 보여 준다.
         val problems = mutableListOf<String>()
+        // CONTRACT 표를 답 파일 이름(name)과 그 파일의 규칙들(rules)로 하나씩 꺼낸다.
         for ((name, rules) in CONTRACT) {
+            // 저장해 둔 서버 답 파일(예: route.json)을 연다.
             val root = fixture(name)
+            // 그 파일의 규칙을 한 줄씩 본다.
             for (rule in rules) {
+                // 규칙이 말하는 자리(예: "routes[]")에 있는 객체들을 모두 모은다.
                 val objects = objectsAt(root, rule.path)
+                // 문제 글에 쓸 위치 이름. 자리가 빈 글자면 "(맨 위)"라고 쓴다. 예: "route routes[]"
                 val where = "$name ${rule.path.ifEmpty { "(맨 위)" }}"
+                // 꼭 있어야 하는 자리(mustExist)인데 객체가 하나도 없으면 문제로 적는다.
                 if (rule.mustExist && objects.isEmpty()) problems += "$where: 비어 있어요"
+                // 모은 객체를 하나씩(i는 몇 번째인지) 본다.
                 objects.forEachIndexed { i, o ->
+                    // 앱이 읽는 이름 중 이 객체에 없는 것만 고른다. 값이 null이어도 이름이 있으면 has()는 참이다.
                     val missing = rule.keys.filterNot { o.has(it) }
+                    // 빠진 이름이 있으면 어느 파일, 어느 자리, 몇 번째 객체에 무엇이 없는지 적는다.
                     if (missing.isNotEmpty()) problems += "$where #$i: 앱이 읽는 ${missing.joinToString()} 이(가) 없어요"
                 }
             }
         }
+        // 문제가 하나라도 있으면 시험 실패. 같은 글은 한 번만, 최대 40줄까지 보여 준다.
         if (problems.isNotEmpty()) {
             fail("서버 응답이 앱이 읽는 모양과 달라요 (${problems.size}곳):\n" + problems.distinct().take(40).joinToString("\n"))
         }
     }
 
+    /** 역할: 걸어가는 경로 답을 읽었을 때 거리·시간·선·해 지는 시각·경로 설명이 제대로 채워지는지 확인한다. */
     @Test
     fun walkingRouteIsReadWithLengthTimeAndLine() {
         val result = parseRouteResult(fixture("route"), UserMode.DISABLED)
@@ -91,6 +124,7 @@ class ServerContractTest {
         assertFalse("경로 설명(explanation.summary)이 비었어요", result.explanation.summary.isBlank())
     }
 
+    /** 역할: 대중교통 경로 답의 구간 종류를 앱이 다 알고, 타는 구간마다 노선·타는 곳·내리는 곳이 채워지는지 확인한다. */
     @Test
     fun transitRoutesAreReadWithRidesAndKnownLegTypes() {
         val json = fixture("transit")
@@ -115,6 +149,7 @@ class ServerContractTest {
         }
     }
 
+    /** 역할: 가까운 버스 정류장과 지하철역 답에서 이름·거리·위치·도착 정보가 제대로 읽히는지 확인한다. */
     @Test
     fun nearbyBusStopsAndSubwayStationsAreRead() {
         val stops = parseBusNearby(fixture("bus"))
@@ -138,6 +173,7 @@ class ServerContractTest {
         }
     }
 
+    /** 역할: 신고 목록과 피할 곳(유효 신고 장소) 답이 빠짐없이, 알맞은 종류·날짜·위치로 읽히는지 확인한다. */
     @Test
     fun reportsAndPlacesToAvoidAreRead() {
         val reportsJson = fixture("reports")
@@ -161,6 +197,7 @@ class ServerContractTest {
         }
     }
 
+    /** 역할: 지도 시설 답의 종류(kind)를 앱이 모두 알고, 휠체어 지도에 그릴 시설이 읽히는지 확인한다. */
     @Test
     fun mapFacilitiesAreReadAsKnownKinds() {
         val json = fixture("pois")
@@ -181,6 +218,7 @@ class ServerContractTest {
         page.layers.facilities.forEach { assertInGwangju("시설 ${it.kind}", LatLon(it.lat, it.lon)) }
     }
 
+    /** 역할: 지금 있는 곳, 장소 검색 결과, 가까운 화장실 답에서 이름·위치·거리가 읽히는지 확인한다. */
     @Test
     fun placesAreReadWithNameAndPosition() {
         val here = Place.fromJson(fixture("places_here"))
@@ -202,6 +240,7 @@ class ServerContractTest {
         }
     }
 
+    /** 역할: 행사 답이 있을 때 하나도 빠지지 않고 광주 안의 위치로 읽히는지 확인한다. */
     @Test
     fun roadEventsAreReadWhenThereAreAny() {
         val json = fixture("events")
@@ -226,9 +265,14 @@ class ServerContractTest {
          * 앱이 읽는 이름 (2026-11-20, 앱 data/ 의 읽기 함수에서 뽑음). 서버 응답 이름을 바꿀 때 이 표가 먼저 깨진다.
          * mustExist = true 는 시연 지역에서 늘 있어야 하는 자리, false 는 있을 때만 보는 자리.
          */
+        //
+        // (읽는 법) "파일 이름" to listOf(규칙들). 파일 이름은 test/resources/contract 폴더의 json 파일 이름이다.
+        // 규칙은 Rule(자리, 꼭 있어야 하나, 앱이 읽는 이름들...) 모양이다.
         val CONTRACT: Map<String, List<Rule>> = mapOf(
             "route" to listOf(
+                // 예: route.json 맨 위에 conditions, routes, explanation, facilities, dataQuality 이름이 꼭 있어야 한다.
                 Rule("", true, "conditions", "routes", "explanation", "facilities", "dataQuality"),
+                // 예: conditions 객체에 밤·비·더위 같은 조건 이름들이 꼭 있어야 한다(값은 null이어도 된다).
                 Rule("conditions", true, "night", "nightSource", "sunset", "rain", "heat", "cold", "tempC", "weatherAvailable", "dustBad", "dustAvailable"),
                 Rule("routes[]", true, "kind", "distanceM", "durationMin", "geometry", "counts", "covered", "sidewalks", "crossings", "events", "stops", "crossAt"),
                 Rule("routes[].sidewalks[]", false, "from", "to", "side", "highway", "lanes", "oneway", "offsetM", "widthM"),
