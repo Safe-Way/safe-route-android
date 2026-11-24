@@ -21,6 +21,10 @@ class GuardianTest {
         assertNull(Guardian.cleanPhone("abc"))
     }
 
+    /**
+     * 역할: SOS 때 보호자에게 가는 문자에 앱 이름과 지금 위치의 카카오맵 링크가 바르게 들어가는지 확인한다.
+     * 위치를 모를 때(null)도 길 벗어남 알림 문자는 만들어져야 한다.
+     */
     @Test
     fun messageCarriesAMapLinkToTheWalker() {
         val text = guardianMessage(GuardianAlert.SOS, LatLon(35.1404, 126.9318))

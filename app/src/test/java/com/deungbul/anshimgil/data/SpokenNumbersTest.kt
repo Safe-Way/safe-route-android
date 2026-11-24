@@ -4,6 +4,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SpokenNumbersTest {
+    /**
+     * 역할: 음성 안내가 112·119를 "백십이"가 아니라 "일일이"처럼 한 자씩 읽는지 확인한다.
+     * 1120m 같은 다른 숫자는 바꾸지 않아야 한다.
+     */
     @Test
     fun emergencyNumbersAreReadDigitByDigit() {
         assertEquals(

@@ -7,6 +7,10 @@ import org.junit.Test
 class TripLogTest {
     private val asiaCulture = Place("1", "국립아시아문화전당", "광주 동구 문화전당로 38", 35.146734, 126.920318, null)
 
+    /**
+     * 역할(개인정보): 길안내 시작 기록에 출발지와 걸은 길이 절대 들어가지 않고, 목적지는 약 100m 단위로 반올림되는지 확인한다.
+     * 누가 실수로 출발지를 넣으면 이 시험이 실패한다.
+     */
     @Test
     fun startBodyRoundsTheDestinationAndHasNoStart() {
         val json = tripStartJson("guest-1", asiaCulture, UserMode.DISABLED, transit = false, routeKind = "safe", weather = "rain", night = false, plannedMin = 12)

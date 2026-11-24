@@ -171,6 +171,10 @@ class AssistantTest {
         assertNull(parseServerAssistantReply(JSONObject("""{"say":"안녕하세요"}"""))!!.action.heard)
     }
 
+    /**
+     * 역할: "넘어졌어요" 같은 급한 말은 서버 AI를 기다리지 않고 앱이 바로 위급 안내(Emergency)를 내는지 확인한다.
+     * 서버가 느리거나 끊겨도 위급 안내가 늦어지면 안 되기 때문.
+     */
     @Test
     fun urgentWordsNeverGoToTheServer() = runBlocking {
         // Not configured for a real server in tests: if it were asked, the call would fail and fall back,

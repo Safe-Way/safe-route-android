@@ -66,6 +66,10 @@ class RoadReportsTest {
 
     data class Exp(val start: String, val end: String, val count: Int, val confirmed: Boolean)
 
+    /**
+     * 역할: 신고된 위험 장소를 언제부터 언제까지 보여 줄지(결정 57)를 서버 팀 사례(check_report_active.py)와 똑같이 계산하는지 확인한다.
+     * 앱과 서버가 다르게 계산하면 지도에 보이는 위험 장소와 경로가 피하는 장소가 달라진다.
+     */
     @Test
     fun theTeamsCasesForDecision57() {
         val wrong = expect.mapNotNull { (today, spot, want) ->
