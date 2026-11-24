@@ -44,11 +44,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.deungbul.anshimgil.data.Guardian
-import com.deungbul.anshimgil.data.GuardianAlert
-import com.deungbul.anshimgil.data.LatLon
-import com.deungbul.anshimgil.data.guardianMessage
 import kotlinx.coroutines.delay
+import com.deungbul.anshimgil.data.route.LatLon
+import com.deungbul.anshimgil.data.safety.Guardian
+import com.deungbul.anshimgil.data.safety.GuardianAlert
+import com.deungbul.anshimgil.data.safety.guardianMessage
 
 private val Alarm = Color(0xFFB42318)
 

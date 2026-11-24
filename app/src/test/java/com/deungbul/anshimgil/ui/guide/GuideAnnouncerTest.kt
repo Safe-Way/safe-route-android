@@ -1,11 +1,11 @@
 package com.deungbul.anshimgil.ui.guide
 
-import com.deungbul.anshimgil.data.Guidance
-import com.deungbul.anshimgil.data.LatLon
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.deungbul.anshimgil.data.guide.Guidance
+import com.deungbul.anshimgil.data.route.LatLon
 
 class GuideAnnouncerTest {
     // West about 110 m, then left (south) about 110 m.

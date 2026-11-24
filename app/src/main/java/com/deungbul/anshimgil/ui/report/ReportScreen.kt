@@ -54,19 +54,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
-import com.deungbul.anshimgil.data.ApiException
-import com.deungbul.anshimgil.data.Origin
-import com.deungbul.anshimgil.data.REPORT_MAX_MEMO
-import com.deungbul.anshimgil.data.REPORT_MAX_PHOTOS
-import com.deungbul.anshimgil.data.ReportRepository
-import com.deungbul.anshimgil.data.ReportType
-import com.deungbul.anshimgil.data.UserMode
-import com.deungbul.anshimgil.data.photoForUpload
 import com.deungbul.anshimgil.location.phoneOrigin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.deungbul.anshimgil.data.guide.Origin
+import com.deungbul.anshimgil.data.guide.WalkSpeedRepository
+import com.deungbul.anshimgil.data.place.REPORT_MAX_MEMO
+import com.deungbul.anshimgil.data.place.REPORT_MAX_PHOTOS
+import com.deungbul.anshimgil.data.place.ReportRepository
+import com.deungbul.anshimgil.data.place.ReportType
+import com.deungbul.anshimgil.data.place.photoForUpload
+import com.deungbul.anshimgil.data.server.ApiException
+import com.deungbul.anshimgil.data.user.UserMode
 
 private val Ink = Color(0xFF17211B)
 private val Muted = Color(0xFF5E6A62)
@@ -204,7 +205,7 @@ fun ReportScreen(
                 error = null
                 scope.launch {
                     try {
-                        ReportRepository.send(t, at, null, mode, memo, photos.toList(), runCatching { com.deungbul.anshimgil.data.WalkSpeedRepository(context).guestId() }.getOrNull())
+                        ReportRepository.send(t, at, null, mode, memo, photos.toList(), runCatching { com.deungbul.anshimgil.data.guide.WalkSpeedRepository(context).guestId() }.getOrNull())
                         // The words of the team's consent text (consent.md 3번): one report already shows on the map.
                         Toast.makeText(context, "신고를 보냈어요. 고마워요! 신고한 곳은 지도에 '신고된 곳'으로 보여요.", Toast.LENGTH_LONG).show()
                         File(context.cacheDir, "report_photos").deleteRecursively()

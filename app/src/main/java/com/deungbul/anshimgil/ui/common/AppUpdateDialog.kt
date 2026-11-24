@@ -11,7 +11,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
-import com.deungbul.anshimgil.data.AppUpdate
+import com.deungbul.anshimgil.data.server.AppUpdate
 
 /**
  * 업데이트 안내 창. Required: no [나중에], and back or a tap outside does not close it, so the old build cannot be used;

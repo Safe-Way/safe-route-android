@@ -13,13 +13,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
-import com.deungbul.anshimgil.data.LatLon
-import com.deungbul.anshimgil.data.Origin
-import com.deungbul.anshimgil.data.OriginIssue
-import com.deungbul.anshimgil.data.chooseOrigin
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
+import com.deungbul.anshimgil.data.guide.Origin
+import com.deungbul.anshimgil.data.guide.OriginIssue
+import com.deungbul.anshimgil.data.guide.chooseOrigin
+import com.deungbul.anshimgil.data.route.LatLon
 
 /*
  * The phone's position. It stays on the phone: it is sent only as a route's origin and never logged (NFR-07).

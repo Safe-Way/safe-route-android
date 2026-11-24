@@ -1,29 +1,16 @@
 package com.deungbul.anshimgil.ui.home
 
-import com.deungbul.anshimgil.data.hereLine
 import com.deungbul.anshimgil.ui.common.AI_BUBBLE_ALPHA
-import com.deungbul.anshimgil.data.busesToShow
-import com.deungbul.anshimgil.data.BusRepository
-import com.deungbul.anshimgil.data.NearbyStop
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.foundation.background
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
-import com.deungbul.anshimgil.data.nextTrainLines
-import com.deungbul.anshimgil.data.matchStation
-import com.deungbul.anshimgil.data.SubwayTrains
 import com.deungbul.anshimgil.ui.safety.SosOverlay
 import com.deungbul.anshimgil.ui.mode.ModeBadge
 import com.deungbul.anshimgil.ui.safety.SosButton
-import com.deungbul.anshimgil.data.Guardian
-import com.deungbul.anshimgil.data.MapLayers
 import androidx.compose.runtime.mutableIntStateOf
-import com.deungbul.anshimgil.data.stationExits
-import com.deungbul.anshimgil.data.FacilityKind
-import com.deungbul.anshimgil.data.meaning
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.IconButton
-import com.deungbul.anshimgil.data.Facility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,13 +41,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberUpdatedState
-import com.deungbul.anshimgil.data.ShownHints
-import com.deungbul.anshimgil.data.MapHintSource
-import com.deungbul.anshimgil.data.MapHint
-import com.deungbul.anshimgil.data.ButtonBox
-import com.deungbul.anshimgil.data.MISS_NEAR_DP
-import com.deungbul.anshimgil.data.MissDetector
-import com.deungbul.anshimgil.data.TAP_MAX_MS
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -68,12 +48,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.positionInRoot
-import com.deungbul.anshimgil.data.nearbyOrder
-import com.deungbul.anshimgil.data.Adaptation
-import com.deungbul.anshimgil.data.Usage
-import com.deungbul.anshimgil.data.TRIP_CONSENT_NO
-import com.deungbul.anshimgil.data.TRIP_CONSENT_YES
-import com.deungbul.anshimgil.data.TRIP_CONSENT_QUESTION
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,16 +61,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.deungbul.anshimgil.data.ApiException
-import com.deungbul.anshimgil.data.Bbox
-import com.deungbul.anshimgil.data.FacilityRepository
-import com.deungbul.anshimgil.data.Place
-import com.deungbul.anshimgil.data.PlaceRepository
-import com.deungbul.anshimgil.data.UserMode
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import com.deungbul.anshimgil.data.LatLon
-import com.deungbul.anshimgil.data.chooseOrigin
 import com.deungbul.anshimgil.location.LOCATION_PERMISSIONS
 import com.deungbul.anshimgil.location.LocationUpdates
 import com.deungbul.anshimgil.location.hasLocationPermission
@@ -109,8 +75,6 @@ import com.deungbul.anshimgil.map.tiltForWalking
 import com.deungbul.anshimgil.location.rememberCompassHeading
 import com.deungbul.anshimgil.map.showLayers
 import com.deungbul.anshimgil.map.showReportSpots
-import com.deungbul.anshimgil.data.ReportSpot
-import com.deungbul.anshimgil.data.RoadReportRepository
 import com.kakao.vectormap.label.Label
 import com.deungbul.anshimgil.ui.common.MapMessage
 import com.deungbul.anshimgil.ui.mode.style
@@ -119,6 +83,48 @@ import com.kakao.vectormap.LatLng
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.kakao.vectormap.camera.CameraUpdateFactory
+import com.deungbul.anshimgil.data.assistant.meaning
+import com.deungbul.anshimgil.data.assistant.whenText
+import com.deungbul.anshimgil.data.guide.chooseOrigin
+import com.deungbul.anshimgil.data.place.Bbox
+import com.deungbul.anshimgil.data.place.Facility
+import com.deungbul.anshimgil.data.place.FacilityKind
+import com.deungbul.anshimgil.data.place.FacilityRepository
+import com.deungbul.anshimgil.data.place.Favorite
+import com.deungbul.anshimgil.data.place.MapLayers
+import com.deungbul.anshimgil.data.place.Place
+import com.deungbul.anshimgil.data.place.PlaceRepository
+import com.deungbul.anshimgil.data.place.ReportSpot
+import com.deungbul.anshimgil.data.place.RoadReportRepository
+import com.deungbul.anshimgil.data.place.stationExits
+import com.deungbul.anshimgil.data.route.BusRepository
+import com.deungbul.anshimgil.data.route.LatLon
+import com.deungbul.anshimgil.data.route.NearbyStop
+import com.deungbul.anshimgil.data.route.SubwayTrains
+import com.deungbul.anshimgil.data.route.busesToShow
+import com.deungbul.anshimgil.data.route.matchStation
+import com.deungbul.anshimgil.data.route.nextTrainLines
+import com.deungbul.anshimgil.data.safety.Guardian
+import com.deungbul.anshimgil.data.safety.TRIP_CONSENT_NO
+import com.deungbul.anshimgil.data.safety.TRIP_CONSENT_QUESTION
+import com.deungbul.anshimgil.data.safety.TRIP_CONSENT_YES
+import com.deungbul.anshimgil.data.server.ApiException
+import com.deungbul.anshimgil.data.user.Adaptation
+import com.deungbul.anshimgil.data.user.ButtonBox
+import com.deungbul.anshimgil.data.user.MISS_NEAR_DP
+import com.deungbul.anshimgil.data.user.MapHint
+import com.deungbul.anshimgil.data.user.MapHintSource
+import com.deungbul.anshimgil.data.user.MissDetector
+import com.deungbul.anshimgil.data.user.SETUP_CONSENT_QUESTION
+import com.deungbul.anshimgil.data.user.SETUP_CONSENT_SPOKEN
+import com.deungbul.anshimgil.data.user.ShownHints
+import com.deungbul.anshimgil.data.user.TAP_MAX_MS
+import com.deungbul.anshimgil.data.user.Usage
+import com.deungbul.anshimgil.data.user.UserMode
+import com.deungbul.anshimgil.data.user.nearbyOrder
+import com.deungbul.anshimgil.data.user.pickAnswerOnServer
+import com.deungbul.anshimgil.data.assistant.withDirection
+import com.deungbul.anshimgil.data.assistant.hereLine
 
 private val Ink = Color(0xFF17211B)
 
@@ -187,7 +193,7 @@ fun HomeScreen(
     setupByVoice: Boolean = false,
     onSetupAnswer: (Int) -> Unit = {},
     /** Saved places with a place set (집, 학교, …): one tap each finds the way there (사용성 점검표 7번). */
-    saved: List<com.deungbul.anshimgil.data.Favorite> = emptyList(),
+    saved: List<com.deungbul.anshimgil.data.place.Favorite> = emptyList(),
     /** 도착 뒤 한마디 (m07): AI 비서's question after arriving and its answers, answered with [onFeedbackAnswer]. */
     feedbackAsk: Pair<String, List<String>>? = null,
     onFeedbackAnswer: (Int) -> Unit = {},
@@ -338,7 +344,7 @@ fun HomeScreen(
         }
         // The phone's words could not tell: the server's AI picks among the buttons (team #152), then as before.
         scope.launch {
-            val byAi = asked?.let { com.deungbul.anshimgil.data.pickAnswerOnServer(it.first, it.second, said) }
+            val byAi = asked?.let { com.deungbul.anshimgil.data.user.pickAnswerOnServer(it.first, it.second, said) }
             if (currentAsk?.first != asked?.first) return@launch
             if (byAi != null) {
                 voiceMisses = 0
@@ -357,7 +363,7 @@ fun HomeScreen(
     LaunchedEffect(setupAsk?.first, listening, listenAgain) {
         val q = setupAsk?.first ?: return@LaunchedEffect
         if (!listening) return@LaunchedEffect
-        val spoken = if (q == com.deungbul.anshimgil.data.SETUP_CONSENT_QUESTION) com.deungbul.anshimgil.data.SETUP_CONSENT_SPOKEN else q
+        val spoken = if (q == com.deungbul.anshimgil.data.user.SETUP_CONSENT_QUESTION) com.deungbul.anshimgil.data.user.SETUP_CONSENT_SPOKEN else q
         val words = if (voiceMisses > 0) "잘 못 알아들었어요. 다시 말해 주세요." else spoken + " " + setupAsk.second.joinToString(", ")
         val main = android.os.Handler(android.os.Looper.getMainLooper())
         setupTts.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
@@ -566,7 +572,7 @@ fun HomeScreen(
             if (savedWithPlace.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 savedWithPlace.forEach { fav ->
                     Surface(
-                        onClick = { onLive(true, "${com.deungbul.anshimgil.data.withDirection(fav.name)} 가기"); onPlaceSelected(fav.place!!.copy(name = fav.name)) },
+                        onClick = { onLive(true, "${com.deungbul.anshimgil.data.assistant.withDirection(fav.name)} 가기"); onPlaceSelected(fav.place!!.copy(name = fav.name)) },
                         shape = RoundedCornerShape(14.dp),
                         color = Color.White,
                         shadowElevation = 4.dp,
@@ -583,7 +589,7 @@ fun HomeScreen(
                                 contentDescription = null, tint = Color(0xFF1F6B42), modifier = Modifier.size(22.dp),
                             )
                             Text(
-                                "${com.deungbul.anshimgil.data.withDirection(fav.name)} 가기",
+                                "${com.deungbul.anshimgil.data.assistant.withDirection(fav.name)} 가기",
                                 fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink, maxLines = 1,
                                 modifier = Modifier.padding(start = 6.dp),
                             )

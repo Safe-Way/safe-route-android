@@ -1,7 +1,8 @@
 package com.deungbul.anshimgil.location
 
-import com.deungbul.anshimgil.data.LatLon
-import com.deungbul.anshimgil.data.distanceMeters
+import com.deungbul.anshimgil.data.place.distanceMeters
+import com.deungbul.anshimgil.data.route.LatLon
+
 
 /**
  * Steadies the phone's position for the map. The phone reports fixes from GPS, Wi-Fi and cell towers

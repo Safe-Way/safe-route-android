@@ -12,7 +12,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import com.deungbul.anshimgil.data.Guardian
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -59,11 +58,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.deungbul.anshimgil.data.AppSettings
-import com.deungbul.anshimgil.data.TextSize
-import com.deungbul.anshimgil.data.UserMode
-import com.deungbul.anshimgil.data.optionalMapItems
 import com.deungbul.anshimgil.ui.mode.style
+import com.deungbul.anshimgil.data.place.optionalMapItems
+import com.deungbul.anshimgil.data.safety.Guardian
+import com.deungbul.anshimgil.data.user.AppSettings
+import com.deungbul.anshimgil.data.user.TextSize
+import com.deungbul.anshimgil.data.user.UserMode
 
 private val Ink = Color(0xFF17211B)
 private val Muted = Color(0xFF4A564E)

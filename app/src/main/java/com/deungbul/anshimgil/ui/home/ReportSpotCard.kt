@@ -18,9 +18,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.deungbul.anshimgil.data.ReportSpot
-import com.deungbul.anshimgil.data.reportSpotTitle
-import com.deungbul.anshimgil.data.reportSpotUntil
+import com.deungbul.anshimgil.data.place.ReportSpot
+import com.deungbul.anshimgil.data.place.reportSpotTitle
+import com.deungbul.anshimgil.data.place.reportSpotUntil
 
 /** A tapped 신고된 곳: what, how many, how recent, the newest note, and until when it shows (결정 57). */
 @Composable

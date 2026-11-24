@@ -1,8 +1,5 @@
 package com.deungbul.anshimgil.ui.search
 
-import com.deungbul.anshimgil.data.isBusResult
-import com.deungbul.anshimgil.data.hereLine
-import com.deungbul.anshimgil.data.mergedSearch
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
 import androidx.compose.foundation.background
@@ -65,15 +62,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.deungbul.anshimgil.data.ApiException
-import com.deungbul.anshimgil.data.Favorite
-import com.deungbul.anshimgil.data.Place
-import com.deungbul.anshimgil.data.PlaceRepository
-import com.deungbul.anshimgil.data.SavedPlacesRepository
-import com.deungbul.anshimgil.data.LatLon
 import com.deungbul.anshimgil.location.phoneOrigin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.deungbul.anshimgil.data.assistant.hereLine
+import com.deungbul.anshimgil.data.place.Favorite
+import com.deungbul.anshimgil.data.place.Place
+import com.deungbul.anshimgil.data.place.PlaceRepository
+import com.deungbul.anshimgil.data.place.SavedPlacesRepository
+import com.deungbul.anshimgil.data.place.isBusResult
+import com.deungbul.anshimgil.data.place.mergedSearch
+import com.deungbul.anshimgil.data.route.LatLon
+import com.deungbul.anshimgil.data.server.ApiException
 
 private val Ink = Color(0xFF17211B)
 private val Muted = Color(0xFF4A564E)

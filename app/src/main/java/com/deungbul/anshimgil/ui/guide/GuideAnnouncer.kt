@@ -1,7 +1,8 @@
 package com.deungbul.anshimgil.ui.guide
 
-import com.deungbul.anshimgil.data.Guidance
-import com.deungbul.anshimgil.data.LatLon
+import com.deungbul.anshimgil.data.guide.Guidance
+import com.deungbul.anshimgil.data.route.LatLon
+
 
 /*
  * 화면이 꺼져도 길안내 (11/13, 팀 요청 3번): the guidance service follows the walker with the same reading as the
