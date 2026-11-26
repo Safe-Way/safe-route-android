@@ -67,7 +67,7 @@ jobs:
 
       - name: 앱 코드로 읽어 보기
         id: test
-        run: ./gradlew --no-daemon testDebugUnitTest --tests 'com.deungbul.anshimgil.data.ServerContractTest'
+        run: ./gradlew --no-daemon testDebugUnitTest --tests 'com.deungbul.anshimgil.data.server.ServerContractTest'
 
       - name: 받은 응답·시험 결과 남기기 (실패했을 때)
         if: failure()
