@@ -500,12 +500,15 @@ class ServerAppAssistant(
         )
         // The phone's reading of a trip with a start or stops, else the phone's own assistant.
         suspend fun fallback() = if (rule is AssistantAction.GoTrip) rule else local.reply(history, context)
+        // When the server itself fails (no network, too slow, AI busy 503, too many asks 429), its map window
+        // would most likely fail the same way, so the phone's word rules answer at once: no second wait, and the
+        // server counts the AI windows together in one limit (safe-route #333).
         val json = try {
             post("/api/assistant", body)
         } catch (e: ApiException) {
-            return fallback()
+            return rule
         } catch (e: IOException) {
-            return fallback()
+            return rule
         }
         val reply = parseServerAssistantReply(json) ?: return fallback()
         // A trip with a start or places on the way that the server did not plan (before 채림 #237 was deployed it
