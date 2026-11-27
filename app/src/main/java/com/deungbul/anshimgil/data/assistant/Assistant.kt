@@ -647,7 +647,8 @@ internal fun assistantStops(json: JSONObject): List<StopPlace> {
 /**
  * The map assistant through the server's window `POST /api/ai/map-chat` (진행표 12, server #119), which picks the
  * action in a fixed shape with the server's Gemini key; anything unusable (503 AI_UNAVAILABLE) falls back to the rules.
- * Only the words and the settings go, never the position or the guest number.
+ * Only the words and the settings go in the body, never the position; the guest number and token ride in the
+ * headers only so the server can count its AI limit per phone ([ServerApi.guest]).
  */
 class MapChatAssistant(private val fallback: AppAssistant) : AppAssistant {
     override suspend fun reply(history: List<ChatLine>, context: AssistantContext): AssistantAction {

@@ -20,6 +20,13 @@ object ServerApi {
     val baseUrl: String = BuildConfig.SERVER_BASE_URL.trimEnd('/')
     val isConfigured: Boolean get() = baseUrl.isNotBlank()
 
+    /**
+     * This phone's guest number and token, set once when the app starts. They go as headers with the AI
+     * requests only ([guestHeadersFor]) so the server counts its AI limit per phone, not per Wi-Fi (safe-route #333).
+     */
+    @Volatile
+    var guest: (suspend () -> Pair<String, String>)? = null
+
     suspend fun get(
         path: String,
         query: Map<String, Any?> = emptyMap(),
@@ -85,12 +92,15 @@ object ServerApi {
         readTimeoutMs: Int = 10_000,
     ): JSONObject =
         withContext(Dispatchers.IO) {
+            val who = if (isAiPath(path)) runCatching { guest?.invoke() }.getOrNull() else null
+            val headers = guestHeadersFor(path, who?.first, who?.second)
             val connection = try {
                 (URL(baseUrl + path).openConnection() as HttpURLConnection).apply {
                     requestMethod = method
                     connectTimeout = connectTimeoutMs
                     readTimeout = readTimeoutMs
                     setRequestProperty("Accept", "application/json")
+                    headers.forEach { (name, value) -> setRequestProperty(name, value) }
                     if (body != null) {
                         doOutput = true
                         setRequestProperty("Content-Type", "application/json; charset=utf-8")
@@ -128,6 +138,21 @@ object ServerApi {
         return if (parts.isEmpty()) "" else "?" + parts.joinToString("&")
     }
 }
+
+/** The AI windows the server counts in one limit: the assistant and everything under /api/ai/. */
+internal fun isAiPath(path: String): Boolean =
+    path.substringBefore('?').let { it == "/api/assistant" || it.startsWith("/api/ai/") }
+
+/**
+ * `X-Guest-Id` and `X-Guest-Token` for an AI request, both or neither: the server ties the first token it sees to
+ * the guest number, and once it checks tokens a number without one is refused. Nothing for other requests.
+ */
+internal fun guestHeadersFor(path: String, guestId: String?, token: String?): Map<String, String> =
+    if (isAiPath(path) && !guestId.isNullOrBlank() && !token.isNullOrBlank()) {
+        mapOf("X-Guest-Id" to guestId, "X-Guest-Token" to token)
+    } else {
+        emptyMap()
+    }
 
 /** In words anyone knows (사용성 점검표 19번): no "서버", and what to check. */
 const val NETWORK_MESSAGE = "인터넷이 안 돼요. 와이파이나 데이터가 켜져 있는지 보고 다시 해 주세요."

@@ -111,6 +111,7 @@ class WalkMeter {
 class WalkSpeedRepository(private val context: Context) {
     private fun key(mode: UserMode) = stringPreferencesKey("walk_samples_${mode.key}")
     private val guestKey = stringPreferencesKey("guest_id")
+    private val tokenKey = stringPreferencesKey("guest_token")
     // Walks not yet accepted by the server, one "mode|sample" per line; sent again later.
     private val pendingKey = stringPreferencesKey("walk_samples_pending")
 
@@ -162,6 +163,23 @@ class WalkSpeedRepository(private val context: Context) {
         context.settingsDataStore.edit { it[guestKey] = id }
         return id
     }
+
+    /**
+     * A random secret made once on this phone and kept with the guest id. The server remembers the first token
+     * it gets for the id, so only this phone can use that id once the server checks tokens (safe-route #333).
+     */
+    suspend fun guestToken(): String {
+        context.settingsDataStore.data.first()[tokenKey]?.let { return it }
+        val token = newGuestToken()
+        context.settingsDataStore.edit { prefs -> prefs[tokenKey]?.let { return@edit }; prefs[tokenKey] = token }
+        return context.settingsDataStore.data.first()[tokenKey] ?: token
+    }
+}
+
+/** 32 random bytes from a secure source, as 64 hex characters. */
+internal fun newGuestToken(): String {
+    val bytes = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+    return bytes.joinToString("") { "%02x".format(it) }
 }
 
 /** Straight-line meters between two points, unrounded. */
