@@ -180,6 +180,7 @@ class MainActivity : ComponentActivity() {
         val facilityRepository = FacilityRepository.create()
         val settingsRepository = SettingsRepository(applicationContext)
         val walkSpeedRepository = WalkSpeedRepository(applicationContext)
+        ServerApi.guest = { walkSpeedRepository.guestId() to walkSpeedRepository.guestToken() }
         val routeRepository = RouteRepository.create(guestId = { walkSpeedRepository.guestId() })
         val tripLog = TripLogRepository(applicationContext, guestId = { walkSpeedRepository.guestId() })
         val myInfoRepository = com.deungbul.anshimgil.data.user.MyInfoRepository(guestId = { walkSpeedRepository.guestId() })
